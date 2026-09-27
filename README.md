@@ -83,4 +83,4 @@ The current German Engine source was migrated from `mbkurt06/german-language-eng
 
 The Chrome extension was migrated from `mbkurt06/german-language-extension` into `apps/extension`.
 
-The target architecture is one product repository: clients call Platform API rather than language engines directly.
+The target architecture is one product repository: clients call Platform API rather than language engines directly. Chrome learning items are now stored through Platform API in PostgreSQL; `chrome.storage.sync` is retained only for lightweight client configuration/identity and one-time migration metadata.
