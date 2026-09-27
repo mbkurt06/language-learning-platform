@@ -248,18 +248,26 @@
       .trim();
   }
 
-  async function renderSentenceTranslation(node,text,translationText=text){
+  function applySentenceTranslation(node,text,data){
     node.querySelector(".gle-subtitle-translation")?.remove();
     if(!state.settings.showSentenceTranslation) return;
+    if(!data?.sentence_meaning_tr || node.dataset.gleText!==text) return;
+    const translation=cleanTranslationText(data.sentence_meaning_tr);
+    if(!translation) return;
+    const line=document.createElement("span");
+    line.className="gle-subtitle-translation";
+    line.textContent=translation;
+    node.appendChild(line);
+  }
+
+  async function renderSentenceTranslation(node,text,translationText=text){
+    if(!state.settings.showSentenceTranslation) {
+      node.querySelector(".gle-subtitle-translation")?.remove();
+      return;
+    }
     try{
       const data=await analyze(translationText);
-      if(!data.sentence_meaning_tr || node.dataset.gleText!==text) return;
-      const translation=cleanTranslationText(data.sentence_meaning_tr);
-      if(!translation) return;
-      const line=document.createElement("span");
-      line.className="gle-subtitle-translation";
-      line.textContent=translation;
-      node.appendChild(line);
+      applySentenceTranslation(node,text,data);
     }catch(_error){}
   }
 
@@ -379,6 +387,15 @@
     if(node.dataset.gleText===text) return;
     node.dataset.gleText=text;
     renderFallbackTokens(node,text);
+
+    const translationPromise=state.settings.showSentenceTranslation
+      ? analyze(translationText).catch(()=>null)
+      : Promise.resolve(null);
+
+    translationPromise.then(data=>{
+      if(data) applySentenceTranslation(node,text,data);
+    });
+
     try{
       const [data,hoverData]=await Promise.all([
         analyze(text),
@@ -386,7 +403,9 @@
       ]);
       if(node.dataset.gleText!==text) return;
       renderAnalyzedTokens(node,text,data,hoverData||data);
-      await renderSentenceTranslation(node,text,translationText);
+
+      const translationData=await translationPromise;
+      if(translationData) applySentenceTranslation(node,text,translationData);
     }catch(_error){}
   }
 
