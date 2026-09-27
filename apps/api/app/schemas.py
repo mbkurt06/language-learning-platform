@@ -4,11 +4,18 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-class AnalyzeAndMatchRequest(BaseModel):
-    profile_id: UUID
+class AnalyzeRequest(BaseModel):
     source_language: str = Field(min_length=2, max_length=16)
     target_language: str = Field(min_length=2, max_length=16)
     text: str = Field(min_length=1)
+
+
+class AnalyzeResponse(BaseModel):
+    analysis: dict[str, Any]
+
+
+class AnalyzeAndMatchRequest(AnalyzeRequest):
+    profile_id: UUID
 
 
 class AnalyzeAndMatchResponse(BaseModel):
