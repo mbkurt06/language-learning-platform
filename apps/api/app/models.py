@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
@@ -96,8 +96,8 @@ class ExampleSentence(Base):
         ForeignKey("example_sources.id", ondelete="CASCADE"), index=True
     )
     sentence: Mapped[str] = mapped_column(Text)
-    start_ms: Mapped[int] = mapped_column()
-    end_ms: Mapped[int] = mapped_column()
+    start_ms: Mapped[int] = mapped_column(BigInteger)
+    end_ms: Mapped[int] = mapped_column(BigInteger)
     quality: Mapped[str] = mapped_column(String(32), default="transcript")
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
 
