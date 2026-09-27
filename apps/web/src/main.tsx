@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
 
@@ -59,12 +59,210 @@ function youtubeWatchUrl(encounter: Encounter) {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(source.external_id)}&t=${t}s`;
 }
 
-function youtubeEmbedUrl(encounter: Encounter) {
+type YTPlayer = {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  getCurrentTime: () => number;
+  setOption?: (module: string, option: string, value: unknown) => void;
+  destroy: () => void;
+};
+
+type YTPlayerEvent = { target: YTPlayer };
+type YTStateEvent = { data: number; target: YTPlayer };
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        element: HTMLElement,
+        options: {
+          videoId: string;
+          playerVars: Record<string, number | string>;
+          events: {
+            onReady: (event: YTPlayerEvent) => void;
+            onStateChange: (event: YTStateEvent) => void;
+          };
+        },
+      ) => YTPlayer;
+      PlayerState: {
+        PLAYING: number;
+        PAUSED: number;
+        ENDED: number;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApiPromise: Promise<void> | null = null;
+
+function loadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (youtubeApiPromise) return youtubeApiPromise;
+
+  youtubeApiPromise = new Promise<void>((resolve) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolve();
+    };
+
+    if (!document.getElementById("youtube-iframe-api")) {
+      const script = document.createElement("script");
+      script.id = "youtube-iframe-api";
+      script.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(script);
+    }
+  });
+
+  return youtubeApiPromise;
+}
+
+function segmentClock(milliseconds: number) {
+  const safe = Math.max(0, milliseconds);
+  const totalSeconds = safe / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds - minutes * 60;
+  return `${minutes}:${secs.toFixed(1).padStart(4, "0")}`;
+}
+
+function SentencePlayer({ encounter }: { encounter: Encounter }) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
+  const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [positionMs, setPositionMs] = useState(0);
+
   const source = encounter.source;
+  const startMs = Math.max(0, encounter.media_timestamp_ms || 0);
+  const rawEndMs = encounter.media_end_timestamp_ms || startMs + 5000;
+  const endMs = Math.max(startMs + 500, rawEndMs);
+  const durationMs = endMs - startMs;
+  const freezeAtMs = Math.max(startMs, endMs - 120);
+
+  useEffect(() => {
+    if (!mountRef.current || !source || source.provider !== "youtube") return;
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    loadYouTubeApi().then(() => {
+      if (cancelled || !mountRef.current || !window.YT) return;
+
+      const player = new window.YT.Player(mountRef.current, {
+        videoId: source.external_id,
+        playerVars: {
+          controls: 0,
+          cc_load_policy: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          playsinline: 1,
+          rel: 0,
+          start: Math.floor(startMs / 1000),
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => {
+            playerRef.current = event.target;
+            // The review player must show the exact subtitle sentence saved by
+            // the extension, not YouTube's own captions. YouTube captions can
+            // differ from the extension transcript for the same audio moment.
+            event.target.setOption?.("captions", "track", {});
+            event.target.seekTo(startMs / 1000, true);
+            setPositionMs(0);
+            setReady(true);
+            event.target.playVideo();
+          },
+          onStateChange: (event) => {
+            if (!window.YT) return;
+            setPlaying(event.data === window.YT.PlayerState.PLAYING);
+          },
+        },
+      });
+
+      timer = window.setInterval(() => {
+        const active = playerRef.current;
+        if (!active) return;
+        const absoluteMs = active.getCurrentTime() * 1000;
+
+        if (absoluteMs >= freezeAtMs) {
+          active.seekTo(freezeAtMs / 1000, true);
+          active.pauseVideo();
+          setPlaying(false);
+          setPositionMs(durationMs);
+          return;
+        }
+
+        if (absoluteMs < startMs - 100) {
+          active.seekTo(startMs / 1000, true);
+          setPositionMs(0);
+          return;
+        }
+
+        setPositionMs(Math.min(durationMs, Math.max(0, absoluteMs - startMs)));
+      }, 80);
+    });
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearInterval(timer);
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
+  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs]);
+
+  function seek(relativeMs: number) {
+    const next = Math.min(durationMs, Math.max(0, relativeMs));
+    const absolute = Math.min(freezeAtMs, startMs + next);
+    playerRef.current?.seekTo(absolute / 1000, true);
+    setPositionMs(next);
+  }
+
+  function togglePlayback() {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (playing) {
+      player.pauseVideo();
+      return;
+    }
+
+    if (positionMs >= durationMs - 150) {
+      player.seekTo(startMs / 1000, true);
+      setPositionMs(0);
+    }
+    player.playVideo();
+  }
+
   if (!source || source.provider !== "youtube") return null;
-  const start = seconds(encounter.media_timestamp_ms);
-  const end = Math.max(start + 1, Math.ceil((encounter.media_end_timestamp_ms || 0) / 1000));
-  return `https://www.youtube.com/embed/${encodeURIComponent(source.external_id)}?start=${start}&end=${end}&autoplay=1&rel=0`;
+
+  return <div className="sentence-player">
+    <div className="video-stage">
+      <div ref={mountRef} className="youtube-mount" />
+      <div className="sentence-overlay">{encounter.sentence}</div>
+    </div>
+    <div className="segment-controls">
+      <button onClick={() => seek(positionMs - 1000)} disabled={!ready} title="1 saniye geri">−1s</button>
+      <button className="play-toggle" onClick={togglePlayback} disabled={!ready}>
+        {playing ? "❚❚" : positionMs >= durationMs - 150 ? "↻" : "▶"}
+      </button>
+      <button onClick={() => seek(positionMs + 1000)} disabled={!ready} title="1 saniye ileri">+1s</button>
+      <span className="segment-time">{segmentClock(positionMs)} / {segmentClock(durationMs)}</span>
+      <input
+        className="segment-slider"
+        type="range"
+        min="0"
+        max={durationMs}
+        step="50"
+        value={Math.min(positionMs, durationMs)}
+        onChange={event => seek(Number(event.target.value))}
+        disabled={!ready}
+        aria-label="Cümle içinde ileri geri sar"
+      />
+    </div>
+  </div>;
 }
 
 function App() {
@@ -236,7 +434,7 @@ function App() {
               ? <p className="no-encounter">Bu öğe eski kayıtlardan geldi; henüz kaynak cümlesi yok.</p>
               : <div className="encounters">
                 {item.encounters.map(encounter => {
-                  const embed = youtubeEmbedUrl(encounter);
+                  const isYouTube = encounter.source?.provider === "youtube";
                   const isPlaying = playingEncounter === encounter.id;
                   return <div className="encounter" key={encounter.id}>
                     <div className="source-row">
@@ -246,19 +444,12 @@ function App() {
                     </div>
                     <blockquote>{encounter.sentence}</blockquote>
                     <div className="actions">
-                      {embed && <button className="primary" onClick={() => setPlayingEncounter(isPlaying ? null : encounter.id)}>
+                      {isYouTube && <button className="primary" onClick={() => setPlayingEncounter(isPlaying ? null : encounter.id)}>
                         {isPlaying ? "Durdur" : "▶ Cümleyi dinle"}
                       </button>}
                       {encounter.source?.url && <a href={youtubeWatchUrl(encounter)} target="_blank" rel="noreferrer">Videoda aç ↗</a>}
                     </div>
-                    {isPlaying && embed && <div className="player-wrap">
-                      <iframe
-                        src={embed}
-                        title={`${item.canonical_form} cümle tekrarı`}
-                        allow="autoplay; encrypted-media; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>}
+                    {isPlaying && isYouTube && <SentencePlayer encounter={encounter} />}
                   </div>;
                 })}
               </div>}
