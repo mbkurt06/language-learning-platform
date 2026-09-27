@@ -1,0 +1,267 @@
+- id: idiom.in_kauf_nehmen
+  canonical: "etwas in Kauf nehmen"
+  type: IDIOM
+  head_lemma: nehmen
+  priority: 95
+  meaning_tr: ["bir şeyi göze almak", "bir şeyi kabullenmek"]
+  cefr: B2
+  slots:
+    - {id: kauf, type: LEMMA, lemma: Kauf}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: nvv.entscheidung_treffen
+  canonical: "eine Entscheidung treffen"
+  type: NOMEN_VERB
+  head_lemma: treffen
+  priority: 85
+  meaning_tr: ["karar vermek"]
+  cefr: B1
+  slots:
+    - {id: entscheidung, type: LEMMA, lemma: Entscheidung}
+
+- id: nvv.ruecksicht_nehmen
+  canonical: "auf jemanden/etwas Rücksicht nehmen"
+  type: NOMEN_VERB
+  head_lemma: nehmen
+  priority: 90
+  meaning_tr: ["birini/bir şeyi dikkate almak", "göz önünde bulundurmak"]
+  grammar_hint: "auf + Akk."
+  cefr: B2
+  slots:
+    - {id: ruecksicht, type: LEMMA, lemma: Rücksicht}
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: reflexiv.interessieren_fuer
+  canonical: "sich für jemanden/etwas interessieren"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: interessieren
+  priority: 90
+  meaning_tr: ["biriyle/bir şeyle ilgilenmek"]
+  grammar_hint: "reflexiv · für + Akk."
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: fuer, type: PREPOSITION, prep: für, case: [Acc]}
+
+- id: vp.abhaengen_von
+  canonical: "von jemandem/etwas abhängen"
+  type: VERB_PREPOSITION
+  head_lemma: abhängen
+  priority: 85
+  meaning_tr: ["birine/bir şeye bağlı olmak"]
+  grammar_hint: "von + Dat. · trennbar"
+  cefr: B1
+  slots:
+    - {id: von, type: PREPOSITION, prep: von, case: [Dat]}
+
+- id: nvv.angst_haben_vor
+  canonical: "Angst vor jemandem/etwas haben"
+  type: NOMEN_VERB
+  head_lemma: haben
+  priority: 85
+  meaning_tr: ["birinden/bir şeyden korkmak"]
+  cefr: A2
+  slots:
+    - {id: angst, type: LEMMA, lemma: Angst}
+    - {id: vor, type: PREPOSITION, prep: vor, case: [Dat]}
+
+- id: fvg.verfuegung_stehen
+  canonical: "jemandem zur Verfügung stehen"
+  type: FUNCTION_VERB
+  head_lemma: stehen
+  priority: 90
+  meaning_tr: ["birinin kullanımına hazır olmak", "birinin hizmetinde olmak"]
+  cefr: B2
+  slots:
+    - {id: verfuegung, type: LEMMA, lemma: Verfügung}
+    - {id: zu, type: PREPOSITION, prep: zu}
+
+- id: fvg.betracht_kommen
+  canonical: "in Betracht kommen"
+  type: FUNCTION_VERB
+  head_lemma: kommen
+  priority: 90
+  meaning_tr: ["söz konusu olmak", "değerlendirmeye alınabilecek olmak"]
+  cefr: B2
+  slots:
+    - {id: betracht, type: LEMMA, lemma: Betracht}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: fixed.ausgehen_davon_dass
+  canonical: "davon ausgehen, dass ..."
+  type: FIXED_CONSTRUCTION
+  head_lemma: ausgehen
+  priority: 95
+  meaning_tr: ["... olduğunu varsaymak", "... olduğunu kabul etmek"]
+  cefr: B2
+  slots:
+    - {id: davon, type: PRONOMINAL_ADVERB, prep: von}
+    - {id: clause, type: CLAUSE}
+
+- id: fixed.es_handelt_sich_um
+  canonical: "es handelt sich um jemanden/etwas"
+  type: FIXED_CONSTRUCTION
+  head_lemma: handeln
+  priority: 95
+  meaning_tr: ["söz konusu olan ...", "... ile ilgili olmak"]
+  cefr: B1
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: um, type: PREPOSITION, prep: um, case: [Acc]}
+
+- id: vp.warten_auf
+  canonical: "auf jemanden/etwas warten"
+  type: VERB_PREPOSITION
+  head_lemma: warten
+  priority: 80
+  meaning_tr: ["birini/bir şeyi beklemek"]
+  grammar_hint: "auf + Akk."
+  cefr: A1
+  slots:
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: reflexiv.erinnern_an
+  canonical: "sich an jemanden/etwas erinnern"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: erinnern
+  priority: 90
+  meaning_tr: ["birini/bir şeyi hatırlamak"]
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: an, type: PREPOSITION, prep: an, case: [Acc]}
+
+- id: reflexiv.beschaeftigen_mit
+  canonical: "sich mit jemandem/etwas beschäftigen"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: beschäftigen
+  priority: 90
+  meaning_tr: ["biriyle/bir şeyle ilgilenmek", "bir şey üzerinde çalışmak"]
+  cefr: B1
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: mit, type: PREPOSITION, prep: mit, case: [Dat]}
+
+- id: reflexiv.kuemmern_um
+  canonical: "sich um jemanden/etwas kümmern"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: kümmern
+  priority: 90
+  meaning_tr: ["biriyle/bir şeyle ilgilenmek", "birinin/bir şeyin bakımını üstlenmek"]
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: um, type: PREPOSITION, prep: um, case: [Acc]}
+
+- id: fvg.rolle_spielen
+  canonical: "eine Rolle spielen"
+  type: FUNCTION_VERB
+  head_lemma: spielen
+  priority: 85
+  meaning_tr: ["rol oynamak", "önem taşımak"]
+  cefr: B1
+  slots:
+    - {id: rolle, type: LEMMA, lemma: Rolle}
+
+- id: nvv.massnahmen_ergreifen
+  canonical: "Maßnahmen ergreifen"
+  type: NOMEN_VERB
+  head_lemma: ergreifen
+  priority: 85
+  meaning_tr: ["önlem almak", "tedbir almak"]
+  cefr: B2
+  slots:
+    - {id: massnahme, type: LEMMA, lemma: Maßnahme, alternatives: [Maßnahmen]}
+
+- id: fvg.zur_verfuegung_stellen
+  canonical: "jemandem etwas zur Verfügung stellen"
+  type: FUNCTION_VERB
+  head_lemma: stellen
+  priority: 90
+  meaning_tr: ["bir şeyi birinin kullanımına sunmak"]
+  cefr: B2
+  slots:
+    - {id: verfuegung, type: LEMMA, lemma: Verfügung}
+    - {id: zu, type: PREPOSITION, prep: zu}
+
+- id: nvv.wert_legen_auf
+  canonical: "Wert auf jemanden/etwas legen"
+  type: NOMEN_VERB
+  head_lemma: legen
+  priority: 90
+  meaning_tr: ["birine/bir şeye önem vermek"]
+  cefr: B2
+  slots:
+    - {id: wert, type: LEMMA, lemma: Wert}
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+
+- id: nvv.gefallen_tun
+  canonical: "jemandem einen Gefallen tun"
+  type: NOMEN_VERB
+  head_lemma: tun
+  priority: 92
+  meaning_tr: ["birine iyilik yapmak", "birinin işine yarayacak bir şey yapmak"]
+  grammar_hint: "+ Dat. · tun → getan"
+  cefr: B1
+  slots:
+    - {id: recipient, type: OBJECT, case: [Dat]}
+    - {id: gefallen, type: LEMMA, lemma: Gefallen}
+
+
+- id: reflexiv.vertun
+  canonical: "sich vertun"
+  type: REFLEXIVE_VERB
+  head_lemma: vertun
+  priority: 92
+  meaning_tr: ["yanılmak", "hata yapmak"]
+  grammar_hint: "reflexiv · sich + vertun"
+  cefr: B1
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+
+- id: vp.verschieben_auf
+  canonical: "etwas auf einen Zeitpunkt/Termin verschieben"
+  type: VERB_PREPOSITION
+  head_lemma: verschieben
+  priority: 88
+  meaning_tr: ["bir şeyi başka bir zamana/tarihe ertelemek", "bir şeyi ... tarihine kaydırmak"]
+  grammar_hint: "auf + Akk."
+  cefr: B1
+  slots:
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: verb.aufschieben
+  canonical: "etwas aufschieben"
+  type: COLLOCATION
+  head_lemma: aufschieben
+  priority: 86
+  meaning_tr: ["bir şeyi ertelemek", "sonraya bırakmak"]
+  grammar_hint: "trennbar · schiebt ... auf"
+  cefr: B1
+  slots:
+    - {id: auf, type: PARTICLE, lemma: auf}
+
+
+- id: vp.sprechen_ueber
+  canonical: "über jemanden/etwas sprechen"
+  type: VERB_PREPOSITION
+  head_lemma: sprechen
+  priority: 88
+  meaning_tr: ["biri/bir şey hakkında konuşmak"]
+  grammar_hint: "über + Akk."
+  cefr: A2
+  slots:
+    - {id: ueber, type: PREPOSITION, prep: über, case: [Acc]}
+
+- id: reflexiv.bedanken_bei
+  canonical: "sich bei jemandem bedanken"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: bedanken
+  priority: 92
+  meaning_tr: ["birine teşekkür etmek"]
+  grammar_hint: "reflexiv · bei + Dat."
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: bei, type: PREPOSITION, prep: bei, case: [Dat]}
