@@ -38,6 +38,7 @@ app = FastAPI(title="Language Learning Platform API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
+    allow_origin_regex=get_settings().cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
