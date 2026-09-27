@@ -19,6 +19,9 @@
 - [ ] viewport-aware web text adapter
 - [ ] learned-item highlighting on arbitrary pages
 - [ ] hover analysis via Platform API
+- [ ] streaming-site adapter contract for browser players
+- [ ] Netflix browser overlay prototype
+- [ ] generic streaming subtitle adapter fallback
 - [ ] encounter deduplication/rate limiting
 
 ## Platform-03 — media provider layer
@@ -26,6 +29,8 @@
 - [ ] ZDF adapter
 - [ ] ARD adapter
 - [ ] ARTE adapter
+- [ ] Netflix browser adapter
+- [ ] generic streaming provider adapter
 - [ ] provider-specific subtitle/playback capability checks
 - [ ] web media search/player
 
