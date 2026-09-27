@@ -1,0 +1,5 @@
+- name: Bootstrap platform host
+  hosts: platform
+  become: true
+  roles:
+    - docker_host

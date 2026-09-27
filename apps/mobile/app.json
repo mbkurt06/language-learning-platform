@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Language Learning",
+    "slug": "language-learning",
+    "scheme": "languagelearning",
+    "plugins": ["expo-router"],
+    "experiments": {"typedRoutes": true}
+  }
+}
