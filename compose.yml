@@ -51,6 +51,7 @@ services:
       LANGUAGE_ENGINE_URLS: '${LANGUAGE_ENGINE_URLS:-{"de":"http://german-engine:8765"}}'
       TRANSLATION_URL: ${TRANSLATION_URL:-http://translation:5000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
+      CORS_ORIGIN_REGEX: '${CORS_ORIGIN_REGEX:-^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$}'
     ports:
       - "8000:8000"
     depends_on:
