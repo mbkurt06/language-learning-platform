@@ -20,6 +20,20 @@ jobs:
       - run: pytest -q
       - run: ruff check app tests
 
+  german-engine:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/german-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: ruff check src tests
+
   web:
     runs-on: ubuntu-latest
     defaults:
@@ -51,6 +65,12 @@ jobs:
           node --check src/youtube-bridge.js
       - name: Unit tests
         run: node --test tests/*.test.js
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config
 
   terraform:
     runs-on: ubuntu-latest
