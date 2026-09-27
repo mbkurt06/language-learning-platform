@@ -86,6 +86,40 @@ def example_index_targets():
     return {"targets": EXAMPLE_INDEX_TARGETS}
 
 
+def contextual_example_window(cues, target_index: int, min_ms: int = 5000, max_ms: int = 10000):
+    left = target_index
+    right = target_index
+
+    while True:
+        start_ms = cues[left].start_ms
+        end_ms = cues[right].end_ms
+        if end_ms - start_ms >= min_ms:
+            break
+
+        options = []
+        if left > 0:
+            span = cues[right].end_ms - cues[left - 1].start_ms
+            if span <= max_ms:
+                options.append((span, left - 1, right))
+        if right + 1 < len(cues):
+            span = cues[right + 1].end_ms - cues[left].start_ms
+            if span <= max_ms:
+                options.append((span, left, right + 1))
+
+        if not options:
+            break
+
+        _, left, right = min(options, key=lambda item: item[0])
+
+    selected = cues[left:right + 1]
+    text = " ".join(cue.text.strip() for cue in selected if cue.text.strip())
+    return {
+        "text": " ".join(text.split()),
+        "start_ms": selected[0].start_ms,
+        "end_ms": selected[-1].end_ms,
+    }
+
+
 @app.post("/api/v1/example-corpus/index-cues")
 def index_example_cues(payload: ExampleCorpusIndexRequest, db: DbSession):
     target_lemmas = {lemma.lower() for lemma in payload.target_lemmas}
@@ -118,8 +152,12 @@ def index_example_cues(payload: ExampleCorpusIndexRequest, db: DbSession):
         # lexical prefix. This keeps us from calling the language engine on
         # every subtitle cue in a long video.
         prefix = lemma[:4]
-        candidate_cues = [cue for cue in payload.cues if prefix in cue.text.lower()]
-        for cue in candidate_cues:
+        candidate_indexes = [
+            index for index, cue in enumerate(payload.cues)
+            if prefix in cue.text.lower()
+        ]
+        for cue_index in candidate_indexes:
+            cue = payload.cues[cue_index]
             try:
                 analysis = analyze_text(payload.language, cue.text)
             except Exception:
@@ -135,39 +173,56 @@ def index_example_cues(payload: ExampleCorpusIndexRequest, db: DbSession):
             if token is None:
                 continue
 
+            window = contextual_example_window(payload.cues, cue_index)
+
+            existing_sentences = db.scalars(
+                select(ExampleSentence).where(ExampleSentence.source_id == source.id)
+            ).all()
+            for existing_sentence in existing_sentences:
+                existing_matches = db.scalars(
+                    select(ExampleLexemeMatch).where(
+                        ExampleLexemeMatch.example_sentence_id == existing_sentence.id,
+                        ExampleLexemeMatch.lemma == lemma,
+                    )
+                ).all()
+                for existing_match in existing_matches:
+                    db.delete(existing_match)
+
             sentence = db.scalar(select(ExampleSentence).where(
                 ExampleSentence.source_id == source.id,
-                ExampleSentence.start_ms == cue.start_ms,
-                ExampleSentence.end_ms == cue.end_ms,
+                ExampleSentence.start_ms == window["start_ms"],
+                ExampleSentence.end_ms == window["end_ms"],
             ))
             if sentence is None:
                 sentence = ExampleSentence(
                     source_id=source.id,
-                    sentence=cue.text,
-                    start_ms=cue.start_ms,
-                    end_ms=cue.end_ms,
-                    quality="youtube-json3",
-                    metadata_json={"indexed_by": "browser-extension"},
+                    sentence=window["text"],
+                    start_ms=window["start_ms"],
+                    end_ms=window["end_ms"],
+                    quality="youtube-json3-context",
+                    metadata_json={"indexed_by": "browser-extension", "target_cue_index": cue_index},
                 )
                 db.add(sentence)
                 db.flush()
+            else:
+                sentence.sentence = window["text"]
+                sentence.quality = "youtube-json3-context"
+                sentence.metadata_json = {
+                    "indexed_by": "browser-extension",
+                    "target_cue_index": cue_index,
+                }
 
-            match = db.scalar(select(ExampleLexemeMatch).where(
-                ExampleLexemeMatch.example_sentence_id == sentence.id,
-                ExampleLexemeMatch.lemma == lemma,
+            db.add(ExampleLexemeMatch(
+                example_sentence_id=sentence.id,
+                lemma=lemma,
+                surface_form=str(token.get("text") or lemma),
             ))
-            if match is None:
-                db.add(ExampleLexemeMatch(
-                    example_sentence_id=sentence.id,
-                    lemma=lemma,
-                    surface_form=str(token.get("text") or lemma),
-                ))
 
             indexed.append({
                 "lemma": lemma,
-                "sentence": cue.text,
-                "start_ms": cue.start_ms,
-                "end_ms": cue.end_ms,
+                "sentence": window["text"],
+                "start_ms": window["start_ms"],
+                "end_ms": window["end_ms"],
             })
             break
 
