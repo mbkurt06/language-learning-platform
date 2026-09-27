@@ -13,6 +13,8 @@ from .providers import provider_catalog
 from .schemas import (
     AnalyzeAndMatchRequest,
     AnalyzeAndMatchResponse,
+    AnalyzeRequest,
+    AnalyzeResponse,
     EncounterCreate,
     LearningItemCreate,
     LearningProfileCreate,
@@ -78,6 +80,17 @@ def create_profile(payload: LearningProfileCreate, db: DbSession):
         "target_language": profile.target_language,
         "level": profile.level,
     }
+
+
+@app.post("/api/v1/analyze", response_model=AnalyzeResponse)
+def analyze(payload: AnalyzeRequest):
+    try:
+        analysis = analyze_text(payload.source_language, payload.text)
+    except UnsupportedLanguageError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"language engine failed: {exc}") from exc
+    return {"analysis": analysis}
 
 
 @app.post("/api/v1/analyze-and-match", response_model=AnalyzeAndMatchResponse)
