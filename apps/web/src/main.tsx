@@ -64,6 +64,7 @@ type YTPlayer = {
   pauseVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getCurrentTime: () => number;
+  setOption?: (module: string, option: string, value: unknown) => void;
   destroy: () => void;
 };
 
@@ -153,6 +154,7 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
         videoId: source.external_id,
         playerVars: {
           controls: 0,
+          cc_load_policy: 0,
           disablekb: 1,
           fs: 0,
           iv_load_policy: 3,
@@ -164,6 +166,10 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
         events: {
           onReady: (event) => {
             playerRef.current = event.target;
+            // The review player must show the exact subtitle sentence saved by
+            // the extension, not YouTube's own captions. YouTube captions can
+            // differ from the extension transcript for the same audio moment.
+            event.target.setOption?.("captions", "track", {});
             event.target.seekTo(startMs / 1000, true);
             setPositionMs(0);
             setReady(true);
