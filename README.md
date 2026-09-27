@@ -29,7 +29,7 @@ docker compose up --build
 
 Open:
 
-- Web: http://localhost:3000
+- Web: http://localhost:3001
 - API docs: http://localhost:8000/docs
 - API health: http://localhost:8000/health
 
