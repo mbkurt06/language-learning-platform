@@ -65,3 +65,19 @@ class LearningProfileEnsure(BaseModel):
     source_language: str = Field(min_length=2, max_length=16)
     target_language: str = Field(min_length=2, max_length=16)
     level: str | None = None
+
+
+class ExampleCue(BaseModel):
+    start_ms: int
+    end_ms: int
+    text: str
+
+
+class ExampleCorpusIndexRequest(BaseModel):
+    provider: str = "youtube"
+    external_id: str
+    title: str | None = None
+    url: str | None = None
+    language: str = "de"
+    target_lemmas: list[str] = Field(min_length=1)
+    cues: list[ExampleCue] = Field(min_length=1)
