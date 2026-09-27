@@ -13,6 +13,7 @@
     settings:{showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82},
     learningItems:[],
     learningProfileId:null,
+    encounterCaptureKeys:new Set(),
     youtube:{
       overlay:null,
       germanLine:null,
@@ -279,6 +280,27 @@
     if(!response.ok) throw new Error("Platform API encounter "+response.status);
   }
 
+  function captureSeenLearningItem(item,surfaceForm){
+    if(adapter.id!=="youtube" || !item?.id) return;
+    const cue=state.youtube.cues?.[state.youtube.cueIndex];
+    const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
+    if(!cue || !videoId) return;
+
+    const key=[item.id,videoId,cue.index].join(":");
+    if(state.encounterCaptureKeys.has(key)) return;
+    state.encounterCaptureKeys.add(key);
+
+    const snapshot=currentYouTubeEncounter(surfaceForm);
+    if(!snapshot){
+      state.encounterCaptureKeys.delete(key);
+      return;
+    }
+
+    captureCurrentEncounter(item.id,surfaceForm,snapshot).catch(()=>{
+      state.encounterCaptureKeys.delete(key);
+    });
+  }
+
   async function removeLearningItem(kind,key){
     const wanted=learningKey(kind,key);
     const item=state.learningItems.find(existing=>learningKey(existing.kind,existing.key)===wanted);
@@ -498,6 +520,12 @@
       });
     }
 
+    const seenLearningItems=new Map();
+    for(const [index,item] of learningWordLabels){
+      const token=tokens[index];
+      if(item?.id && token?.text) seenLearningItems.set(item.id,{item,surface:token.text});
+    }
+
     const expressionMembers=new Map();
     const expressionBadges=new Map();
     const expressions=hoverData.expressions||[];
@@ -519,7 +547,18 @@
           visible.push(i);
         }
       });
-      if(visible.length) expressionBadges.set(visible[0],expressionMembers.get(visible[0])||item);
+      if(visible.length) {
+        const currentItem=expressionMembers.get(visible[0])||item;
+        expressionBadges.set(visible[0],currentItem);
+        if(currentItem?.id) {
+          const surface=visible.map(index=>tokens[index]?.text).filter(Boolean).join(" ");
+          seenLearningItems.set(currentItem.id,{item:currentItem,surface:surface||currentItem.label});
+        }
+      }
+    }
+
+    for(const {item,surface} of seenLearningItems.values()){
+      captureSeenLearningItem(item,surface);
     }
 
     tokens.forEach((token,i)=>{

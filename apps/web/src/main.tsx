@@ -127,9 +127,11 @@ function segmentClock(milliseconds: number) {
   return `${minutes}:${secs.toFixed(1).padStart(4, "0")}`;
 }
 
-function SentencePlayer({ encounter }: { encounter: Encounter }) {
+function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onComplete?: () => void }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
+  const completedRef = useRef(false);
+  const completionTimerRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
@@ -144,6 +146,7 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
   useEffect(() => {
     if (!mountRef.current || !source || source.provider !== "youtube") return;
 
+    completedRef.current = false;
     let cancelled = false;
     let timer: number | undefined;
 
@@ -192,6 +195,12 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
           active.pauseVideo();
           setPlaying(false);
           setPositionMs(durationMs);
+          if (!completedRef.current) {
+            completedRef.current = true;
+            if (onComplete) {
+              completionTimerRef.current = window.setTimeout(onComplete, 450);
+            }
+          }
           return;
         }
 
@@ -208,10 +217,11 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearInterval(timer);
+      if (completionTimerRef.current !== null) window.clearTimeout(completionTimerRef.current);
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs]);
+  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs, onComplete]);
 
   function seek(relativeMs: number) {
     const next = Math.min(durationMs, Math.max(0, relativeMs));
@@ -230,6 +240,11 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
     }
 
     if (positionMs >= durationMs - 150) {
+      completedRef.current = false;
+      if (completionTimerRef.current !== null) {
+        window.clearTimeout(completionTimerRef.current);
+        completionTimerRef.current = null;
+      }
       player.seekTo(startMs / 1000, true);
       setPositionMs(0);
     }
@@ -265,6 +280,67 @@ function SentencePlayer({ encounter }: { encounter: Encounter }) {
   </div>;
 }
 
+function playlistEncounters(encounters: Encounter[]) {
+  const selected: Encounter[] = [];
+  const seenVideos = new Set<string>();
+
+  for (const encounter of encounters) {
+    if (encounter.source?.provider !== "youtube" || !encounter.source.external_id) continue;
+    if (seenVideos.has(encounter.source.external_id)) continue;
+    seenVideos.add(encounter.source.external_id);
+    selected.push(encounter);
+    if (selected.length === 6) break;
+  }
+
+  return selected;
+}
+
+function ExamplePlaylist({ item, onClose }: { item: LearningItem; onClose: () => void }) {
+  const examples = useMemo(() => playlistEncounters(item.encounters), [item.encounters]);
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (index >= examples.length) setIndex(0);
+  }, [examples.length, index]);
+
+  const current = examples[index];
+  if (!current) return <div className="example-playlist empty-playlist">
+    <span>Henüz oynatılabilir YouTube örneği yok.</span>
+    <button onClick={onClose}>Kapat</button>
+  </div>;
+
+  return <div className="example-playlist">
+    <div className="playlist-head">
+      <div>
+        <span className="playlist-kicker">ÖRNEKLERİ DİNLE</span>
+        <strong>{item.canonical_form}</strong>
+        <small>{index + 1} / {examples.length} · farklı YouTube videoları</small>
+      </div>
+      <button className="playlist-close" onClick={onClose}>Kapat</button>
+    </div>
+
+    <SentencePlayer
+      encounter={current}
+      onComplete={index < examples.length - 1 ? () => setIndex(value => value + 1) : undefined}
+    />
+
+    <div className="playlist-nav">
+      <button onClick={() => setIndex(value => Math.max(0, value - 1))} disabled={index === 0}>← Önceki</button>
+      <div className="playlist-dots">
+        {examples.map((encounter, exampleIndex) =>
+          <button
+            key={encounter.id}
+            className={exampleIndex === index ? "active" : ""}
+            onClick={() => setIndex(exampleIndex)}
+            aria-label={`Örnek ${exampleIndex + 1}`}
+          />
+        )}
+      </div>
+      <button onClick={() => setIndex(value => Math.min(examples.length - 1, value + 1))} disabled={index === examples.length - 1}>Sonraki →</button>
+    </div>
+  </div>;
+}
+
 function App() {
   const [status, setStatus] = useState("bağlanıyor");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -272,6 +348,7 @@ function App() {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [query, setQuery] = useState("");
   const [playingEncounter, setPlayingEncounter] = useState<string | null>(null);
+  const [playlistItemId, setPlaylistItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -419,6 +496,15 @@ function App() {
               </div>
               <div className="word-actions">
                 <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
+                {playlistEncounters(item.encounters).length > 0 && <button
+                  className="listen-examples"
+                  onClick={() => {
+                    setPlayingEncounter(null);
+                    setPlaylistItemId(playlistItemId === item.id ? null : item.id);
+                  }}
+                >
+                  {playlistItemId === item.id ? "Örnekleri kapat" : "▶ Örnekleri Dinle"}
+                </button>}
                 <button
                   className="delete-word"
                   disabled={deletingItemId === item.id}
@@ -429,6 +515,8 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {playlistItemId === item.id && <ExamplePlaylist item={item} onClose={() => setPlaylistItemId(null)} />}
 
             {item.encounters.length === 0
               ? <p className="no-encounter">Bu öğe eski kayıtlardan geldi; henüz kaynak cümlesi yok.</p>
