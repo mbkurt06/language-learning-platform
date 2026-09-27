@@ -84,3 +84,8 @@ The current German Engine source was migrated from `mbkurt06/german-language-eng
 The Chrome extension was migrated from `mbkurt06/german-language-extension` into `apps/extension`.
 
 The target architecture is one product repository: clients call Platform API rather than language engines directly. Chrome learning items are now stored through Platform API in PostgreSQL; `chrome.storage.sync` is retained only for lightweight client configuration/identity and one-time migration metadata.
+
+
+## Encounter review
+
+Learning items can carry source encounters. YouTube saves include the visible German subtitle, video id/title/link, and start/end timestamps. The web app exposes these under **Kelimelerim** and can replay the saved sentence segment with the YouTube embed player.

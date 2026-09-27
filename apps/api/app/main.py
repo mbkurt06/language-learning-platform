@@ -84,6 +84,18 @@ def create_profile(payload: LearningProfileCreate, db: DbSession):
     }
 
 
+@app.get("/api/v1/profiles")
+def list_profiles(db: DbSession):
+    profiles = db.scalars(select(LearningProfile).order_by(LearningProfile.created_at.desc())).all()
+    return {"profiles": [{
+        "id": profile.id,
+        "source_language": profile.source_language,
+        "target_language": profile.target_language,
+        "level": profile.level,
+        "created_at": profile.created_at,
+    } for profile in profiles]}
+
+
 @app.post("/api/v1/profiles/ensure")
 def ensure_profile(payload: LearningProfileEnsure, db: DbSession):
     user = db.scalar(select(User).where(User.external_subject == payload.external_subject))
@@ -138,7 +150,12 @@ def analyze_and_match(payload: AnalyzeAndMatchRequest, db: DbSession):
     return {"analysis": analysis, "learning_matches": match_learning_items(db, payload.profile_id, analysis)}
 
 
-def serialize_learning_item(item: LearningItem):
+def serialize_learning_item(db: Session, item: LearningItem):
+    encounters = db.scalars(
+        select(Encounter)
+        .where(Encounter.learning_item_id == item.id)
+        .order_by(Encounter.encountered_at.desc())
+    ).all()
     return {
         "id": item.id,
         "canonical_form": item.canonical_form,
@@ -147,6 +164,26 @@ def serialize_learning_item(item: LearningItem):
         "language_specific_type": item.language_specific_type,
         "status": item.status,
         "translations": [{"language": t.language, "meaning": t.meaning} for t in item.translations],
+        "encounters": [{
+            "id": encounter.id,
+            "surface_form": encounter.surface_form,
+            "sentence": encounter.sentence,
+            "media_timestamp_ms": encounter.media_timestamp_ms,
+            "media_end_timestamp_ms": encounter.media_end_timestamp_ms,
+            "encountered_at": encounter.encountered_at,
+            "context": encounter.context_json,
+            "source": (
+                {
+                    "provider": source.provider,
+                    "source_type": source.source_type,
+                    "external_id": source.external_id,
+                    "url": source.url,
+                    "title": source.title,
+                }
+                if (source := db.get(ContentSource, encounter.source_id))
+                else None
+            ),
+        } for encounter in encounters],
     }
 
 
@@ -159,7 +196,7 @@ def list_learning_items(profile_id: UUID, db: DbSession):
         .where(LearningItem.profile_id == profile_id)
         .order_by(LearningItem.created_at.desc())
     ).all()
-    return {"items": [serialize_learning_item(item) for item in items]}
+    return {"items": [serialize_learning_item(db, item) for item in items]}
 
 
 @app.post("/api/v1/learning-items")
@@ -206,7 +243,7 @@ def create_learning_item(payload: LearningItemCreate, db: DbSession):
 
     db.commit()
     db.refresh(item)
-    return serialize_learning_item(item)
+    return serialize_learning_item(db, item)
 
 
 @app.delete("/api/v1/learning-items/{item_id}")
@@ -221,23 +258,51 @@ def delete_learning_item(item_id: UUID, db: DbSession):
 
 @app.post("/api/v1/encounters")
 def create_encounter(payload: EncounterCreate, db: DbSession):
+    item = db.get(LearningItem, payload.learning_item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="learning item not found")
+
     source = db.scalar(select(ContentSource).where(
         ContentSource.provider == payload.provider,
         ContentSource.external_id == payload.external_id,
     ))
     if source is None:
-        source = ContentSource(provider=payload.provider, source_type=payload.source_type, external_id=payload.external_id, url=payload.url, title=payload.title)
+        source = ContentSource(
+            provider=payload.provider,
+            source_type=payload.source_type,
+            external_id=payload.external_id,
+            url=payload.url,
+            title=payload.title,
+        )
         db.add(source)
         db.flush()
-    encounter = Encounter(
-        learning_item_id=payload.learning_item_id,
-        source_id=source.id,
-        surface_form=payload.surface_form,
-        sentence=payload.sentence,
-        media_timestamp_ms=payload.media_timestamp_ms,
-        context_json=payload.context,
-    )
-    db.add(encounter)
+    else:
+        source.url = payload.url or source.url
+        source.title = payload.title or source.title
+        source.source_type = payload.source_type
+
+    encounter = db.scalar(select(Encounter).where(
+        Encounter.learning_item_id == payload.learning_item_id,
+        Encounter.source_id == source.id,
+        Encounter.sentence == payload.sentence,
+        Encounter.media_timestamp_ms == payload.media_timestamp_ms,
+    ))
+    if encounter is None:
+        encounter = Encounter(
+            learning_item_id=payload.learning_item_id,
+            source_id=source.id,
+            surface_form=payload.surface_form,
+            sentence=payload.sentence,
+            media_timestamp_ms=payload.media_timestamp_ms,
+            media_end_timestamp_ms=payload.media_end_timestamp_ms,
+            context_json=payload.context,
+        )
+        db.add(encounter)
+    else:
+        encounter.surface_form = payload.surface_form
+        encounter.media_end_timestamp_ms = payload.media_end_timestamp_ms
+        encounter.context_json = payload.context
+
     db.commit()
     db.refresh(encounter)
     return {"id": encounter.id}

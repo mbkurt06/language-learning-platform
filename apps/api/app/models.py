@@ -69,5 +69,6 @@ class Encounter(Base):
     surface_form: Mapped[str] = mapped_column(Text)
     sentence: Mapped[str] = mapped_column(Text)
     media_timestamp_ms: Mapped[int | None] = mapped_column(nullable=True)
+    media_end_timestamp_ms: Mapped[int | None] = mapped_column(nullable=True)
     context_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     encountered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
