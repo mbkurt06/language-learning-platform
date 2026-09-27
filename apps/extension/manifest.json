@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "description": "Context-first German subtitle analysis for ZDF, ARD and YouTube.",
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab"
   ],
   "host_permissions": [
     "https://*.zdf.de/*",

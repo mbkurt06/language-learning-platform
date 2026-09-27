@@ -26,6 +26,7 @@ from .schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
     EncounterCreate,
+    ExampleCorpusIndexRequest,
     LearningItemCreate,
     LearningProfileCreate,
     LearningProfileEnsure,
@@ -64,6 +65,202 @@ def health():
 @app.get("/api/v1/providers")
 def providers():
     return {"providers": provider_catalog()}
+
+
+EXAMPLE_INDEX_TARGETS = {
+    "_fFwfcS_9TY": ["lernen"],
+    "BXv8NUSOZko": ["lernen"],
+    "ELkk8PQssE4": ["lernen"],
+    "DwQMtqGRscg": ["lernen"],
+    "tuD9NsBj7vg": ["lernen"],
+    "R6XtawFJAj0": ["lernen"],
+    "EhOONXEZRTA": ["lernen"],
+    "m9rk87XbqhY": ["lernen"],
+}
+
+
+@app.get("/api/v1/example-corpus/index-targets")
+def example_index_targets():
+    return {"targets": EXAMPLE_INDEX_TARGETS}
+
+
+@app.post("/api/v1/example-corpus/index-cues")
+def index_example_cues(payload: ExampleCorpusIndexRequest, db: DbSession):
+    target_lemmas = {lemma.lower() for lemma in payload.target_lemmas}
+    expected = set(EXAMPLE_INDEX_TARGETS.get(payload.external_id, []))
+    if expected and not target_lemmas.issubset(expected):
+        raise HTTPException(status_code=422, detail="unexpected target lemma for video")
+
+    source = db.scalar(select(ExampleSource).where(
+        ExampleSource.provider == payload.provider,
+        ExampleSource.external_id == payload.external_id,
+    ))
+    if source is None:
+        source = ExampleSource(
+            provider=payload.provider,
+            external_id=payload.external_id,
+            title=payload.title,
+            url=payload.url,
+            language=payload.language,
+            metadata_json={"indexed_by": "browser-extension"},
+        )
+        db.add(source)
+        db.flush()
+    else:
+        source.title = payload.title or source.title
+        source.url = payload.url or source.url
+
+    indexed = []
+    for lemma in sorted(target_lemmas):
+        # Cheap pre-filter: German inflections normally preserve a useful
+        # lexical prefix. This keeps us from calling the language engine on
+        # every subtitle cue in a long video.
+        prefix = lemma[:4]
+        candidate_cues = [cue for cue in payload.cues if prefix in cue.text.lower()]
+        for cue in candidate_cues:
+            try:
+                analysis = analyze_text(payload.language, cue.text)
+            except Exception:
+                continue
+
+            token = next(
+                (
+                    token for token in analysis.get("tokens", [])
+                    if str(token.get("lemma", "")).lower() == lemma
+                ),
+                None,
+            )
+            if token is None:
+                continue
+
+            sentence = db.scalar(select(ExampleSentence).where(
+                ExampleSentence.source_id == source.id,
+                ExampleSentence.start_ms == cue.start_ms,
+                ExampleSentence.end_ms == cue.end_ms,
+            ))
+            if sentence is None:
+                sentence = ExampleSentence(
+                    source_id=source.id,
+                    sentence=cue.text,
+                    start_ms=cue.start_ms,
+                    end_ms=cue.end_ms,
+                    quality="youtube-json3",
+                    metadata_json={"indexed_by": "browser-extension"},
+                )
+                db.add(sentence)
+                db.flush()
+
+            match = db.scalar(select(ExampleLexemeMatch).where(
+                ExampleLexemeMatch.example_sentence_id == sentence.id,
+                ExampleLexemeMatch.lemma == lemma,
+            ))
+            if match is None:
+                db.add(ExampleLexemeMatch(
+                    example_sentence_id=sentence.id,
+                    lemma=lemma,
+                    surface_form=str(token.get("text") or lemma),
+                ))
+
+            indexed.append({
+                "lemma": lemma,
+                "sentence": cue.text,
+                "start_ms": cue.start_ms,
+                "end_ms": cue.end_ms,
+            })
+            break
+
+    db.commit()
+    return {"indexed": indexed, "count": len(indexed)}
+
+
+@app.post("/api/v1/example-corpus/index-video")
+def index_example_video(payload: ExampleCorpusIndexRequest, db: DbSession):
+    allowed_pos = {"NOUN", "PROPN", "VERB", "ADJ", "ADV"}
+
+    source = db.scalar(select(ExampleSource).where(
+        ExampleSource.provider == payload.provider,
+        ExampleSource.external_id == payload.external_id,
+    ))
+    if source is None:
+        source = ExampleSource(
+            provider=payload.provider,
+            external_id=payload.external_id,
+            title=payload.title,
+            url=payload.url,
+            language=payload.language,
+            metadata_json={"indexed_by": "browser-extension-manual"},
+        )
+        db.add(source)
+        db.flush()
+    else:
+        source.title = payload.title or source.title
+        source.url = payload.url or source.url
+
+    indexed = []
+    seen_lemmas = set()
+
+    for cue in payload.cues:
+        try:
+            analysis = analyze_text(payload.language, cue.text)
+        except Exception:
+            continue
+
+        candidates = [
+            token for token in analysis.get("tokens", [])
+            if str(token.get("pos", "")).upper() in allowed_pos
+            and str(token.get("lemma", "")).strip()
+        ]
+        if not candidates:
+            continue
+
+        sentence = db.scalar(select(ExampleSentence).where(
+            ExampleSentence.source_id == source.id,
+            ExampleSentence.start_ms == cue.start_ms,
+            ExampleSentence.end_ms == cue.end_ms,
+        ))
+        if sentence is None:
+            sentence = ExampleSentence(
+                source_id=source.id,
+                sentence=cue.text,
+                start_ms=cue.start_ms,
+                end_ms=cue.end_ms,
+                quality="youtube-json3",
+                metadata_json={"indexed_by": "browser-extension-manual"},
+            )
+            db.add(sentence)
+            db.flush()
+
+        for token in candidates:
+            lemma = str(token.get("lemma", "")).strip().lower()
+            if not lemma or lemma in seen_lemmas:
+                continue
+
+            match = db.scalar(select(ExampleLexemeMatch).where(
+                ExampleLexemeMatch.example_sentence_id == sentence.id,
+                ExampleLexemeMatch.lemma == lemma,
+            ))
+            if match is None:
+                db.add(ExampleLexemeMatch(
+                    example_sentence_id=sentence.id,
+                    lemma=lemma,
+                    surface_form=str(token.get("text") or lemma),
+                ))
+
+            seen_lemmas.add(lemma)
+            indexed.append({
+                "lemma": lemma,
+                "surface_form": str(token.get("text") or lemma),
+                "sentence": cue.text,
+                "start_ms": cue.start_ms,
+                "end_ms": cue.end_ms,
+            })
+
+    db.commit()
+    return {
+        "indexed": indexed,
+        "count": len(indexed),
+        "unique_lemmas": len(seen_lemmas),
+    }
 
 
 @app.post("/api/v1/users")

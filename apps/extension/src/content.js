@@ -30,6 +30,7 @@
       domFirstSeen:0,
       domTimer:null,
       hideTimer:null,
+      corpusIndexing:new Set(),
     }
   };
 
@@ -748,6 +749,86 @@
     hideYouTubeOverlay();
   }
 
+  async function indexPreparedCorpusFromYouTube(cues){
+    const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
+    if(!videoId || state.youtube.corpusIndexing.has(videoId) || !cues?.length) return;
+
+    state.youtube.corpusIndexing.add(videoId);
+    try{
+      const apiBase=await platformApiBase();
+      const targetsResponse=await fetch(apiBase+"/api/v1/example-corpus/index-targets");
+      if(!targetsResponse.ok) throw new Error("index targets "+targetsResponse.status);
+      const targetsPayload=await targetsResponse.json();
+      const targetLemmas=targetsPayload.targets?.[videoId];
+      if(!Array.isArray(targetLemmas) || !targetLemmas.length) return;
+
+      const response=await fetch(apiBase+"/api/v1/example-corpus/index-cues",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          provider:"youtube",
+          external_id:videoId,
+          title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim()||null,
+          url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
+          language:"de",
+          target_lemmas:targetLemmas,
+          cues:cues.map(cue=>({
+            start_ms:Math.round(cue.startMs),
+            end_ms:Math.round(cue.endMs),
+            text:cue.text,
+          })),
+        }),
+      });
+      if(!response.ok) throw new Error("corpus index "+response.status);
+      const result=await response.json();
+      console.info("GLE corpus indexed",videoId,result);
+    }catch(error){
+      state.youtube.corpusIndexing.delete(videoId);
+      console.warn("GLE corpus indexing failed",error);
+    }
+  }
+
+  async function indexCurrentYouTubeVideo(){
+    const cues=state.youtube.cues;
+    const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
+    if(adapter.id!=="youtube" || !videoId || !cues?.length){
+      throw new Error("YouTube altyazısı henüz hazır değil");
+    }
+
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/example-corpus/index-video",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        provider:"youtube",
+        external_id:videoId,
+        title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim()||null,
+        url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
+        language:"de",
+        index_all:true,
+        cues:cues.map(cue=>({
+          start_ms:Math.round(cue.startMs),
+          end_ms:Math.round(cue.endMs),
+          text:cue.text,
+        })),
+      }),
+    });
+    if(!response.ok) throw new Error("corpus index "+response.status);
+    return response.json();
+  }
+
+  chrome.runtime.onMessage.addListener((message,_sender,sendResponse)=>{
+    if(message?.type!=="gle-index-current-video") return;
+    indexCurrentYouTubeVideo()
+      .then(result=>sendResponse({
+        ok:true,
+        count:result.count||0,
+        uniqueLemmas:result.unique_lemmas||0,
+      }))
+      .catch(error=>sendResponse({ok:false,error:String(error?.message||error)}));
+    return true;
+  });
+
   function prefetchYouTubeAnalyses(index,horizon=2){
     const cues=state.youtube.cues;
     if(!cues?.length || index<0) return;
@@ -852,6 +933,7 @@
       state.youtube.cues=cues;
       state.youtube.cueIndex=-1;
       state.youtube.timedAvailable=true;
+      indexPreparedCorpusFromYouTube(cues);
       bindYouTubeVideo();
       const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
       const currentCue=video ? globalThis.GLEYoutubeCues.cueAtTime(cues,video.currentTime*1000) : cues[0];
