@@ -6,67 +6,93 @@ from .db import SessionLocal
 from .models import ExampleLexemeMatch, ExampleSentence, ExampleSource
 
 
+OLD_LEARNEN_VIDEO_IDS = [
+    "KoLhgG-Sz4k",
+    "c4nE091F970",
+    "xnqTeFypXjk",
+    "xx6OANMfMDY",
+    "qMZrB1jhP8g",
+    "ToNZk6PsSuo",
+]
+
+
 LEARNEN_EXAMPLES = [
     {
-        "video_id": "KoLhgG-Sz4k",
-        "title": "Learn German: 30 Beispielsätze - 30 phrases + Translation in the subtitles",
-        "surface_form": "lerne",
-        "sentence": "Seit ich Deutsch lerne, bin ich glücklich.",
-        "start_ms": 7000,
-        "end_ms": 15000,
-        "reference": "youtube-description-timestamp",
-    },
-    {
-        "video_id": "c4nE091F970",
-        "title": "Wie lernt man allein nahezu akzentfreies Deutsch? | Easy German Podcast 698",
+        "video_id": "THVuE41ivpM",
+        "title": "Im Aufzug mit Felix Lobrecht",
         "surface_form": "gelernt",
-        "sentence": "Du hast uns erzählt, du hast Deutsch eigentlich ganz alleine gelernt.",
-        "start_ms": 36000,
-        "end_ms": 61000,
-        "reference": "easy-german-public-transcript",
+        "sentence": "Danke. Ich hab viel gelernt.",
+        "start_ms": 3932000,
+        "end_ms": 3942000,
+        "reference": "im-aufzug-public-transcript",
     },
     {
-        "video_id": "xnqTeFypXjk",
-        "title": "Laberpodcast zum Deutschlernen | Easy German Podcast Live in Berlin",
-        "surface_form": "lernen",
-        "sentence": "Und dort könnt ihr dann zweimal pro Woche unseren Podcast hören und dabei Deutsch lernen.",
-        "start_ms": 41000,
-        "end_ms": 47000,
-        "reference": "public-subtitle-transcript",
-    },
-    {
-        "video_id": "xx6OANMfMDY",
-        "title": "So habe ich Deutsch gelernt (A1-C1)",
-        "surface_form": "lernen",
-        "sentence": "Wie viele Stunden investierst du, um Deutsch zu lernen?",
-        "start_ms": 184000,
-        "end_ms": 200000,
-        "reference": "creator-published-video-timestamp",
-    },
-    {
-        "video_id": "qMZrB1jhP8g",
-        "title": "How I Learned German in 6 Months | Deutsch Lernen | My Story",
+        "video_id": "ogpWRmrysp4",
+        "title": "Im Aufzug mit Leon Windscheid",
         "surface_form": "gelernt",
-        "sentence": "Heute werde ich mit euch sprechen, wie ich Deutsch gelernt habe und warum ich Deutsch gelernt habe.",
-        "start_ms": 2000,
-        "end_ms": 14000,
-        "reference": "public-transcript",
+        "sentence": "Das hat echt Spaß gemacht, ich habe viel gelernt.",
+        "start_ms": 5598000,
+        "end_ms": 5608000,
+        "reference": "im-aufzug-public-transcript",
     },
     {
-        "video_id": "ToNZk6PsSuo",
-        "title": "So habe ich angefangen, auf Deutsch zu denken",
-        "surface_form": "lernte",
-        "sentence": "Ich lernte, ganze Satzteile anstelle von einzelnen Wörtern zu lernen.",
-        "start_ms": 181000,
-        "end_ms": 204000,
-        "reference": "public-video-transcript-summary",
+        "video_id": "5M0nr7xyTqE",
+        "title": "Im Aufzug mit Anne Gersdorff",
+        "surface_form": "gelernt",
+        "sentence": "Die meisten Sachen, wo ich Sachen gelernt hab, war vielleicht erst mal aus meiner Komfortzone heraus.",
+        "start_ms": 2179000,
+        "end_ms": 2189000,
+        "reference": "im-aufzug-public-transcript",
+    },
+    {
+        "video_id": "ZtPdQuWEtDE",
+        "title": "Im Aufzug mit Christoph Amend",
+        "surface_form": "gelernt",
+        "sentence": "Aber in dem Moment haben wir gelernt, es gab noch einen anderen.",
+        "start_ms": 192000,
+        "end_ms": 202000,
+        "reference": "im-aufzug-public-transcript",
+    },
+    {
+        "video_id": "JdR941OG5a4",
+        "title": "Im Aufzug mit Gerhard Jaworek",
+        "surface_form": "gelernt",
+        "sentence": "Ich habe gelernt, dass der Rasen grün ist, aber ja, das ist für mich nicht mehr als eine Vokabel.",
+        "start_ms": 4795000,
+        "end_ms": 4805000,
+        "reference": "im-aufzug-public-transcript",
+    },
+    {
+        "video_id": "uuzpkXm7K_M",
+        "title": "Im Aufzug mit Ralph Caspers",
+        "surface_form": "gelernt",
+        "sentence": "Ich habe für mich im Studium gelernt: Das Schlimmste ist, sich nicht zu entscheiden.",
+        "start_ms": 671000,
+        "end_ms": 681000,
+        "reference": "im-aufzug-public-transcript",
     },
 ]
+
+
+def remove_old_curated_lernen_sources(db) -> None:
+    old_sources = db.scalars(
+        select(ExampleSource).where(
+            ExampleSource.provider == "youtube",
+            ExampleSource.external_id.in_(OLD_LEARNEN_VIDEO_IDS),
+        )
+    ).all()
+    for source in old_sources:
+        db.delete(source)
+    if old_sources:
+        db.commit()
+        print(f"removed {len(old_sources)} old learning-channel examples")
 
 
 def seed_curated_lernen_examples() -> int:
     seeded = 0
     with SessionLocal() as db:
+        remove_old_curated_lernen_sources(db)
+
         for entry in LEARNEN_EXAMPLES:
             source = db.scalar(
                 select(ExampleSource).where(
@@ -82,12 +108,19 @@ def seed_curated_lernen_examples() -> int:
                     url=f"https://www.youtube.com/watch?v={entry['video_id']}",
                     language="de",
                     metadata_json={
-                        "seed": "curated-lernen-v1",
+                        "seed": "curated-lernen-natural-v2",
                         "reference": entry["reference"],
                     },
                 )
                 db.add(source)
                 db.flush()
+            else:
+                source.title = entry["title"]
+                source.url = f"https://www.youtube.com/watch?v={entry['video_id']}"
+                source.metadata_json = {
+                    "seed": "curated-lernen-natural-v2",
+                    "reference": entry["reference"],
+                }
 
             sentence = db.scalar(
                 select(ExampleSentence).where(
@@ -104,12 +137,19 @@ def seed_curated_lernen_examples() -> int:
                     end_ms=entry["end_ms"],
                     quality="curated-public-transcript",
                     metadata_json={
-                        "seed": "curated-lernen-v1",
+                        "seed": "curated-lernen-natural-v2",
                         "reference": entry["reference"],
                     },
                 )
                 db.add(sentence)
                 db.flush()
+            else:
+                sentence.sentence = entry["sentence"]
+                sentence.quality = "curated-public-transcript"
+                sentence.metadata_json = {
+                    "seed": "curated-lernen-natural-v2",
+                    "reference": entry["reference"],
+                }
 
             match = db.scalar(
                 select(ExampleLexemeMatch).where(
@@ -125,15 +165,17 @@ def seed_curated_lernen_examples() -> int:
                         surface_form=entry["surface_form"],
                     )
                 )
+            else:
+                match.surface_form = entry["surface_form"]
 
             db.commit()
             seeded += 1
             print(
-                f"seeded {seeded}/6: {entry['video_id']} "
+                f"seeded {seeded}/6 natural: {entry['video_id']} "
                 f"{entry['start_ms']}-{entry['end_ms']}ms [{entry['surface_form']}]"
             )
 
-    print(f"curated lernen corpus ready: {seeded} examples")
+    print(f"natural lernen corpus ready: {seeded} examples")
     return seeded
 
 
