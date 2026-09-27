@@ -131,6 +131,7 @@
       key:item.canonical_key,
       label:item.canonical_form,
       meaning_tr:translation?.meaning||"",
+      encounters:item.encounters||[],
     };
   }
 
@@ -229,7 +230,53 @@
       }),
     });
     if(!response.ok) throw new Error("Platform API learning item "+response.status);
+    const created=await response.json();
+    await captureCurrentEncounter(created.id,normalized.surface||normalized.label||normalized.key);
     await loadLearningItems();
+    return created;
+  }
+
+  function currentYouTubeEncounter(surfaceForm){
+    if(adapter.id!=="youtube") return null;
+    const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
+    if(!videoId) return null;
+
+    const cue=state.youtube.cues?.[state.youtube.cueIndex] || null;
+    const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
+    const fallbackStart=Math.max(0,Math.round((video?.currentTime||0)*1000));
+    const startMs=Number.isFinite(cue?.startMs) ? Math.round(cue.startMs) : fallbackStart;
+    const endMs=Number.isFinite(cue?.endMs) && cue.endMs>startMs
+      ? Math.round(cue.endMs)
+      : startMs+5000;
+    const sentence=cue?.text || state.youtube.germanLine?.dataset.gleText || "";
+
+    return {
+      surface_form:surfaceForm,
+      sentence,
+      provider:"youtube",
+      source_type:"video",
+      external_id:videoId,
+      url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
+      title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim() || null,
+      media_timestamp_ms:startMs,
+      media_end_timestamp_ms:endMs,
+      context:{
+        cue_index:cue?.index ?? null,
+        page_url:location.href,
+      },
+    };
+  }
+
+  async function captureCurrentEncounter(learningItemId,surfaceForm){
+    const encounter=currentYouTubeEncounter(surfaceForm);
+    if(!encounter || !encounter.sentence) return;
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/encounters",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({learning_item_id:learningItemId,...encounter}),
+    });
+    if(!response.ok) throw new Error("Platform API encounter "+response.status);
   }
 
   async function removeLearningItem(kind,key){
@@ -288,15 +335,17 @@
       key:expr.pattern_id||expr.canonical,
       label:expr.canonical,
       meaning:primaryMeaning,
+      surface:expr.surface||primaryLabel,
     } : {
       kind:"word",
       key:lemma,
       label:lemma,
       meaning:primaryMeaning,
+      surface:sourceToken?.text||lemma,
     };
     const learning=learnTarget.key && isLearning(learnTarget.kind,learnTarget.key);
     const learnAction=learnTarget.key
-      ? `<div class="gle-learn-actions"><button type="button" class="gle-learn-button gle-learn-toggle" title="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" aria-label="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" data-kind="${escAttr(learnTarget.kind)}" data-key="${escAttr(learnTarget.key)}" data-label="${escAttr(learnTarget.label)}" data-meaning="${escAttr(learnTarget.meaning)}">${learning?"★":"☆"} <span>Öğren</span></button></div>`
+      ? `<div class="gle-learn-actions"><button type="button" class="gle-learn-button gle-learn-toggle" title="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" aria-label="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" data-kind="${escAttr(learnTarget.kind)}" data-key="${escAttr(learnTarget.key)}" data-label="${escAttr(learnTarget.label)}" data-meaning="${escAttr(learnTarget.meaning)}" data-surface="${escAttr(learnTarget.surface)}">${learning?"★":"☆"} <span>Öğren</span></button></div>`
       : "";
 
     state.tooltip.innerHTML=header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>";
@@ -320,6 +369,7 @@
               key,
               label:learnButton.dataset.label,
               meaning_tr:learnButton.dataset.meaning,
+              surface:learnButton.dataset.surface,
             });
             learnButton.innerHTML="★ <span>Öğren</span>";
             learnButton.title="Öğreniyorum listesinden kaldır";
