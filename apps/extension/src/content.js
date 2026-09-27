@@ -749,6 +749,18 @@
     hideYouTubeOverlay();
   }
 
+  function currentYouTubeTitle(){
+    const heading=document.querySelector("ytd-watch-metadata h1 yt-formatted-string");
+    const headingText=(heading?.textContent||"").trim();
+    if(headingText) return headingText;
+
+    const metaTitle=document.querySelector('meta[itemprop="name"]')?.getAttribute("content")
+      || document.querySelector('meta[name="title"]')?.getAttribute("content");
+    if(metaTitle?.trim()) return metaTitle.trim();
+
+    return document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim()||null;
+  }
+
   async function indexPreparedCorpusFromYouTube(cues){
     const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
     if(!videoId || state.youtube.corpusIndexing.has(videoId) || !cues?.length) return;
@@ -768,7 +780,7 @@
         body:JSON.stringify({
           provider:"youtube",
           external_id:videoId,
-          title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim()||null,
+          title:currentYouTubeTitle(),
           url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
           language:"de",
           target_lemmas:targetLemmas,
@@ -802,7 +814,7 @@
       body:JSON.stringify({
         provider:"youtube",
         external_id:videoId,
-        title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim()||null,
+        title:currentYouTubeTitle(),
         url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
         language:"de",
         index_all:true,
