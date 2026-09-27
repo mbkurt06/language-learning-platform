@@ -45,6 +45,7 @@ class EncounterCreate(BaseModel):
     url: str | None = None
     title: str | None = None
     media_timestamp_ms: int | None = None
+    media_end_timestamp_ms: int | None = None
     context: dict[str, Any] = Field(default_factory=dict)
 
 
