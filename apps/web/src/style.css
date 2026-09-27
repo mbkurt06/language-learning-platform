@@ -60,6 +60,9 @@ h1{font-size:40px;letter-spacing:-.035em;margin:0 0 8px}
 .word-head h2{margin:8px 0 3px;font-size:25px;letter-spacing:-.02em}
 .meaning{margin:0;color:#536176}
 .encounter-badge{white-space:nowrap;background:#f4f7fa;color:#647287;padding:6px 9px;border-radius:999px;font-size:11px}
+.word-actions{display:flex;align-items:center;gap:8px}
+.delete-word{border:1px solid #e2e8f0;background:#fff;color:#69778b;border-radius:9px;padding:6px 9px;font-size:11px;font-weight:700}
+.delete-word:hover:not(:disabled){border-color:#f0b8b8;color:#b42318;background:#fff8f8}
 .no-encounter{margin:18px 0 0;color:#8793a3;font-size:13px;padding-top:16px;border-top:1px solid #edf1f5}
 
 .encounters{display:flex;flex-direction:column;gap:11px;margin-top:19px;padding-top:17px;border-top:1px solid #edf1f5}
