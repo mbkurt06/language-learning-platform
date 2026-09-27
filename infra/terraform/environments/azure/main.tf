@@ -1,4 +1,6 @@
-provider "azurerm" { features {} }
+provider "azurerm" {
+  features {}
+}
 
 resource "azurerm_resource_group" "platform" {
   name     = var.resource_group_name
@@ -32,7 +34,7 @@ resource "azurerm_network_security_group" "platform" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
-    source_address_prefix      = "*"
+    source_address_prefix      = var.allowed_ssh_cidr
     destination_address_prefix = "*"
   }
 
@@ -76,11 +78,11 @@ resource "azurerm_network_interface_security_group_association" "platform" {
 }
 
 resource "azurerm_linux_virtual_machine" "platform" {
-  name                = "vm-language-learning"
-  resource_group_name = azurerm_resource_group.platform.name
-  location            = azurerm_resource_group.platform.location
-  size                = var.vm_size
-  admin_username      = var.admin_username
+  name                  = "vm-language-learning"
+  resource_group_name   = azurerm_resource_group.platform.name
+  location              = azurerm_resource_group.platform.location
+  size                  = var.vm_size
+  admin_username        = var.admin_username
   network_interface_ids = [azurerm_network_interface.platform.id]
 
   admin_ssh_key {
