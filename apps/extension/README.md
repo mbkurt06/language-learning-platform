@@ -57,3 +57,8 @@ Platform-specific DOM handling stays in the extension. Linguistic analysis stays
 The extension resolves a German → Turkish learning profile through Platform API and treats PostgreSQL as the source of truth for the “Öğreniyorum” list.
 
 On first run after migration, any legacy `chrome.storage.sync.learningItems` entries are copied to Platform API and then removed from Chrome sync storage. Chrome sync keeps only lightweight client configuration such as the API URL, client subject and resolved profile id.
+
+
+## YouTube encounter capture
+
+When a new word or expression is added to **Öğreniyorum** on YouTube, the extension also stores an encounter through Platform API with the subtitle sentence, video identity, source URL and cue start/end timestamps. The web app uses this data for source review and sentence-only playback.
