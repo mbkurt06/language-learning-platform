@@ -12,6 +12,7 @@
     tooltipHideTimer:null,
     settings:{showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82},
     learningItems:[],
+    learningProfileId:null,
     youtube:{
       overlay:null,
       germanLine:null,
@@ -117,12 +118,128 @@
     return state.learningItems.some(item=>learningKey(item.kind,item.key)===wanted);
   }
 
-  function saveLearningItem(item){
+  async function platformApiBase(){
+    const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
+    return platformApiUrl.replace(/\/$/,"");
+  }
+
+  function normalizeApiLearningItem(item){
+    const translation=(item.translations||[]).find(entry=>entry.language==="tr") || item.translations?.[0];
+    return {
+      id:item.id,
+      kind:item.category,
+      key:item.canonical_key,
+      label:item.canonical_form,
+      meaning_tr:translation?.meaning||"",
+    };
+  }
+
+  function refreshLearningHighlights(){
+    if(adapter.id==="youtube" && state.youtube.cues?.length){
+      state.youtube.cueIndex=-1;
+      renderTimedCue();
+      return;
+    }
+    document.querySelectorAll("[data-gle-text]").forEach(node=>{
+      const text=node.dataset.gleText;
+      node.dataset.gleText="";
+      decorate(node,text);
+    });
+  }
+
+  async function ensureLearningProfile(){
+    const stored=await chrome.storage.sync.get({
+      clientSubject:"",
+      learningProfileId:"",
+      learningItems:[],
+      learningItemsMigratedToApi:false,
+    });
+    let clientSubject=stored.clientSubject;
+    if(!clientSubject){
+      clientSubject=crypto.randomUUID();
+      await chrome.storage.sync.set({clientSubject});
+    }
+
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/profiles/ensure",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        external_subject:clientSubject,
+        source_language:"de",
+        target_language:"tr",
+      }),
+    });
+    if(!response.ok) throw new Error("Platform API profile "+response.status);
+    const profile=await response.json();
+    state.learningProfileId=profile.id;
+    await chrome.storage.sync.set({learningProfileId:profile.id});
+
+    if(!stored.learningItemsMigratedToApi && Array.isArray(stored.learningItems) && stored.learningItems.length){
+      for(const legacy of stored.learningItems){
+        await fetch(apiBase+"/api/v1/learning-items",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            profile_id:profile.id,
+            canonical_form:legacy.label||legacy.key,
+            canonical_key:String(legacy.key||"").toLocaleLowerCase("de-DE"),
+            category:legacy.kind||"word",
+            status:"learning",
+            meaning:legacy.meaning_tr||null,
+            meaning_language:legacy.meaning_tr?"tr":null,
+            metadata:{migrated_from:"chrome.storage.sync"},
+          }),
+        });
+      }
+      await chrome.storage.sync.set({learningItemsMigratedToApi:true});
+      await chrome.storage.sync.remove("learningItems");
+    }
+    return profile.id;
+  }
+
+  async function loadLearningItems(){
+    const profileId=state.learningProfileId || await ensureLearningProfile();
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
+    if(!response.ok) throw new Error("Platform API learning items "+response.status);
+    const payload=await response.json();
+    state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
+    refreshLearningHighlights();
+  }
+
+  async function saveLearningItem(item){
     const normalized={...item,key:String(item.key||"").toLocaleLowerCase("de-DE")};
     const id=learningKey(normalized.kind,normalized.key);
     if(state.learningItems.some(existing=>learningKey(existing.kind,existing.key)===id)) return;
-    state.learningItems=[...state.learningItems,normalized];
-    chrome.storage.sync.set({learningItems:state.learningItems});
+    const profileId=state.learningProfileId || await ensureLearningProfile();
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/learning-items",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        profile_id:profileId,
+        canonical_form:normalized.label||normalized.key,
+        canonical_key:normalized.key,
+        category:normalized.kind,
+        status:"learning",
+        meaning:normalized.meaning_tr||null,
+        meaning_language:normalized.meaning_tr?"tr":null,
+        metadata:{source:"chrome-extension"},
+      }),
+    });
+    if(!response.ok) throw new Error("Platform API learning item "+response.status);
+    await loadLearningItems();
+  }
+
+  async function removeLearningItem(kind,key){
+    const wanted=learningKey(kind,key);
+    const item=state.learningItems.find(existing=>learningKey(existing.kind,existing.key)===wanted);
+    if(!item?.id) return;
+    const apiBase=await platformApiBase();
+    const response=await fetch(apiBase+"/api/v1/learning-items/"+encodeURIComponent(item.id),{method:"DELETE"});
+    if(!response.ok && response.status!==404) throw new Error("Platform API learning item "+response.status);
+    await loadLearningItems();
   }
 
   function renderCard(data, tokenIndex, anchor){
@@ -185,27 +302,33 @@
     state.tooltip.innerHTML=header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>";
     const learnButton=state.tooltip.querySelector(".gle-learn-toggle");
     if(learnButton){
-      learnButton.addEventListener("click",()=>{
+      learnButton.addEventListener("click",async()=>{
         const kind=learnButton.dataset.kind;
         const key=learnButton.dataset.key;
         const id=learningKey(kind,key);
         const existing=state.learningItems.some(item=>learningKey(item.kind,item.key)===id);
-        if(existing){
-          state.learningItems=state.learningItems.filter(item=>learningKey(item.kind,item.key)!==id);
-          chrome.storage.sync.set({learningItems:state.learningItems});
-          learnButton.innerHTML="☆ <span>Öğren</span>";
-          learnButton.title="Öğreniyorum listesine ekle";
-          learnButton.setAttribute("aria-label","Öğreniyorum listesine ekle");
-        }else{
-          saveLearningItem({
-            kind,
-            key,
-            label:learnButton.dataset.label,
-            meaning_tr:learnButton.dataset.meaning,
-          });
-          learnButton.innerHTML="★ <span>Öğren</span>";
-          learnButton.title="Öğreniyorum listesinden kaldır";
-          learnButton.setAttribute("aria-label","Öğreniyorum listesinden kaldır");
+        learnButton.disabled=true;
+        try{
+          if(existing){
+            await removeLearningItem(kind,key);
+            learnButton.innerHTML="☆ <span>Öğren</span>";
+            learnButton.title="Öğreniyorum listesine ekle";
+            learnButton.setAttribute("aria-label","Öğreniyorum listesine ekle");
+          }else{
+            await saveLearningItem({
+              kind,
+              key,
+              label:learnButton.dataset.label,
+              meaning_tr:learnButton.dataset.meaning,
+            });
+            learnButton.innerHTML="★ <span>Öğren</span>";
+            learnButton.title="Öğreniyorum listesinden kaldır";
+            learnButton.setAttribute("aria-label","Öğreniyorum listesinden kaldır");
+          }
+        }catch(error){
+          console.warn("Learning item sync failed",error);
+        }finally{
+          learnButton.disabled=false;
         }
       });
     }
@@ -757,13 +880,13 @@
     showSentenceTranslation:true,
     germanFontSize:100,
     translationFontSize:100,
-    youtubeSubtitlePositionY:82,
-    learningItems:[]
+    youtubeSubtitlePositionY:82
   },settings=>{
-    state.learningItems=Array.isArray(settings.learningItems)?settings.learningItems:[];
-    delete settings.learningItems;
     state.settings=settings;
     scan();
+    ensureLearningProfile()
+      .then(()=>loadLearningItems())
+      .catch(error=>console.warn("Learning state bootstrap failed",error));
   });
 
   chrome.storage.onChanged.addListener((changes,area)=>{
@@ -772,13 +895,6 @@
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
     if(changes.youtubeSubtitlePositionY) state.settings.youtubeSubtitlePositionY=changes.youtubeSubtitlePositionY.newValue;
-    if(changes.learningItems){
-      state.learningItems=Array.isArray(changes.learningItems.newValue)?changes.learningItems.newValue:[];
-      if(adapter.id==="youtube" && state.youtube.cues?.length){
-        state.youtube.cueIndex=-1;
-        renderTimedCue();
-      }
-    }
     applyYouTubeAppearance();
 
     document.querySelectorAll(".gle-subtitle-translation").forEach(el=>el.remove());
