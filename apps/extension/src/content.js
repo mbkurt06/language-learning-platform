@@ -296,6 +296,7 @@
 
   function renderAnalyzedTokens(node,text,data,hoverData=data){
     if(node.dataset.gleText!==text) return;
+    const translationNode=node.querySelector(".gle-subtitle-translation");
     node.textContent="";
     const tokens=data.tokens||[];
     const hoverTokens=hoverData.tokens||[];
@@ -369,6 +370,7 @@
       node.appendChild(span);
       if(shouldInsertSpace(token,tokens[i+1])) node.append(" ");
     });
+    if(translationNode) node.appendChild(translationNode);
   }
 
   function renderFallbackTokens(node,text){
