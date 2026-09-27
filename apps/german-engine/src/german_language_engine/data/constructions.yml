@@ -1,0 +1,166 @@
+# Fixed constructions, noun-verb combinations and copular phrase patterns.
+
+- id: fixed.auf_der_suche_nach_sein
+  canonical: "auf der Suche nach jemandem/etwas sein"
+  type: COPULAR_CONSTRUCTION
+  head_lemma: Suche
+  priority: 96
+  meaning_tr: ["birini/bir şeyi arıyor olmak", "birini/bir şeyi aramak"]
+  grammar_hint: "auf + Dat. · nach + Dat. · sein"
+  slots:
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Dat]}
+    - {id: nach, type: PREPOSITION, prep: nach, case: [Dat]}
+    - {id: sein, type: LEMMA, lemma: sein}
+
+- id: fixed.in_der_lage_sein
+  canonical: "in der Lage sein, etwas zu tun"
+  type: COPULAR_CONSTRUCTION
+  head_lemma: Lage
+  priority: 96
+  meaning_tr: ["bir şeyi yapabilecek durumda olmak", "bir şeye muktedir olmak"]
+  grammar_hint: "in + Dat. · sein · zu + Infinitiv"
+  slots:
+    - {id: in, type: PREPOSITION, prep: in, case: [Dat]}
+    - {id: sein, type: LEMMA, lemma: sein}
+
+- id: fixed.im_begriff_sein
+  canonical: "im Begriff sein, etwas zu tun"
+  type: COPULAR_CONSTRUCTION
+  head_lemma: Begriff
+  priority: 94
+  meaning_tr: ["bir şeyi yapmak üzere olmak"]
+  grammar_hint: "in + Dat. · sein · zu + Infinitiv"
+  slots:
+    - {id: in, type: PREPOSITION, prep: in, case: [Dat]}
+    - {id: sein, type: LEMMA, lemma: sein}
+
+- id: fixed.ausser_gefahr_sein
+  canonical: "außer Gefahr sein"
+  type: COPULAR_CONSTRUCTION
+  head_lemma: Gefahr
+  priority: 92
+  meaning_tr: ["tehlikeyi atlatmış olmak", "tehlikede olmamak"]
+  slots:
+    - {id: ausser, type: PREPOSITION, prep: außer}
+    - {id: sein, type: LEMMA, lemma: sein}
+
+- id: fvg.in_frage_kommen
+  canonical: "in Frage kommen"
+  type: FUNCTION_VERB
+  head_lemma: kommen
+  priority: 94
+  meaning_tr: ["söz konusu olmak", "uygun/olası seçenek olmak"]
+  slots:
+    - {id: frage, type: LEMMA, lemma: Frage}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: fvg.in_frage_stellen
+  canonical: "etwas in Frage stellen"
+  type: FUNCTION_VERB
+  head_lemma: stellen
+  priority: 94
+  meaning_tr: ["bir şeyi sorgulamak", "bir şeyden kuşku duymak"]
+  slots:
+    - {id: frage, type: LEMMA, lemma: Frage}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: fvg.in_betracht_ziehen
+  canonical: "etwas in Betracht ziehen"
+  type: FUNCTION_VERB
+  head_lemma: ziehen
+  priority: 94
+  meaning_tr: ["bir şeyi göz önünde bulundurmak", "değerlendirmek"]
+  slots:
+    - {id: betracht, type: LEMMA, lemma: Betracht}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: fvg.zum_ausdruck_bringen
+  canonical: "etwas zum Ausdruck bringen"
+  type: FUNCTION_VERB
+  head_lemma: bringen
+  priority: 94
+  meaning_tr: ["bir şeyi ifade etmek", "dile getirmek"]
+  slots:
+    - {id: ausdruck, type: LEMMA, lemma: Ausdruck}
+    - {id: zu, type: PREPOSITION, prep: zu}
+
+- id: fvg.zur_sprache_bringen
+  canonical: "etwas zur Sprache bringen"
+  type: FUNCTION_VERB
+  head_lemma: bringen
+  priority: 94
+  meaning_tr: ["bir konuyu gündeme getirmek", "konuyu açmak"]
+  slots:
+    - {id: sprache, type: LEMMA, lemma: Sprache}
+    - {id: zu, type: PREPOSITION, prep: zu}
+
+- id: fvg.in_erfuellung_gehen
+  canonical: "in Erfüllung gehen"
+  type: FUNCTION_VERB
+  head_lemma: gehen
+  priority: 92
+  meaning_tr: ["gerçekleşmek", "yerine gelmek"]
+  slots:
+    - {id: erfuellung, type: LEMMA, lemma: Erfüllung}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: fvg.zum_einsatz_kommen
+  canonical: "zum Einsatz kommen"
+  type: FUNCTION_VERB
+  head_lemma: kommen
+  priority: 90
+  meaning_tr: ["kullanılmak", "devreye girmek"]
+  slots:
+    - {id: einsatz, type: LEMMA, lemma: Einsatz}
+    - {id: zu, type: PREPOSITION, prep: zu}
+
+- id: fvg.einfluss_nehmen_auf
+  canonical: "Einfluss auf jemanden/etwas nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 92
+  meaning_tr: ["birini/bir şeyi etkilemek", "üzerinde etkide bulunmak"]
+  grammar_hint: "auf + Akk."
+  slots:
+    - {id: einfluss, type: LEMMA, lemma: Einfluss}
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: fvg.abschied_nehmen_von
+  canonical: "Abschied von jemandem/etwas nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 90
+  meaning_tr: ["birine/bir şeye veda etmek"]
+  grammar_hint: "von + Dat."
+  slots:
+    - {id: abschied, type: LEMMA, lemma: Abschied}
+    - {id: von, type: PREPOSITION, prep: von, case: [Dat]}
+
+- id: fixed.darauf_ankommen
+  canonical: "auf jemanden/etwas ankommen"
+  type: VERB_PREPOSITION
+  head_lemma: ankommen
+  priority: 90
+  meaning_tr: ["birine/bir şeye bağlı olmak", "önemli olan ... olmak"]
+  grammar_hint: "auf + Akk. · oft: darauf ankommen"
+  slots:
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: fixed.es_geht_um
+  canonical: "es geht um jemanden/etwas"
+  type: FIXED_CONSTRUCTION
+  head_lemma: gehen
+  priority: 94
+  meaning_tr: ["konu biri/bir şey olmak", "biri/bir şey hakkında olmak"]
+  grammar_hint: "um + Akk."
+  slots:
+    - {id: um, type: PREPOSITION, prep: um, case: [Acc]}
+
+- id: fixed.es_kommt_darauf_an
+  canonical: "es kommt darauf an"
+  type: FIXED_CONSTRUCTION
+  head_lemma: ankommen
+  priority: 96
+  meaning_tr: ["duruma bağlı", "önemli olan ..."]
+  slots:
+    - {id: darauf, type: PRONOMINAL_ADVERB, prep: auf}

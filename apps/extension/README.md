@@ -1,21 +1,52 @@
 # German Language Extension
 
-Chrome Manifest V3 client for the German Language Engine.
+Chrome Manifest V3 client for the Language Learning Platform.
 
 ## Goal
+
 Real subtitle testing on ZDF, ARD Mediathek and YouTube with the UX rule **context first, dictionary second**.
 
 The extension is intentionally thin:
+
 1. a site adapter observes visible subtitle text;
 2. subtitle words become hover targets;
-3. the full sentence is sent to the language engine;
-4. hover renders expression/chunk first, contextual meaning next, lexical/dictionary detail last.
+3. the full sentence is sent to Platform API;
+4. Platform API routes the request to the configured language engine;
+5. hover renders expression/chunk first, contextual meaning next, lexical/dictionary detail last.
 
 ## Local development
-Load this repository as an unpacked extension in Chrome. The default engine endpoint is `http://127.0.0.1:8765` and can be changed in the extension options.
+
+Start the complete platform stack from the repository root:
+
+```bash
+docker compose up --build
+```
+
+Then load `apps/extension` as an unpacked extension in Chrome.
+
+The default Platform API endpoint is:
+
+```text
+http://127.0.0.1:8000
+```
+
+It can be changed in the extension options.
+
+The extension no longer connects directly to `german-engine:8765`. The browser talks only to Platform API.
 
 ## Architecture
-The extension does not implement German grammar. Platform-specific DOM handling stays here; linguistic analysis stays in `german-language-engine`.
 
-### Status
-This is the first real-environment scaffold. YouTube has an explicit caption selector. ZDF/ARD selectors are deliberately adapter-based and will be hardened from observations in live pages during testing.
+```text
+Chrome Extension
+      |
+      v
+Platform API :8000
+      |
+      v
+German Engine :8765
+      |
+      v
+LibreTranslate :5000
+```
+
+Platform-specific DOM handling stays in the extension. Linguistic analysis stays in `apps/german-engine`.

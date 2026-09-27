@@ -8,8 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     database_url: str = "postgresql+psycopg://platform:platform@localhost:5432/language_learning"
-    language_engine_urls: str = '{"de":"http://host.docker.internal:8765"}'
-    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+    language_engine_urls: str = '{"de":"http://german-engine:8765"}'
+    cors_origins: str = "http://localhost:3001,http://localhost:5173"
+    cors_origin_regex: str = r"^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$"
     environment: str = "local"
 
     def engine_urls(self) -> dict[str, str]:

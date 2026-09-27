@@ -25,24 +25,42 @@ services:
       - "5001:5000"
     restart: unless-stopped
 
+  german-engine:
+    build:
+      context: ./apps/german-engine
+    environment:
+      GLE_TRANSLATION_URL: ${GLE_TRANSLATION_URL:-http://translation:5000}
+    ports:
+      - "8765:8765"
+    depends_on:
+      translation:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   api:
     build:
       context: ./apps/api
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-local}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://platform:platform@postgres:5432/language_learning}
-      LANGUAGE_ENGINE_URLS: '${LANGUAGE_ENGINE_URLS:-{"de":"http://host.docker.internal:8765"}}'
+      LANGUAGE_ENGINE_URLS: '${LANGUAGE_ENGINE_URLS:-{"de":"http://german-engine:8765"}}'
       TRANSLATION_URL: ${TRANSLATION_URL:-http://translation:5000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
+      CORS_ORIGIN_REGEX: '${CORS_ORIGIN_REGEX:-^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$}'
     ports:
       - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
       translation:
         condition: service_started
+      german-engine:
+        condition: service_healthy
     restart: unless-stopped
 
   web:

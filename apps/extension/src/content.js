@@ -221,14 +221,20 @@
     if(state.analysisInflight.has(text)) return state.analysisInflight.get(text);
 
     const request=(async()=>{
-      const {engineUrl="http://127.0.0.1:8765"}=await chrome.storage.sync.get("engineUrl");
-      const response=await fetch(engineUrl.replace(/\/$/,"")+"/analyze",{
+      const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
+      const response=await fetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/analyze",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({text})
+        body:JSON.stringify({
+          source_language:"de",
+          target_language:"tr",
+          text
+        })
       });
-      if(!response.ok) throw new Error("Engine "+response.status);
-      const data=await response.json();
+      if(!response.ok) throw new Error("Platform API "+response.status);
+      const payload=await response.json();
+      const data=payload.analysis;
+      if(!data) throw new Error("Platform API response missing analysis");
       state.cache.set(text,data);
       return data;
     })();
