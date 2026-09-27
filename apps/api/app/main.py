@@ -18,6 +18,7 @@ from .schemas import (
     EncounterCreate,
     LearningItemCreate,
     LearningProfileCreate,
+    LearningProfileEnsure,
     UserCreate,
 )
 from .services import UnsupportedLanguageError, analyze_text, match_learning_items
@@ -83,6 +84,38 @@ def create_profile(payload: LearningProfileCreate, db: DbSession):
     }
 
 
+@app.post("/api/v1/profiles/ensure")
+def ensure_profile(payload: LearningProfileEnsure, db: DbSession):
+    user = db.scalar(select(User).where(User.external_subject == payload.external_subject))
+    if user is None:
+        user = User(external_subject=payload.external_subject)
+        db.add(user)
+        db.flush()
+
+    profile = db.scalar(select(LearningProfile).where(
+        LearningProfile.user_id == user.id,
+        LearningProfile.source_language == payload.source_language,
+        LearningProfile.target_language == payload.target_language,
+    ))
+    if profile is None:
+        profile = LearningProfile(
+            user_id=user.id,
+            source_language=payload.source_language,
+            target_language=payload.target_language,
+            level=payload.level,
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+
+    return {
+        "id": profile.id,
+        "source_language": profile.source_language,
+        "target_language": profile.target_language,
+        "level": profile.level,
+    }
+
+
 @app.post("/api/v1/analyze", response_model=AnalyzeResponse)
 def analyze(payload: AnalyzeRequest):
     try:
@@ -105,10 +138,8 @@ def analyze_and_match(payload: AnalyzeAndMatchRequest, db: DbSession):
     return {"analysis": analysis, "learning_matches": match_learning_items(db, payload.profile_id, analysis)}
 
 
-@app.get("/api/v1/learning-items")
-def list_learning_items(profile_id: UUID, db: DbSession):
-    items = db.scalars(select(LearningItem).where(LearningItem.profile_id == profile_id).order_by(LearningItem.created_at.desc())).all()
-    return {"items": [{
+def serialize_learning_item(item: LearningItem):
+    return {
         "id": item.id,
         "canonical_form": item.canonical_form,
         "canonical_key": item.canonical_key,
@@ -116,27 +147,76 @@ def list_learning_items(profile_id: UUID, db: DbSession):
         "language_specific_type": item.language_specific_type,
         "status": item.status,
         "translations": [{"language": t.language, "meaning": t.meaning} for t in item.translations],
-    } for item in items]}
+    }
+
+
+@app.get("/api/v1/learning-items")
+def list_learning_items(profile_id: UUID, db: DbSession):
+    if db.get(LearningProfile, profile_id) is None:
+        raise HTTPException(status_code=404, detail="learning profile not found")
+    items = db.scalars(
+        select(LearningItem)
+        .where(LearningItem.profile_id == profile_id)
+        .order_by(LearningItem.created_at.desc())
+    ).all()
+    return {"items": [serialize_learning_item(item) for item in items]}
 
 
 @app.post("/api/v1/learning-items")
 def create_learning_item(payload: LearningItemCreate, db: DbSession):
-    item = LearningItem(
-        profile_id=payload.profile_id,
-        canonical_form=payload.canonical_form,
-        canonical_key=payload.canonical_key,
-        category=payload.category,
-        language_specific_type=payload.language_specific_type,
-        status=payload.status,
-        metadata_json=payload.metadata,
-    )
-    db.add(item)
-    db.flush()
+    if db.get(LearningProfile, payload.profile_id) is None:
+        raise HTTPException(status_code=404, detail="learning profile not found")
+
+    item = db.scalar(select(LearningItem).where(
+        LearningItem.profile_id == payload.profile_id,
+        LearningItem.canonical_key == payload.canonical_key,
+    ))
+    if item is None:
+        item = LearningItem(
+            profile_id=payload.profile_id,
+            canonical_form=payload.canonical_form,
+            canonical_key=payload.canonical_key,
+            category=payload.category,
+            language_specific_type=payload.language_specific_type,
+            status=payload.status,
+            metadata_json=payload.metadata,
+        )
+        db.add(item)
+        db.flush()
+    else:
+        item.canonical_form = payload.canonical_form
+        item.category = payload.category
+        item.language_specific_type = payload.language_specific_type
+        item.status = payload.status
+        item.metadata_json = payload.metadata
+
     if payload.meaning and payload.meaning_language:
-        db.add(LearningItemTranslation(learning_item_id=item.id, language=payload.meaning_language, meaning=payload.meaning))
+        translation = db.scalar(select(LearningItemTranslation).where(
+            LearningItemTranslation.learning_item_id == item.id,
+            LearningItemTranslation.language == payload.meaning_language,
+        ))
+        if translation is None:
+            db.add(LearningItemTranslation(
+                learning_item_id=item.id,
+                language=payload.meaning_language,
+                meaning=payload.meaning,
+            ))
+        else:
+            translation.meaning = payload.meaning
+
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "status": item.status}
+    return serialize_learning_item(item)
+
+
+@app.delete("/api/v1/learning-items/{item_id}")
+def delete_learning_item(item_id: UUID, db: DbSession):
+    item = db.get(LearningItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="learning item not found")
+    db.delete(item)
+    db.commit()
+    return {"deleted": True, "id": item_id}
 
 
 @app.post("/api/v1/encounters")
