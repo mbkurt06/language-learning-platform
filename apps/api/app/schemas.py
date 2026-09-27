@@ -39,3 +39,14 @@ class EncounterCreate(BaseModel):
     title: str | None = None
     media_timestamp_ms: int | None = None
     context: dict[str, Any] = Field(default_factory=dict)
+
+
+class UserCreate(BaseModel):
+    external_subject: str = Field(min_length=1, max_length=255)
+
+
+class LearningProfileCreate(BaseModel):
+    user_id: UUID
+    source_language: str = Field(min_length=2, max_length=16)
+    target_language: str = Field(min_length=2, max_length=16)
+    level: str | None = None
