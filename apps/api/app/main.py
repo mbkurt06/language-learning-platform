@@ -8,7 +8,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import SessionLocal
-from .models import ContentSource, Encounter, LearningItem, LearningItemTranslation, LearningProfile, User
+from .models import (
+    ContentSource,
+    Encounter,
+    ExampleLexemeMatch,
+    ExampleSentence,
+    ExampleSource,
+    LearningItem,
+    LearningItemTranslation,
+    LearningProfile,
+    User,
+)
 from .providers import provider_catalog
 from .schemas import (
     AnalyzeAndMatchRequest,
@@ -150,6 +160,42 @@ def analyze_and_match(payload: AnalyzeAndMatchRequest, db: DbSession):
     return {"analysis": analysis, "learning_matches": match_learning_items(db, payload.profile_id, analysis)}
 
 
+def serialize_examples(db: Session, lemma: str, limit: int = 6):
+    matches = db.scalars(
+        select(ExampleLexemeMatch)
+        .where(ExampleLexemeMatch.lemma == lemma.lower())
+    ).all()
+
+    examples = []
+    seen_sources = set()
+    for match in matches:
+        sentence = db.get(ExampleSentence, match.example_sentence_id)
+        if sentence is None or sentence.source_id in seen_sources:
+            continue
+        source = db.get(ExampleSource, sentence.source_id)
+        if source is None:
+            continue
+        seen_sources.add(sentence.source_id)
+        examples.append({
+            "id": sentence.id,
+            "surface_form": match.surface_form,
+            "sentence": sentence.sentence,
+            "media_timestamp_ms": sentence.start_ms,
+            "media_end_timestamp_ms": sentence.end_ms,
+            "quality": sentence.quality,
+            "source": {
+                "provider": source.provider,
+                "source_type": "video",
+                "external_id": source.external_id,
+                "url": source.url,
+                "title": source.title,
+            },
+        })
+        if len(examples) >= limit:
+            break
+    return examples
+
+
 def serialize_learning_item(db: Session, item: LearningItem):
     encounters = db.scalars(
         select(Encounter)
@@ -164,6 +210,7 @@ def serialize_learning_item(db: Session, item: LearningItem):
         "language_specific_type": item.language_specific_type,
         "status": item.status,
         "translations": [{"language": t.language, "meaning": t.meaning} for t in item.translations],
+        "examples": serialize_examples(db, item.canonical_key) if item.category == "word" else [],
         "encounters": [{
             "id": encounter.id,
             "surface_form": encounter.surface_form,
