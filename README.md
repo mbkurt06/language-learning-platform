@@ -95,10 +95,6 @@ Learning items can carry source encounters. YouTube saves include the visible Ge
 
 The platform now separates a reusable example corpus from a learner's own encounters. Prepared examples are indexed by lemma and can be shown immediately in **Örnekleri Dinle** when a matching word is added to a learning profile.
 
-For the initial `lernen` prototype, run the idempotent seed inside the API container after migrations:
+Prepared examples can be indexed directly from the Chrome extension. On a YouTube watch page, open the extension popup and choose **Bu videoyu indexle**. The extension reuses the subtitle cues it already captured in the browser and sends them to Platform API, where the German Engine extracts reusable lemmas and stores exact sentence timestamps.
 
-```bash
-docker compose exec api python -m app.example_seed
-```
-
-The seed checks German YouTube transcripts, finds an actual inflected form of `lernen`, stores the verified subtitle window with exact timestamps, and keeps up to six different videos.
+Only videos explicitly selected with this action are fully indexed. A small configured target list can also be indexed automatically for experiments such as the initial `lernen` corpus.
