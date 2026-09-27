@@ -79,5 +79,6 @@ class ExampleCorpusIndexRequest(BaseModel):
     title: str | None = None
     url: str | None = None
     language: str = "de"
-    target_lemmas: list[str] = Field(min_length=1)
+    target_lemmas: list[str] = Field(default_factory=list)
+    index_all: bool = False
     cues: list[ExampleCue] = Field(min_length=1)
