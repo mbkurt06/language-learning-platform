@@ -65,6 +65,7 @@ type YTPlayer = {
   pauseVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getCurrentTime: () => number;
+  setPlaybackRate?: (rate: number) => void;
   setOption?: (module: string, option: string, value: unknown) => void;
   destroy: () => void;
 };
@@ -145,6 +146,7 @@ function SentencePlayer({
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
 
   const source = encounter.source;
   const startMs = Math.max(0, encounter.media_timestamp_ms || 0);
@@ -185,6 +187,7 @@ function SentencePlayer({
             // differ from the extension transcript for the same audio moment.
             event.target.setOption?.("captions", "track", {});
             event.target.seekTo(startMs / 1000, true);
+            event.target.setPlaybackRate?.(playbackRate);
             setPositionMs(0);
             setReady(true);
             event.target.playVideo();
@@ -242,7 +245,12 @@ function SentencePlayer({
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs, onComplete, repeatCount]);
+  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs, onComplete, repeatCount, playbackRate]);
+
+  function changePlaybackRate(rate: number) {
+    setPlaybackRate(rate);
+    playerRef.current?.setPlaybackRate?.(rate);
+  }
 
   function seek(relativeMs: number) {
     const next = Math.min(durationMs, Math.max(0, relativeMs));
@@ -279,6 +287,19 @@ function SentencePlayer({
     <div className="video-stage">
       <div ref={mountRef} className="youtube-mount" />
       <div className="sentence-overlay">{encounter.sentence}</div>
+    </div>
+    <div className="playback-rate-control" aria-label="Oynatma hızı">
+      <span>Hız</span>
+      {[0.5, 0.75, 1].map(rate =>
+        <button
+          key={rate}
+          className={playbackRate === rate ? "active" : ""}
+          onClick={() => changePlaybackRate(rate)}
+          disabled={!ready}
+        >
+          {rate}×
+        </button>
+      )}
     </div>
     <div className="segment-controls">
       <button onClick={() => seek(positionMs - 1000)} disabled={!ready} title="1 saniye geri">−1s</button>
