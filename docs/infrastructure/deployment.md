@@ -9,7 +9,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Web: http://localhost:3000
+- Web: http://localhost:3001
 - Platform API: http://localhost:8000
 - PostgreSQL: internal Docker network only
 - German engine: reached through `host.docker.internal:8765`
