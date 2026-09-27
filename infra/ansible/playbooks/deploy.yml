@@ -1,0 +1,37 @@
+- name: Deploy language learning platform
+  hosts: platform
+  become: true
+  vars:
+    platform_dir: /opt/language-learning-platform
+    platform_repo: "https://github.com/mbkurt06/language-learning-platform.git"
+    platform_version: main
+  tasks:
+    - name: Create platform directory
+      ansible.builtin.file:
+        path: "{{ platform_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Checkout requested release
+      ansible.builtin.git:
+        repo: "{{ platform_repo }}"
+        dest: "{{ platform_dir }}"
+        version: "{{ platform_version }}"
+        force: false
+      no_log: true
+
+    - name: Require externally managed environment file
+      ansible.builtin.stat:
+        path: "{{ platform_dir }}/.env"
+      register: platform_env
+
+    - name: Stop when secrets have not been provisioned
+      ansible.builtin.fail:
+        msg: "Provision {{ platform_dir }}/.env from your secret manager/Jenkins credentials before deploy."
+      when: not platform_env.stat.exists
+
+    - name: Pull and build platform
+      ansible.builtin.command:
+        cmd: docker compose up -d --build --remove-orphans
+        chdir: "{{ platform_dir }}"
+      changed_when: true
