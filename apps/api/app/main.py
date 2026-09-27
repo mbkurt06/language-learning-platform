@@ -173,6 +173,96 @@ def index_example_cues(payload: ExampleCorpusIndexRequest, db: DbSession):
     return {"indexed": indexed, "count": len(indexed)}
 
 
+@app.post("/api/v1/example-corpus/index-video")
+def index_example_video(payload: ExampleCorpusIndexRequest, db: DbSession):
+    allowed_pos = {"NOUN", "PROPN", "VERB", "ADJ", "ADV"}
+
+    source = db.scalar(select(ExampleSource).where(
+        ExampleSource.provider == payload.provider,
+        ExampleSource.external_id == payload.external_id,
+    ))
+    if source is None:
+        source = ExampleSource(
+            provider=payload.provider,
+            external_id=payload.external_id,
+            title=payload.title,
+            url=payload.url,
+            language=payload.language,
+            metadata_json={"indexed_by": "browser-extension-manual"},
+        )
+        db.add(source)
+        db.flush()
+    else:
+        source.title = payload.title or source.title
+        source.url = payload.url or source.url
+
+    indexed = []
+    seen_lemmas = set()
+
+    for cue in payload.cues:
+        try:
+            analysis = analyze_text(payload.language, cue.text)
+        except Exception:
+            continue
+
+        candidates = [
+            token for token in analysis.get("tokens", [])
+            if str(token.get("pos", "")).upper() in allowed_pos
+            and str(token.get("lemma", "")).strip()
+        ]
+        if not candidates:
+            continue
+
+        sentence = db.scalar(select(ExampleSentence).where(
+            ExampleSentence.source_id == source.id,
+            ExampleSentence.start_ms == cue.start_ms,
+            ExampleSentence.end_ms == cue.end_ms,
+        ))
+        if sentence is None:
+            sentence = ExampleSentence(
+                source_id=source.id,
+                sentence=cue.text,
+                start_ms=cue.start_ms,
+                end_ms=cue.end_ms,
+                quality="youtube-json3",
+                metadata_json={"indexed_by": "browser-extension-manual"},
+            )
+            db.add(sentence)
+            db.flush()
+
+        for token in candidates:
+            lemma = str(token.get("lemma", "")).strip().lower()
+            if not lemma or lemma in seen_lemmas:
+                continue
+
+            match = db.scalar(select(ExampleLexemeMatch).where(
+                ExampleLexemeMatch.example_sentence_id == sentence.id,
+                ExampleLexemeMatch.lemma == lemma,
+            ))
+            if match is None:
+                db.add(ExampleLexemeMatch(
+                    example_sentence_id=sentence.id,
+                    lemma=lemma,
+                    surface_form=str(token.get("text") or lemma),
+                ))
+
+            seen_lemmas.add(lemma)
+            indexed.append({
+                "lemma": lemma,
+                "surface_form": str(token.get("text") or lemma),
+                "sentence": cue.text,
+                "start_ms": cue.start_ms,
+                "end_ms": cue.end_ms,
+            })
+
+    db.commit()
+    return {
+        "indexed": indexed,
+        "count": len(indexed),
+        "unique_lemmas": len(seen_lemmas),
+    }
+
+
 @app.post("/api/v1/users")
 def create_user(payload: UserCreate, db: DbSession):
     user = User(external_subject=payload.external_subject)
