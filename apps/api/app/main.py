@@ -68,14 +68,16 @@ def providers():
 
 
 EXAMPLE_INDEX_TARGETS = {
-    "_fFwfcS_9TY": ["lernen"],
-    "BXv8NUSOZko": ["lernen"],
-    "ELkk8PQssE4": ["lernen"],
-    "DwQMtqGRscg": ["lernen"],
-    "tuD9NsBj7vg": ["lernen"],
-    "R6XtawFJAj0": ["lernen"],
-    "EhOONXEZRTA": ["lernen"],
-    "m9rk87XbqhY": ["lernen"],
+    # Visual, natural-speed German videos selected for the initial lernen corpus.
+    # The browser extension captures the real YouTube JSON3 cues and the API
+    # verifies the lemma before storing an example, so no guessed timestamps
+    # are committed here.
+    "KJ7qOMr_6o0": ["lernen"],  # GERMANIA - MefYou
+    "kup1mfXtkTc": ["lernen"],  # GERMANIA - Melissa Lee
+    "P0XJHzynUYE": ["lernen"],  # GERMANIA - Sugar MMFK
+    "68-ITNXS78E": ["lernen"],  # GERMANIA - Donnie O'Sullivan
+    "_yFGmiHn_UE": ["lernen"],  # GERMANIA - Der Asiate
+    "TpqxiHgyy_Y": ["lernen"],  # Joseph DeChangeman - Selbstexperiment
 }
 
 
