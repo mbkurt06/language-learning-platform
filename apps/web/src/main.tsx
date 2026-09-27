@@ -38,6 +38,7 @@ type LearningItem = {
   language_specific_type?: string | null;
   status: string;
   translations: { language: string; meaning: string }[];
+  examples: Encounter[];
   encounters: Encounter[];
 };
 
@@ -296,7 +297,7 @@ function playlistEncounters(encounters: Encounter[]) {
 }
 
 function ExamplePlaylist({ item, onClose }: { item: LearningItem; onClose: () => void }) {
-  const examples = useMemo(() => playlistEncounters(item.encounters), [item.encounters]);
+  const examples = useMemo(() => playlistEncounters(item.examples), [item.examples]);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -418,7 +419,7 @@ function App() {
     if (!needle) return items;
     return items.filter(item => {
       const meaning = item.translations.map(t => t.meaning).join(" ");
-      const sentences = item.encounters.map(e => e.sentence).join(" ");
+      const sentences = [...item.encounters, ...item.examples].map(e => e.sentence).join(" ");
       return `${item.canonical_form} ${meaning} ${sentences}`.toLocaleLowerCase("de-DE").includes(needle);
     });
   }, [items, query]);
@@ -496,7 +497,7 @@ function App() {
               </div>
               <div className="word-actions">
                 <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
-                {playlistEncounters(item.encounters).length > 0 && <button
+                {playlistEncounters(item.examples).length > 0 && <button
                   className="listen-examples"
                   onClick={() => {
                     setPlayingEncounter(null);
