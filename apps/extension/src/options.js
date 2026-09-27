@@ -8,9 +8,9 @@ const status=document.querySelector("#status");
 const learningList=document.querySelector("#learningList");
 let learningItems=[];
 
-const defaults={engineUrl:"http://127.0.0.1:8765",showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,learningItems:[]};
+const defaults={platformApiUrl:"http://127.0.0.1:8000",showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,learningItems:[]};
 chrome.storage.sync.get(defaults,x=>{
-  url.value=x.engineUrl;
+  url.value=x.platformApiUrl;
   showTranslation.checked=x.showSentenceTranslation;
   germanSize.value=x.germanFontSize;
   germanSizeValue.value=x.germanFontSize+"%";
@@ -22,7 +22,7 @@ chrome.storage.sync.get(defaults,x=>{
 germanSize.addEventListener("input",()=>germanSizeValue.value=germanSize.value+"%");
 translationSize.addEventListener("input",()=>sizeValue.value=translationSize.value+"%");
 document.querySelector("#save").onclick=()=>chrome.storage.sync.set({
-  engineUrl:url.value.trim(),
+  platformApiUrl:url.value.trim(),
   showSentenceTranslation:showTranslation.checked,
   germanFontSize:Number(germanSize.value),
   translationFontSize:Number(translationSize.value)
