@@ -666,17 +666,16 @@
       const text=cues[i]?.text;
       if(text && !state.cache.has(text)) analyze(text).catch(()=>{});
 
-      // Translation is user-visible and latency-sensitive. Prefetch only the
-      // current cue's translation context; future wide hover contexts are
-      // intentionally left lazy to avoid flooding the engine at video start.
-      if(i===index){
-        const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,i);
-        if(translationText && !state.cache.has(translationText)) analyze(translationText).catch(()=>{});
-      }
+      // Sentence translation is latency-sensitive. Prefetch translation
+      // context for the visible cue and a small number of upcoming cues so
+      // playback can stay ahead of the subtitle clock. Wide hover context
+      // remains lazy to avoid flooding the engine.
+      const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,i);
+      if(translationText && !state.cache.has(translationText)) analyze(translationText).catch(()=>{});
     }
   }
 
-  function renderTimedCue(mediaTime){
+  function renderTimedCue(mediaTime,prefetchHorizon=2){
     const cues=state.youtube.cues;
     if(!cues?.length) return false;
 
@@ -693,7 +692,7 @@
       return true;
     }
 
-    prefetchYouTubeAnalyses(cue.index);
+    prefetchYouTubeAnalyses(cue.index,prefetchHorizon);
 
     if(state.youtube.cueIndex!==cue.index){
       state.youtube.cueIndex=cue.index;
@@ -720,7 +719,10 @@
     }
 
     state.youtube.video=video;
-    state.youtube.videoListeners=()=>renderTimedCue();
+    state.youtube.videoListeners=event=>{
+      const horizon=event?.type==="seeking" || event?.type==="seeked" ? 5 : 2;
+      renderTimedCue(undefined,horizon);
+    };
     ["timeupdate","seeking","seeked","play","pause","ratechange"].forEach(type=>
       video.addEventListener(type,state.youtube.videoListeners)
     );
