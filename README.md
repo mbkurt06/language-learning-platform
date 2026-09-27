@@ -89,3 +89,16 @@ The target architecture is one product repository: clients call Platform API rat
 ## Encounter review
 
 Learning items can carry source encounters. YouTube saves include the visible German subtitle, video id/title/link, and start/end timestamps. The web app exposes these under **Kelimelerim** and can replay the saved sentence segment with the YouTube embed player.
+
+
+## Prepared example corpus
+
+The platform now separates a reusable example corpus from a learner's own encounters. Prepared examples are indexed by lemma and can be shown immediately in **Örnekleri Dinle** when a matching word is added to a learning profile.
+
+For the initial `lernen` prototype, run the idempotent seed inside the API container after migrations:
+
+```bash
+docker compose exec api python -m app.example_seed
+```
+
+The seed checks German YouTube transcripts, finds an actual inflected form of `lernen`, stores the verified subtitle window with exact timestamps, and keeps up to six different videos.
