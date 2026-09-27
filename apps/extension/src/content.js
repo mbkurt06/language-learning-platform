@@ -527,16 +527,21 @@
     hideYouTubeOverlay();
   }
 
-  function prefetchYouTubeAnalyses(index,horizon=5){
+  function prefetchYouTubeAnalyses(index,horizon=2){
     const cues=state.youtube.cues;
     if(!cues?.length || index<0) return;
+
     for(let i=index;i<=Math.min(cues.length-1,index+horizon);i++){
       const text=cues[i]?.text;
       if(text && !state.cache.has(text)) analyze(text).catch(()=>{});
-      const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,i);
-      if(translationText && !state.cache.has(translationText)) analyze(translationText).catch(()=>{});
-      const hoverContextText=globalThis.GLEYoutubeCues.hoverTextForCue(cues,i);
-      if(hoverContextText && !state.cache.has(hoverContextText)) analyze(hoverContextText).catch(()=>{});
+
+      // Translation is user-visible and latency-sensitive. Prefetch only the
+      // current cue's translation context; future wide hover contexts are
+      // intentionally left lazy to avoid flooding the engine at video start.
+      if(i===index){
+        const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,i);
+        if(translationText && !state.cache.has(translationText)) analyze(translationText).catch(()=>{});
+      }
     }
   }
 
