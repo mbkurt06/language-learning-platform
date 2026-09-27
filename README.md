@@ -33,7 +33,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - API health: http://localhost:8000/health
 
-The default local configuration reaches the German engine through `host.docker.internal:8765`.
+The default local configuration reaches the German engine through `host.docker.internal:8765`. LibreTranslate now runs inside the same Compose project as `translation` and is exposed on host port `5001` for local diagnostics.
 
 ## First platform milestone
 

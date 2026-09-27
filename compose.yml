@@ -16,6 +16,15 @@ services:
       retries: 12
     restart: unless-stopped
 
+  translation:
+    image: libretranslate/libretranslate:v1.9.6
+    environment:
+      LT_LOAD_ONLY: ${LT_LOAD_ONLY:-de,en,tr}
+      LT_DISABLE_WEB_UI: "true"
+    ports:
+      - "5001:5000"
+    restart: unless-stopped
+
   api:
     build:
       context: ./apps/api
@@ -23,6 +32,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-local}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://platform:platform@postgres:5432/language_learning}
       LANGUAGE_ENGINE_URLS: '${LANGUAGE_ENGINE_URLS:-{"de":"http://host.docker.internal:8765"}}'
+      TRANSLATION_URL: ${TRANSLATION_URL:-http://translation:5000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
     ports:
       - "8000:8000"
@@ -31,6 +41,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      translation:
+        condition: service_started
     restart: unless-stopped
 
   web:

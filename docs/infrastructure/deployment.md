@@ -12,6 +12,7 @@ docker compose up --build
 - Web: http://localhost:3001
 - Platform API: http://localhost:8000
 - PostgreSQL: internal Docker network only
+- LibreTranslate: `http://localhost:5001` on the host, `http://translation:5000` inside Compose
 - German engine: reached through `host.docker.internal:8765`
 
 This is transitional. The engine will later receive its own production container image and join the same private network.
