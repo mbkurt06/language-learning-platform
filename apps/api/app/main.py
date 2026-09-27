@@ -76,7 +76,6 @@ EXAMPLE_INDEX_TARGETS = {
     "kup1mfXtkTc": ["lernen"],  # GERMANIA - Melissa Lee
     "P0XJHzynUYE": ["lernen"],  # GERMANIA - Sugar MMFK
     "68-ITNXS78E": ["lernen"],  # GERMANIA - Donnie O'Sullivan
-    "_yFGmiHn_UE": ["lernen"],  # GERMANIA - Der Asiate
     "TpqxiHgyy_Y": ["lernen"],  # Joseph DeChangeman - Selbstexperiment
 }
 
