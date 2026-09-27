@@ -6,9 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import SessionLocal
-from .models import ContentSource, Encounter, LearningItem, LearningItemTranslation
+from .models import ContentSource, Encounter, LearningItem, LearningItemTranslation, LearningProfile, User
 from .providers import provider_catalog
-from .schemas import AnalyzeAndMatchRequest, AnalyzeAndMatchResponse, EncounterCreate, LearningItemCreate
+from .schemas import (
+    AnalyzeAndMatchRequest,
+    AnalyzeAndMatchResponse,
+    EncounterCreate,
+    LearningItemCreate,
+    LearningProfileCreate,
+    UserCreate,
+)
 from .services import UnsupportedLanguageError, analyze_text, match_learning_items
 
 
@@ -38,6 +45,34 @@ def health():
 @app.get("/api/v1/providers")
 def providers():
     return {"providers": provider_catalog()}
+
+
+@app.post("/api/v1/users")
+def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+    user = User(external_subject=payload.external_subject)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "external_subject": user.external_subject}
+
+
+@app.post("/api/v1/profiles")
+def create_profile(payload: LearningProfileCreate, db: Session = Depends(get_db)):
+    profile = LearningProfile(
+        user_id=payload.user_id,
+        source_language=payload.source_language,
+        target_language=payload.target_language,
+        level=payload.level,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return {
+        "id": profile.id,
+        "source_language": profile.source_language,
+        "target_language": profile.target_language,
+        "level": profile.level,
+    }
 
 
 @app.post("/api/v1/analyze-and-match", response_model=AnalyzeAndMatchResponse)
