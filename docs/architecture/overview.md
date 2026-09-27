@@ -13,7 +13,7 @@ Chrome Extension       Web App        Mobile App
       |               |                |
  PostgreSQL      Language Engines   Provider Adapters
                       |                |
-                 DE / EN / ES    YouTube/ZDF/ARD/ARTE/...
+                 DE / EN / ES    YouTube/ZDF/ARD/ARTE/Netflix/...
 ```
 
 ## Boundaries
@@ -40,9 +40,11 @@ A provider declares capabilities independently:
 - metadata
 - playback
 - subtitles
+- browser_overlay
 
-This allows German providers such as ZDF/ARD and French providers to be added without modifying Learning Core.
-Provider adapters must respect each service's public APIs, embedding rules, DRM and terms; unsupported capabilities remain absent.
+This allows German providers such as ZDF/ARD, French providers, and browser-only streaming integrations such as Netflix to be added without modifying Learning Core. `browser_overlay` means the Chrome extension can observe user-visible subtitle/text surfaces and render learning UI on top of the page without becoming responsible for the protected video stream itself.
+
+Provider adapters must respect each service's public APIs, embedding rules, DRM and terms; unsupported capabilities remain absent. DRM-protected media is never downloaded, decrypted, proxied or re-hosted by the platform.
 
 ## Deployment
 
