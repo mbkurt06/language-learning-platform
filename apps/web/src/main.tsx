@@ -74,6 +74,7 @@ function App() {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [query, setQuery] = useState("");
   const [playingEncounter, setPlayingEncounter] = useState<string | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -115,6 +116,27 @@ function App() {
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, [profileId]);
+
+  async function removeLearningItem(item: LearningItem) {
+    const confirmed = window.confirm(`"${item.canonical_form}" ve buna ait tüm karşılaşmalar silinsin mi?`);
+    if (!confirmed) return;
+
+    setDeletingItemId(item.id);
+    try {
+      const response = await fetch(apiBase + "/api/v1/learning-items/" + encodeURIComponent(item.id), {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("delete failed");
+      setItems(current => current.filter(existing => existing.id !== item.id));
+      if (playingEncounter && item.encounters.some(encounter => encounter.id === playingEncounter)) {
+        setPlayingEncounter(null);
+      }
+    } catch {
+      window.alert("Kelime silinemedi. Platform API bağlantısını kontrol et.");
+    } finally {
+      setDeletingItemId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("de-DE");
@@ -197,7 +219,17 @@ function App() {
                 <h2>{item.canonical_form}</h2>
                 <p className="meaning">{meaning}</p>
               </div>
-              <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
+              <div className="word-actions">
+                <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
+                <button
+                  className="delete-word"
+                  disabled={deletingItemId === item.id}
+                  onClick={() => removeLearningItem(item)}
+                  title="Öğreniyorum listesinden çıkar"
+                >
+                  {deletingItemId === item.id ? "Siliniyor…" : "Listeden çıkar"}
+                </button>
+              </div>
             </div>
 
             {item.encounters.length === 0

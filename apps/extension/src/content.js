@@ -209,7 +209,7 @@
     refreshLearningHighlights();
   }
 
-  async function saveLearningItem(item){
+  async function saveLearningItem(item, encounterSnapshot=null){
     const normalized={...item,key:String(item.key||"").toLocaleLowerCase("de-DE")};
     const id=learningKey(normalized.kind,normalized.key);
     if(state.learningItems.some(existing=>learningKey(existing.kind,existing.key)===id)) return;
@@ -231,7 +231,7 @@
     });
     if(!response.ok) throw new Error("Platform API learning item "+response.status);
     const created=await response.json();
-    await captureCurrentEncounter(created.id,normalized.surface||normalized.label||normalized.key);
+    await captureCurrentEncounter(created.id,normalized.surface||normalized.label||normalized.key,encounterSnapshot);
     await loadLearningItems();
     return created;
   }
@@ -267,8 +267,8 @@
     };
   }
 
-  async function captureCurrentEncounter(learningItemId,surfaceForm){
-    const encounter=currentYouTubeEncounter(surfaceForm);
+  async function captureCurrentEncounter(learningItemId,surfaceForm,encounterSnapshot=null){
+    const encounter=encounterSnapshot || currentYouTubeEncounter(surfaceForm);
     if(!encounter || !encounter.sentence) return;
     const apiBase=await platformApiBase();
     const response=await fetch(apiBase+"/api/v1/encounters",{
@@ -343,6 +343,7 @@
       meaning:primaryMeaning,
       surface:sourceToken?.text||lemma,
     };
+    const encounterSnapshot=currentYouTubeEncounter(learnTarget.surface);
     const learning=learnTarget.key && isLearning(learnTarget.kind,learnTarget.key);
     const learnAction=learnTarget.key
       ? `<div class="gle-learn-actions"><button type="button" class="gle-learn-button gle-learn-toggle" title="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" aria-label="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" data-kind="${escAttr(learnTarget.kind)}" data-key="${escAttr(learnTarget.key)}" data-label="${escAttr(learnTarget.label)}" data-meaning="${escAttr(learnTarget.meaning)}" data-surface="${escAttr(learnTarget.surface)}">${learning?"★":"☆"} <span>Öğren</span></button></div>`
@@ -370,7 +371,7 @@
               label:learnButton.dataset.label,
               meaning_tr:learnButton.dataset.meaning,
               surface:learnButton.dataset.surface,
-            });
+            },encounterSnapshot);
             learnButton.innerHTML="★ <span>Öğren</span>";
             learnButton.title="Öğreniyorum listesinden kaldır";
             learnButton.setAttribute("aria-label","Öğreniyorum listesinden kaldır");
