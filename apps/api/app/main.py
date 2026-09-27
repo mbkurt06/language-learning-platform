@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from typing import Annotated
 from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +29,9 @@ def get_db():
         db.close()
 
 
+DbSession = Annotated[Session, Depends(get_db)]
+
+
 app = FastAPI(title="Language Learning Platform API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +53,7 @@ def providers():
 
 
 @app.post("/api/v1/users")
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(payload: UserCreate, db: DbSession):
     user = User(external_subject=payload.external_subject)
     db.add(user)
     db.commit()
@@ -57,7 +62,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/profiles")
-def create_profile(payload: LearningProfileCreate, db: Session = Depends(get_db)):
+def create_profile(payload: LearningProfileCreate, db: DbSession):
     profile = LearningProfile(
         user_id=payload.user_id,
         source_language=payload.source_language,
@@ -76,7 +81,7 @@ def create_profile(payload: LearningProfileCreate, db: Session = Depends(get_db)
 
 
 @app.post("/api/v1/analyze-and-match", response_model=AnalyzeAndMatchResponse)
-def analyze_and_match(payload: AnalyzeAndMatchRequest, db: Session = Depends(get_db)):
+def analyze_and_match(payload: AnalyzeAndMatchRequest, db: DbSession):
     try:
         analysis = analyze_text(payload.source_language, payload.text)
     except UnsupportedLanguageError as exc:
@@ -87,7 +92,7 @@ def analyze_and_match(payload: AnalyzeAndMatchRequest, db: Session = Depends(get
 
 
 @app.get("/api/v1/learning-items")
-def list_learning_items(profile_id: UUID, db: Session = Depends(get_db)):
+def list_learning_items(profile_id: UUID, db: DbSession):
     items = db.scalars(select(LearningItem).where(LearningItem.profile_id == profile_id).order_by(LearningItem.created_at.desc())).all()
     return {"items": [{
         "id": item.id,
@@ -101,7 +106,7 @@ def list_learning_items(profile_id: UUID, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/learning-items")
-def create_learning_item(payload: LearningItemCreate, db: Session = Depends(get_db)):
+def create_learning_item(payload: LearningItemCreate, db: DbSession):
     item = LearningItem(
         profile_id=payload.profile_id,
         canonical_form=payload.canonical_form,
@@ -121,7 +126,7 @@ def create_learning_item(payload: LearningItemCreate, db: Session = Depends(get_
 
 
 @app.post("/api/v1/encounters")
-def create_encounter(payload: EncounterCreate, db: Session = Depends(get_db)):
+def create_encounter(payload: EncounterCreate, db: DbSession):
     source = db.scalar(select(ContentSource).where(
         ContentSource.provider == payload.provider,
         ContentSource.external_id == payload.external_id,
