@@ -50,3 +50,10 @@ LibreTranslate :5000
 ```
 
 Platform-specific DOM handling stays in the extension. Linguistic analysis stays in `apps/german-engine`.
+
+
+## Learning state
+
+The extension resolves a German → Turkish learning profile through Platform API and treats PostgreSQL as the source of truth for the “Öğreniyorum” list.
+
+On first run after migration, any legacy `chrome.storage.sync.learningItems` entries are copied to Platform API and then removed from Chrome sync storage. Chrome sync keeps only lightweight client configuration such as the API URL, client subject and resolved profile id.
