@@ -57,3 +57,10 @@ class LearningProfileCreate(BaseModel):
     source_language: str = Field(min_length=2, max_length=16)
     target_language: str = Field(min_length=2, max_length=16)
     level: str | None = None
+
+
+class LearningProfileEnsure(BaseModel):
+    external_subject: str = Field(min_length=1, max_length=255)
+    source_language: str = Field(min_length=2, max_length=16)
+    target_language: str = Field(min_length=2, max_length=16)
+    level: str | None = None
