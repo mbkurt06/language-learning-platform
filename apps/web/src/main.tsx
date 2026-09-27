@@ -65,6 +65,7 @@ type YTPlayer = {
   pauseVideo: () => void;
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   getCurrentTime: () => number;
+  setPlaybackRate?: (rate: number) => void;
   setOption?: (module: string, option: string, value: unknown) => void;
   destroy: () => void;
 };
@@ -128,14 +129,24 @@ function segmentClock(milliseconds: number) {
   return `${minutes}:${secs.toFixed(1).padStart(4, "0")}`;
 }
 
-function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onComplete?: () => void }) {
+function SentencePlayer({
+  encounter,
+  onComplete,
+  repeatCount = 1,
+}: {
+  encounter: Encounter;
+  onComplete?: () => void;
+  repeatCount?: number;
+}) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const completedRef = useRef(false);
+  const completedPlaysRef = useRef(0);
   const completionTimerRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
 
   const source = encounter.source;
   const startMs = Math.max(0, encounter.media_timestamp_ms || 0);
@@ -148,6 +159,7 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
     if (!mountRef.current || !source || source.provider !== "youtube") return;
 
     completedRef.current = false;
+    completedPlaysRef.current = 0;
     let cancelled = false;
     let timer: number | undefined;
 
@@ -175,6 +187,7 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
             // differ from the extension transcript for the same audio moment.
             event.target.setOption?.("captions", "track", {});
             event.target.seekTo(startMs / 1000, true);
+            event.target.setPlaybackRate?.(playbackRate);
             setPositionMs(0);
             setReady(true);
             event.target.playVideo();
@@ -196,9 +209,19 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
           active.pauseVideo();
           setPlaying(false);
           setPositionMs(durationMs);
+
           if (!completedRef.current) {
             completedRef.current = true;
-            if (onComplete) {
+            completedPlaysRef.current += 1;
+
+            if (completedPlaysRef.current < repeatCount) {
+              completionTimerRef.current = window.setTimeout(() => {
+                completedRef.current = false;
+                active.seekTo(startMs / 1000, true);
+                setPositionMs(0);
+                active.playVideo();
+              }, 450);
+            } else if (onComplete) {
               completionTimerRef.current = window.setTimeout(onComplete, 450);
             }
           }
@@ -222,7 +245,12 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs, onComplete]);
+  }, [source?.external_id, source?.provider, startMs, endMs, freezeAtMs, durationMs, onComplete, repeatCount, playbackRate]);
+
+  function changePlaybackRate(rate: number) {
+    setPlaybackRate(rate);
+    playerRef.current?.setPlaybackRate?.(rate);
+  }
 
   function seek(relativeMs: number) {
     const next = Math.min(durationMs, Math.max(0, relativeMs));
@@ -242,6 +270,7 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
 
     if (positionMs >= durationMs - 150) {
       completedRef.current = false;
+      completedPlaysRef.current = 0;
       if (completionTimerRef.current !== null) {
         window.clearTimeout(completionTimerRef.current);
         completionTimerRef.current = null;
@@ -258,6 +287,19 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
     <div className="video-stage">
       <div ref={mountRef} className="youtube-mount" />
       <div className="sentence-overlay">{encounter.sentence}</div>
+    </div>
+    <div className="playback-rate-control" aria-label="Oynatma hızı">
+      <span>Hız</span>
+      {[0.5, 0.75, 1].map(rate =>
+        <button
+          key={rate}
+          className={playbackRate === rate ? "active" : ""}
+          onClick={() => changePlaybackRate(rate)}
+          disabled={!ready}
+        >
+          {rate}×
+        </button>
+      )}
     </div>
     <div className="segment-controls">
       <button onClick={() => seek(positionMs - 1000)} disabled={!ready} title="1 saniye geri">−1s</button>
@@ -281,6 +323,18 @@ function SentencePlayer({ encounter, onComplete }: { encounter: Encounter; onCom
   </div>;
 }
 
+function examplePlaybackEncounter(encounter: Encounter) {
+  const startMs = Math.max(0, encounter.media_timestamp_ms || 0);
+  const rawEndMs = Math.max(startMs + 500, encounter.media_end_timestamp_ms || startMs + 5000);
+  if (rawEndMs - startMs <= 10000) return encounter;
+
+  return {
+    ...encounter,
+    media_timestamp_ms: Math.max(startMs, rawEndMs - 10000),
+    media_end_timestamp_ms: rawEndMs,
+  };
+}
+
 function playlistEncounters(encounters: Encounter[]) {
   const selected: Encounter[] = [];
   const seenVideos = new Set<string>();
@@ -299,12 +353,14 @@ function playlistEncounters(encounters: Encounter[]) {
 function ExamplePlaylist({ item, onClose }: { item: LearningItem; onClose: () => void }) {
   const examples = useMemo(() => playlistEncounters(item.examples), [item.examples]);
   const [index, setIndex] = useState(0);
+  const [repeatCount, setRepeatCount] = useState(1);
 
   useEffect(() => {
     if (index >= examples.length) setIndex(0);
   }, [examples.length, index]);
 
   const current = examples[index];
+  const playbackCurrent = current ? examplePlaybackEncounter(current) : null;
   if (!current) return <div className="example-playlist empty-playlist">
     <span>Henüz oynatılabilir YouTube örneği yok.</span>
     <button onClick={onClose}>Kapat</button>
@@ -320,10 +376,25 @@ function ExamplePlaylist({ item, onClose }: { item: LearningItem; onClose: () =>
       <button className="playlist-close" onClick={onClose}>Kapat</button>
     </div>
 
-    <SentencePlayer
-      encounter={current}
+    <div className="repeat-control">
+      <span>Her örnek</span>
+      {[1, 2, 3].map(count =>
+        <button
+          key={count}
+          className={repeatCount === count ? "active" : ""}
+          onClick={() => setRepeatCount(count)}
+        >
+          {count}×
+        </button>
+      )}
+      <small>kez oynat, sonra otomatik sonraki videoya geç</small>
+    </div>
+
+    {playbackCurrent && <SentencePlayer
+      encounter={playbackCurrent}
+      repeatCount={repeatCount}
       onComplete={index < examples.length - 1 ? () => setIndex(value => value + 1) : undefined}
-    />
+    />}
 
     <div className="playlist-nav">
       <button onClick={() => setIndex(value => Math.max(0, value - 1))} disabled={index === 0}>← Önceki</button>
