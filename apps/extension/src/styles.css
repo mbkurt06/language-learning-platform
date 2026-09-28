@@ -259,3 +259,51 @@ html.gle-zdf-panel-open #gle-player-controls{
 .gle-zdf-overlay .gle-subtitle-translation{
   font-size:clamp(18px,calc(2.1vw * var(--gle-translation-font-scale,1)),52px);
 }
+
+/* Shared panel header controls */
+#gle-player-controls{display:none!important}
+.gle-panel-actions{display:flex;align-items:center;flex:0 0 auto;height:50px}
+.gle-panel-actions button{
+  appearance:none;border:0;background:transparent;color:#b7b7c0;cursor:pointer;height:46px
+}
+.gle-header-main-toggle{
+  width:34px!important;height:30px!important;margin:0 2px;border-radius:9px!important;
+  border:1px solid #45454e!important;background:#202026!important;color:#d4d4d8!important;
+  font:800 14px/1 system-ui!important
+}
+.gle-header-main-toggle.is-active{
+  background:#6d28d9!important;border-color:#8b5cf6!important;color:#fff!important;
+  box-shadow:0 0 0 1px rgba(168,85,247,.18)
+}
+.gle-header-settings{width:36px;font-size:17px!important}
+.gle-panel-actions .gle-panel-toggle{width:38px!important;flex:0 0 38px!important}
+
+/* When collapsed, the panel itself becomes the persistent G launcher. */
+#gle-youtube-panel.collapsed .gle-panel-actions{display:flex!important;width:46px;height:54px}
+#gle-youtube-panel.collapsed .gle-header-main-toggle,
+#gle-youtube-panel.collapsed .gle-header-settings{display:none!important}
+#gle-youtube-panel.collapsed .gle-panel-toggle{
+  display:block!important;width:46px!important;height:54px!important;
+  color:#fff!important;background:#6d28d9!important;font:800 16px/1 system-ui!important
+}
+
+/* ZDF: reserve real viewport space for the side panel. Some ZDF player shells
+   use viewport sizing, so constrain both the page and media surfaces. */
+html.gle-zdf-panel-open{
+  overflow-x:hidden!important;
+}
+html.gle-zdf-panel-open body{
+  width:calc(100vw - var(--gle-zdf-panel-space,432px))!important;
+  max-width:calc(100vw - var(--gle-zdf-panel-space,432px))!important;
+  min-width:0!important;
+  margin-right:var(--gle-zdf-panel-space,432px)!important;
+  box-sizing:border-box!important;
+  overflow-x:hidden!important;
+}
+html.gle-zdf-panel-open body video{
+  max-width:calc(100vw - var(--gle-zdf-panel-space,432px))!important;
+}
+html.gle-zdf-panel-open .gle-zdf-overlay{
+  left:calc((100vw - var(--gle-zdf-panel-space,432px))/2)!important;
+  max-width:calc(92vw - var(--gle-zdf-panel-space,432px))!important;
+}
