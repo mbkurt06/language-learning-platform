@@ -23,13 +23,12 @@ def make_handler(engine):
      texts=payload.get("texts") or []
      if not isinstance(texts,list) or not texts: raise ValueError("texts is required")
      if len(texts)>500: raise ValueError("max 500 texts")
-     items=[]
-     for text in texts:
-      source=str(text or "").strip()
-      if not source:
-       items.append({"text":"","tokens":[]}); continue
-      tokens=engine.nlp.parse(source)
-      items.append({"text":source,"tokens":[token.model_dump(mode="json") for token in tokens]})
+     sources=[str(text or "").strip() for text in texts]
+     parsed=engine.nlp.parse_many(sources)
+     items=[
+      {"text":source,"tokens":[token.model_dump(mode="json") for token in tokens]}
+      for source,tokens in zip(sources,parsed)
+     ]
      body=json.dumps({"items":items},ensure_ascii=False).encode()
     else:
      text=payload.get("text","").strip()
