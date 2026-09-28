@@ -97,3 +97,56 @@ def test_build_batch_separates_ready_from_review():
     assert ready[0]["promotion_status"] == "ready_for_translation"
     assert [item["canonical"] for item in review] == ["es gehen"]
     assert review[0]["promotion_status"] == "needs_review"
+
+
+def test_particle_verb_canonical_must_match_particle_plus_head():
+    item = candidate(
+        "stellen ein",
+        "PARTICLE_VERB",
+        [{"id": "particle", "type": "PARTICLE", "lemma": "ein"}],
+        evidence=3,
+    )
+    item["head_lemma"] = "stellen"
+
+    assert "particle_verb_canonical_mismatch" in MODULE.quality_reasons(item)
+
+
+def test_particle_verb_dictionary_form_passes_canonical_check():
+    item = candidate(
+        "einstellen",
+        "PARTICLE_VERB",
+        [{"id": "particle", "type": "PARTICLE", "lemma": "ein"}],
+        evidence=3,
+    )
+    item["head_lemma"] = "stellen"
+
+    assert "particle_verb_canonical_mismatch" not in MODULE.quality_reasons(item)
+
+
+def test_build_batch_routes_duplicate_canonicals_to_review():
+    first = candidate(
+        "sich stellen",
+        "REFLEXIVE_VERB",
+        [{"id": "reflexive", "type": "REFLEXIVE"}],
+        evidence=8,
+    )
+    first["head_lemma"] = "stellen"
+    second = candidate(
+        "sich stellen",
+        "REFLEXIVE_VERB",
+        [
+            {"id": "reflexive", "type": "REFLEXIVE"},
+            {"id": "heraus", "type": "LEMMA", "lemma": "heraus"},
+        ],
+        evidence=4,
+    )
+    second["head_lemma"] = "stellen"
+
+    ready, review = MODULE.build_batch([first, second], "B")
+
+    assert ready == []
+    assert len(review) == 2
+    assert all(
+        "duplicate_canonical_in_tier" in item["review_reasons"]
+        for item in review
+    )
