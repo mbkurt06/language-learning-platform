@@ -39,6 +39,8 @@ class GermanLanguageEngine:
   items=[]
   for text,tokens in zip(texts,parsed):
    expressions,_,_=self._lexicon_expressions(tokens)
+   dynamic_expressions,_=self.dynamic_detector.detect_groups(tokens)
+   expressions=[*expressions,*dynamic_expressions]
    groups=[
     {
      "pattern_id":expr.pattern_id,
