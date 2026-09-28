@@ -934,6 +934,7 @@
       button.addEventListener("click",()=>{
         state.youtube.panelTab=button.dataset.tab;
         state.youtube.panelSelectedLemma="";
+        state.youtube.panelSelectedGroupKey="";
         renderYouTubeSidePanel();
       });
     });
@@ -1222,12 +1223,72 @@
     });
   }
 
+  function expressionGroupLabel(type){
+    return ({
+      VERB_PREPOSITION:"Fiil + edat",
+      REFLEXIVE_VERB:"Refleksif fiiller",
+      REFLEXIVE_VERB_PREPOSITION:"Refleksif fiil + edat",
+      IDIOM:"Deyimler",
+      NOUN_PREPOSITION:"İsim + edat",
+      ADJECTIVE_PREPOSITION:"Sıfat + edat",
+    })[type] || type;
+  }
+
+  function expressionGroupsSection(entries){
+    if(entries===null) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-loading">Kelime grupları analiz ediliyor…</div></section>';
+    if(!entries?.length) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-empty">Bu videoda desteklenen kelime grubu bulunamadı.</div></section>';
+
+    const order=["VERB_PREPOSITION","REFLEXIVE_VERB_PREPOSITION","REFLEXIVE_VERB","IDIOM","NOUN_PREPOSITION","ADJECTIVE_PREPOSITION"];
+    const sections=order.map(type=>{
+      const items=entries.filter(entry=>entry.type===type);
+      if(!items.length) return "";
+      const chips=items.map(entry=>
+        '<button type="button" class="gle-expression-chip" data-group-key="'+escAttr(entry.key)+'">'+
+          '<span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
+        '</button>'
+      ).join("");
+      return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
+    }).join("");
+
+    return '<section class="gle-expression-groups"><h3>Kelime grupları</h3>'+sections+'</section>';
+  }
+
+  function renderExpressionGroupDetail(body,entry){
+    const cues=state.youtube.cues||[];
+    const rows=entry.occurrences.map(index=>{
+      const cue=cues[index];
+      if(!cue) return "";
+      return '<button type="button" class="gle-word-occurrence" data-cue-index="'+index+'"><span>▶</span><b>'+panelClock(cue.startMs)+'</b><em>'+esc(cue.text)+'</em></button>';
+    }).join("");
+
+    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.canonical)+'</strong><span>'+esc(expressionGroupLabel(entry.type))+' · '+entry.count+' kez</span></div></div>'+
+      '<div class="gle-word-forms">Videodaki biçimler: '+esc(entry.forms.join(", "))+'</div>'+
+      '<div class="gle-word-occurrences">'+rows+'</div>';
+
+    body.querySelector(".gle-word-back").addEventListener("click",()=>{
+      state.youtube.panelSelectedGroupKey="";
+      renderYouTubeSidePanel();
+    });
+    body.querySelectorAll(".gle-word-occurrence").forEach(button=>{
+      button.addEventListener("click",()=>playYouTubeCue(Number(button.dataset.cueIndex)));
+    });
+  }
+
   function renderPanelWords(body){
     const analysis=state.youtube.transcriptAnalysis;
     if(!analysis){
       body.innerHTML='<div class="gle-panel-empty"><b>Video kelimeleri analiz ediliyor…</b><span>Altyazıdaki kelimeler lemma bazında gruplanıyor.</span></div>';
       analyzeWholeYouTubeTranscript();
       return;
+    }
+
+    if(state.youtube.panelSelectedGroupKey){
+      const group=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===state.youtube.panelSelectedGroupKey);
+      if(group){
+        renderExpressionGroupDetail(body,group);
+        return;
+      }
+      state.youtube.panelSelectedGroupKey="";
     }
 
     if(state.youtube.panelSelectedLemma){
@@ -1245,7 +1306,19 @@
     const frequentSet=new Set(frequent.map(entry=>entry.lemma));
     const others=analysis.filter(entry=>!learningSet.has(entry.lemma) && !frequentSet.has(entry.lemma));
 
-    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+wordGroup("Bu videoda sık geçenler",frequent)+wordGroup("Diğer kelimeler",others);
+    const groups=state.youtube.expressionGroupsAnalysis;
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+
+      expressionGroupsSection(groups)+
+      wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
+      wordGroup("Bu videoda sık geçenler",frequent)+
+      wordGroup("Diğer kelimeler",others);
+    body.querySelectorAll(".gle-expression-chip").forEach(button=>{
+      button.addEventListener("click",()=>{
+        state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
+        state.youtube.panelSelectedLemma="";
+        renderYouTubeSidePanel();
+      });
+    });
     body.querySelectorAll(".gle-word-chip").forEach(button=>{
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedLemma=button.dataset.lemma;
