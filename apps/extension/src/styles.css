@@ -184,7 +184,7 @@
 
 
 .gle-words-tools{position:sticky;top:0;z-index:3;background:#111114;border-bottom:1px solid #27272d;padding:10px}
-.gle-words-subtabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}
+.gle-words-subtabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:8px}
 .gle-words-subtabs button{
   appearance:none;border:1px solid #34343b;border-radius:8px;background:#18181c;color:#b7b7c0;
   padding:8px 6px;font:700 11px/1 system-ui,-apple-system,sans-serif;cursor:pointer
@@ -737,3 +737,19 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-overlay{
   left:var(--gle-zdf-overlay-left)!important;
 }
+
+/* Shared contextual word-sense table (YouTube, ZDF and future stream adapters). */
+.gle-sense-table{display:grid;gap:0;margin:10px;border:1px solid #2f2f36;border-radius:10px;overflow:hidden;background:#111114}
+.gle-sense-head,.gle-sense-row{display:grid;grid-template-columns:minmax(82px,.8fr) minmax(130px,1.6fr) 76px;align-items:center}
+.gle-sense-head{background:#19191e;color:#a1a1aa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.gle-sense-head>span,.gle-sense-row>*{padding:9px 8px}
+.gle-sense-row{border-top:1px solid #29292f;min-height:44px}
+.gle-sense-row:hover{background:#17171c}
+.gle-sense-word{appearance:none;border:0;background:transparent;color:#f4f4f5;text-align:left;font:700 13px/1.3 system-ui;cursor:pointer}
+.gle-sense-word:hover{text-decoration:underline}
+.gle-sense-meaning{color:#d4d4d8;font-size:12px;line-height:1.35}
+.gle-sense-actions{display:flex;gap:5px;justify-content:flex-end}
+.gle-sense-actions button{width:28px;height:28px;border:1px solid #3f3f46;border-radius:7px;background:#202026;color:#a1a1aa;cursor:pointer;font:700 15px/1 system-ui}
+.gle-sense-actions button:hover{border-color:#8b5cf6;color:#fff}
+.gle-sense-actions button.active{background:#4c1d95;border-color:#a855f7;color:#fff}
+.gle-sense-actions button:disabled{opacity:.55;cursor:wait}
