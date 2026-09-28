@@ -215,8 +215,8 @@ def test_parseme_vid_demonstrative_das_heisst_normalization(tmp_path: Path):
     cupt.write_text(
         "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
         "2\tdas\tder\tPRON\t_\t_\t1\tobj\t_\t_\t1\n\n"
-        "1\tdas\tder\tPRON\t_\t_\t2\tobj\t_\t_\t1:VID\n"
-        "2\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n",
+        "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tdas\tder\tPRON\t_\t_\t1\tobj\t_\t_\t1\n\n",
         encoding="utf-8",
     )
 
