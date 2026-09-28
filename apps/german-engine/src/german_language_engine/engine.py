@@ -49,6 +49,9 @@ class GermanLanguageEngine:
      "surface":expr.surface,
      "token_indices":expr.token_indices,
      "confidence":expr.confidence,
+     "meaning_tr":expr.meaning_tr,
+     "contextual_meaning_tr":expr.contextual_meaning_tr,
+     "grammar_hint":expr.grammar_hint,
     }
     for expr in expressions
     if str(expr.type) in wanted
