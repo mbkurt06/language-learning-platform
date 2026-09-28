@@ -537,6 +537,8 @@
           learningWordLabels.set(i,{
             ...item,
             meaning_tr:currentHover.contextual_word_meaning_tr||item.meaning_tr,
+            bubbleType:"word",
+            bubbleSurface:token.text,
           });
         }
       });
@@ -555,6 +557,8 @@
         key:lemma,
         label:lemma,
         meaning_tr:meaning,
+        bubbleType:"word",
+        bubbleSurface:token.text,
       });
     }
 
@@ -586,10 +590,14 @@
         }
       });
       if(visible.length) {
-        const currentItem=expressionMembers.get(visible[0])||item;
+        const surface=visible.map(index=>tokens[index]?.text).filter(Boolean).join(" ");
+        const currentItem={
+          ...(expressionMembers.get(visible[0])||item),
+          bubbleType:"expression",
+          bubbleSurface:surface||match.surface||item.label,
+        };
         expressionBadges.set(visible[0],currentItem);
         if(currentItem?.id) {
-          const surface=visible.map(index=>tokens[index]?.text).filter(Boolean).join(" ");
           seenLearningItems.set(currentItem.id,{item:currentItem,surface:surface||currentItem.label});
         }
       }
@@ -613,7 +621,13 @@
         }
       });
       if(visible.length){
-        expressionBadges.set(visible[0],expressionMembers.get(visible[0]));
+        const surface=visible.map(index=>tokens[index]?.text).filter(Boolean).join(" ");
+        const currentItem={
+          ...expressionMembers.get(visible[0]),
+          bubbleType:"expression",
+          bubbleSurface:surface||match.surface||match.canonical||key,
+        };
+        expressionBadges.set(visible[0],currentItem);
       }
     }
 
@@ -621,6 +635,7 @@
       captureSeenLearningItem(item,surface);
     }
 
+    let visibleBubbleCount=0;
     tokens.forEach((token,i)=>{
       const span=document.createElement("span");
       span.textContent=token.text;
@@ -629,11 +644,34 @@
       const learningItem=expressionMembers.get(i)||learningWordLabels.get(i);
       if(learningItem){
         span.classList.add("gle-learning-item");
-        if(learningItem.kind==="video-unknown" || learningItem.kind==="video-unknown-expression") span.classList.add("gle-video-unknown-item");
+        if(learningItem.kind==="video-unknown" || learningItem.kind==="video-unknown-expression"){
+          span.classList.add("gle-video-unknown-item");
+        }else{
+          span.classList.add("gle-persistent-learning-item");
+        }
       }
       const badgeItem=expressionBadges.get(i)||learningWordLabels.get(i);
-      if(badgeItem){
-        span.dataset.gleLearningLabel=`${badgeItem.label} → ${badgeItem.meaning_tr||""}`;
+      if(badgeItem && visibleBubbleCount<2 && badgeItem.meaning_tr){
+        const bubble=document.createElement("span");
+        bubble.className="gle-learning-bubble "+
+          ((badgeItem.kind==="video-unknown" || badgeItem.kind==="video-unknown-expression")?"temporary":"persistent")+
+          " "+(badgeItem.bubbleType==="expression"?"expression":"word");
+        if(badgeItem.bubbleType==="expression"){
+          const source=document.createElement("span");
+          source.className="gle-learning-bubble-source";
+          source.textContent=badgeItem.bubbleSurface||badgeItem.label||"";
+          const meaning=document.createElement("span");
+          meaning.className="gle-learning-bubble-meaning";
+          meaning.textContent=badgeItem.meaning_tr||"";
+          bubble.append(source,meaning);
+        }else{
+          const meaning=document.createElement("span");
+          meaning.className="gle-learning-bubble-meaning";
+          meaning.textContent=badgeItem.meaning_tr||"";
+          bubble.appendChild(meaning);
+        }
+        span.appendChild(bubble);
+        visibleBubbleCount+=1;
       }
       if(span.classList.contains("gle-word")){
         const mappedToken=mappedTokens[i]||token;
