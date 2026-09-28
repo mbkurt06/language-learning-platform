@@ -740,7 +740,7 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 
 /* Shared contextual word-sense table (YouTube, ZDF and future stream adapters). */
 .gle-sense-table{display:grid;gap:0;margin:10px;border:1px solid #2f2f36;border-radius:10px;overflow:hidden;background:#111114}
-.gle-sense-head,.gle-sense-row{display:grid;grid-template-columns:minmax(82px,.8fr) minmax(130px,1.6fr) 76px;align-items:center}
+.gle-sense-head,.gle-sense-row{display:grid;grid-template-columns:minmax(105px,1.15fr) minmax(115px,1.35fr) minmax(64px,.7fr) 68px;align-items:center}
 .gle-sense-head{background:#19191e;color:#a1a1aa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
 .gle-sense-head>span,.gle-sense-row>*{padding:9px 8px}
 .gle-sense-row{border-top:1px solid #29292f;min-height:44px}
@@ -753,3 +753,5 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .gle-sense-actions button:hover{border-color:#8b5cf6;color:#fff}
 .gle-sense-actions button.active{background:#4c1d95;border-color:#a855f7;color:#fff}
 .gle-sense-actions button:disabled{opacity:.55;cursor:wait}
+
+.gle-sense-type{color:#a1a1aa;font-size:11px;line-height:1.25}
