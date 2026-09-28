@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from .engine import GermanLanguageEngine
+from .api import build_engine
 
 
 def main():
@@ -15,7 +15,9 @@ def main():
     if args.command == "analyze":
         from .nlp import SpacyGermanAdapter
 
-        result = GermanLanguageEngine(nlp=SpacyGermanAdapter(args.model)).analyze(args.text)
+        engine = build_engine()
+        engine.nlp = SpacyGermanAdapter(args.model)
+        result = engine.analyze(args.text)
         print(json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2))
 
 
