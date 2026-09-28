@@ -50,8 +50,6 @@ def _fallback_sense_id(db,word,pos,idx):
         return base
 
     existing=str(row[0])
-    # Keep the all-lowercase lexical entry on the historical base ID when a
-    # case-only collision exists (er/Er, ach/ACh). Disambiguate the other entry.
     preferred=min((existing,word),key=lambda value:(value!=value.casefold(),value))
     if preferred==existing:
         return _case_disambiguated_sense_id(base,word)
@@ -72,6 +70,15 @@ def import_wiktextract(path,db):
         word=str(item.get("word") or "").strip()
         pos=POS_MAP.get(str(item.get("pos") or "").lower(),str(item.get("pos") or "").upper())
         if not word: continue
+
+        # Product rule: sentence-initial "Er" is the same subject pronoun as
+        # sentence-internal "er". Ignore Wiktionary's separate uppercase PRON
+        # entry and remove any legacy rows created by older imports.
+        if pos=="PRON" and word=="Er":
+            db.execute("delete from senses where lemma=? collate binary and pos=?",("Er","PRON"))
+            db.execute("delete from forms where lemma=? collate binary and pos=?",("Er","PRON"))
+            continue
+
         forms=item.get("forms") or []
         for form in forms:
           value=str(form.get("form") or "").strip()
