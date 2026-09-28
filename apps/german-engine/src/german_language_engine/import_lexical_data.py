@@ -39,8 +39,6 @@ def _translations_for(gloss,mapped):
             candidates.extend(values)
     return list(dict.fromkeys(candidates))
 
-CASE_SENSITIVE_POS={"NOUN","PROPN","ABBREV"}
-
 def _case_disambiguated_sense_id(base,word):
     suffix=hashlib.sha1(word.encode("utf-8")).hexdigest()[:8]
     return f"{base}:case:{suffix}"
@@ -53,15 +51,13 @@ def _fallback_sense_id(db,word,pos,idx):
 
     existing=str(row[0])
 
-    # For case-insensitive lexical classes, sentence-initial capitalization is
-    # not a distinct lexical sense. Prefer the lowercase dictionary entry and
-    # keep the historical base ID stable (Er == er, Ach == ach, ...).
-    if pos not in CASE_SENSITIVE_POS and existing.casefold()==word.casefold():
-        if existing==existing.casefold() and word!=word.casefold():
+    # Product rule: sentence-initial "Er" and sentence-internal "er" are the
+    # same subject pronoun and must share one lexical sense / learning unit.
+    if pos=="PRON" and word.casefold()=="er" and existing.casefold()=="er":
+        if existing=="er" and word=="Er":
             return None
         return base
 
-    # Nouns, proper nouns and abbreviations may genuinely differ by case.
     preferred=min((existing,word),key=lambda value:(value!=value.casefold(),value))
     if preferred==existing:
         return _case_disambiguated_sense_id(base,word)
