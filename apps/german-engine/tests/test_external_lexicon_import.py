@@ -126,3 +126,39 @@ def test_parseme_normalizes_particle_verb_to_dictionary_form(tmp_path: Path):
 
     assert len(items) == 1
     assert items[0].canonical == "stattfinden"
+
+
+def test_parseme_vid_known_constructions_get_learner_facing_forms(tmp_path: Path):
+    cupt = tmp_path / "vid.cupt"
+    cupt.write_text(
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tgibt\tgeben\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n"
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tgibt\tgeben\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "es gibt"
+    assert items[0].type == "FIXED_CONSTRUCTION"
+
+
+def test_parseme_vid_fixed_particle_expression_is_normalized(tmp_path: Path):
+    cupt = tmp_path / "vid2.cupt"
+    cupt.write_text(
+        "1\tDavon\tdavon\tADV\t_\t_\t2\tadvmod\t_\t_\t1:VID\n"
+        "2\tgeht\tgehen\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\taus\taus\tPART\t_\t_\t2\tcompound:prt\t_\t_\t1\n\n"
+        "1\tDavon\tdavon\tADV\t_\t_\t2\tadvmod\t_\t_\t1:VID\n"
+        "2\tgehen\tgehen\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\taus\taus\tPART\t_\t_\t2\tcompound:prt\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "davon ausgehen"
+    assert items[0].type == "FIXED_CONSTRUCTION"
