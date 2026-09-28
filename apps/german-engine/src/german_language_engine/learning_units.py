@@ -66,7 +66,7 @@ class LearningUnitResolver:
     continue
    if set(expr.token_indices).issubset(covered):
     continue
-   identity=f"expression|{expr.pattern_id}|{meaning.lower()}"
+   identity=f"expression|{expr.pattern_id}"
    units.append(LearningUnit(
     id="lu:"+_slug(identity),canonical=expr.canonical,meaning_tr=meaning,
     unit_type=EXPRESSION_LABELS.get(str(expr.type),str(expr.type)),
