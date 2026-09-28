@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, sqlite3, xml.etree.ElementTree as ET
+import argparse, gzip, json, sqlite3, xml.etree.ElementTree as ET
 from pathlib import Path
 
 POS_MAP={"noun":"NOUN","verb":"VERB","adj":"ADJ","adv":"ADV","name":"PROPN","proper-noun":"PROPN"}
@@ -17,9 +17,31 @@ def schema(db):
     create table if not exists translations(lemma text not null collate nocase,meaning_tr text not null,primary key(lemma,meaning_tr));
     """)
 
+def _open_text(path):
+    return gzip.open(path,"rt",encoding="utf-8") if str(path).endswith(".gz") else open(path,encoding="utf-8")
+
+def _turkish_by_sense(item):
+    mapped={}
+    for tr in item.get("translations") or []:
+        if tr.get("lang_code")!="tr": continue
+        word=str(tr.get("word") or "").strip()
+        if not word: continue
+        sense=str(tr.get("sense") or "").strip()
+        mapped.setdefault(sense,[]).append(word)
+    return mapped
+
+def _translations_for(gloss,mapped):
+    exact=mapped.get(gloss,[])
+    if exact: return list(dict.fromkeys(exact))
+    candidates=[]
+    for sense,values in mapped.items():
+        if not sense or not gloss or sense in gloss or gloss in sense:
+            candidates.extend(values)
+    return list(dict.fromkeys(candidates))
+
 def import_wiktextract(path,db):
     count=0
-    with open(path,encoding="utf-8") as fh:
+    with _open_text(path) as fh:
       for line in fh:
         try: item=json.loads(line)
         except json.JSONDecodeError: continue
@@ -33,18 +55,26 @@ def import_wiktextract(path,db):
           if value and value not in {"-","—"}:
             db.execute("insert or ignore into forms(form,lemma,pos) values(?,?,?)",(value,word,pos))
         db.execute("insert or ignore into forms(form,lemma,pos) values(?,?,?)",(word,word,pos))
-        article=None; plural=None
+        entry_tags=set(item.get("tags") or [])
+        article="die" if "feminine" in entry_tags else ("der" if "masculine" in entry_tags else ("das" if "neuter" in entry_tags else None))
+        plural=None
         for form in forms:
           tags=set(form.get("tags") or []); value=str(form.get("form") or "").strip()
-          if "plural" in tags and value and "table-tags" not in tags: plural=plural or value
+          if not article and {"nominative","singular"}.issubset(tags) and form.get("article") in {"der","die","das"}:
+            article=form.get("article")
+          if "plural" in tags and "nominative" in tags and value and "table-tags" not in tags:
+            plural=plural or value
+        turkish=_turkish_by_sense(item)
         for idx,sense in enumerate(item.get("senses") or []):
-          if "form-of" in set(sense.get("tags") or []): continue
+          tags=set(sense.get("tags") or [])
+          if "form-of" in tags: continue
           glosses=sense.get("glosses") or sense.get("raw_glosses") or []
           gloss=str(glosses[0] if glosses else "").strip()
           sid=str(sense.get("id") or sense.get("senseid") or "").strip()
           if not sid: sid=f"wiktextract:{word.casefold()}:{pos}:{idx}"
-          db.execute("""insert or replace into senses(sense_id,lemma,pos,ordinal,gloss,tags,article,plural)
-             values(?,?,?,?,?,?,?,?)""",(sid,word,pos,idx,gloss,json.dumps(sense.get("tags") or [],ensure_ascii=False),article,plural))
+          meanings=_translations_for(gloss,turkish)
+          db.execute("""insert or replace into senses(sense_id,lemma,pos,ordinal,gloss,meanings_tr,tags,article,plural)
+             values(?,?,?,?,?,?,?,?,?)""",(sid,word,pos,idx,gloss,json.dumps(meanings,ensure_ascii=False),json.dumps(list(tags),ensure_ascii=False),article,plural))
           count+=1
     return count
 
@@ -62,11 +92,12 @@ def import_freedict(path,db):
       elem.clear()
     return count
 
-def attach_translations(db):
+def attach_freedict_fallbacks(db):
     rows=db.execute("select lemma,group_concat(meaning_tr,char(31)) meanings from translations group by lemma").fetchall()
     for lemma,joined in rows:
       values=list(dict.fromkeys(x.strip() for x in (joined or "").split(chr(31)) if x.strip()))
-      db.execute("update senses set meanings_tr=? where lemma=? collate nocase",(json.dumps(values,ensure_ascii=False),lemma))
+      payload=json.dumps(values,ensure_ascii=False)
+      db.execute("update senses set meanings_tr=? where lemma=? collate nocase and meanings_tr='[]'",(payload,lemma))
 
 def main():
     p=argparse.ArgumentParser(description="Build offline German lexical sense SQLite index")
@@ -75,7 +106,7 @@ def main():
     db=sqlite3.connect(out); schema(db)
     print("wiktextract senses:",import_wiktextract(a.wiktextract,db))
     if a.freedict: print("freedict translations:",import_freedict(a.freedict,db))
-    attach_translations(db); db.commit()
+    attach_freedict_fallbacks(db); db.commit()
     print("index:",out,"senses:",db.execute("select count(*) from senses").fetchone()[0],"forms:",db.execute("select count(*) from forms").fetchone()[0])
     db.close()
 if __name__=="__main__": main()
