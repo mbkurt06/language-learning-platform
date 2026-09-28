@@ -1018,29 +1018,61 @@
     syncYouTubePanelHost();
   }
 
+  function clearZdfPanelLayout(){
+    document.documentElement.classList.remove("gle-zdf-panel-open");
+    document.documentElement.style.removeProperty("--gle-zdf-panel-space");
+    document.querySelectorAll(".gle-zdf-media-host-panel-open").forEach(node=>{
+      node.classList.remove("gle-zdf-media-host-panel-open");
+      node.style.removeProperty("--gle-zdf-panel-width");
+    });
+    document.querySelectorAll(".gle-zdf-video-panel-open").forEach(node=>{
+      node.classList.remove("gle-zdf-video-panel-open");
+      node.style.removeProperty("--gle-zdf-video-scale");
+      node.style.removeProperty("--gle-zdf-panel-width");
+    });
+    document.querySelectorAll(".gle-zdf-fullscreen-panel-open,.gle-zdf-fullscreen-panel-collapsed").forEach(node=>{
+      node.classList.remove("gle-zdf-fullscreen-panel-open","gle-zdf-fullscreen-panel-collapsed");
+      node.style.removeProperty("--gle-zdf-fullscreen-panel-width");
+    });
+  }
+
   function syncYouTubePanelHost(){
     const panel=state.youtube.panel;
     if(adapter.id==="zdf"){
       if(!panel) return;
       const fullscreenRoot=document.fullscreenElement;
-      const mediaHost=state.zdf.video?.parentElement;
-      document.querySelectorAll(".gle-zdf-media-host-panel-open").forEach(node=>{
-        if(node!==mediaHost) node.classList.remove("gle-zdf-media-host-panel-open");
-      });
+      const video=bindZdfVideo() || state.zdf.video;
+      const mediaHost=video?.parentElement;
+      const open=!state.youtube.panelCollapsed;
       const host=fullscreenRoot || document.documentElement;
+
+      clearZdfPanelLayout();
       if(panel.parentElement!==host) host.appendChild(panel);
       panel.classList.add("gle-zdf-shared-panel");
       panel.classList.toggle("docked",Boolean(fullscreenRoot));
-      const open=!state.youtube.panelCollapsed;
-      mediaHost?.classList.toggle("gle-zdf-media-host-panel-open",open);
-      document.documentElement.classList.toggle("gle-zdf-panel-open",open && !fullscreenRoot);
-      document.documentElement.style.setProperty("--gle-zdf-panel-space",open && !fullscreenRoot?"432px":"0px");
-      if(fullscreenRoot){
-        fullscreenRoot.classList.toggle("gle-zdf-fullscreen-panel-open",open);
-        fullscreenRoot.classList.toggle("gle-zdf-fullscreen-panel-collapsed",!open);
-        const width=fullscreenRoot.getBoundingClientRect().width || innerWidth || 1;
-        const panelWidth=Math.min(420,width*0.35);
-        fullscreenRoot.style.setProperty("--gle-zdf-fullscreen-panel-width",panelWidth+"px");
+
+      if(open){
+        const viewportWidth=fullscreenRoot?.getBoundingClientRect().width || innerWidth || 1;
+        const panelWidth=fullscreenRoot
+          ? Math.min(420,Math.max(320,viewportWidth*0.30))
+          : Math.min(408,Math.max(320,viewportWidth*0.30));
+        const scale=Math.max(0.55,(viewportWidth-panelWidth)/viewportWidth);
+        panel.style.setProperty("--gle-zdf-current-panel-width",panelWidth+"px");
+        video?.classList.add("gle-zdf-video-panel-open");
+        video?.style.setProperty("--gle-zdf-video-scale",String(scale));
+        video?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
+        mediaHost?.classList.add("gle-zdf-media-host-panel-open");
+        mediaHost?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
+
+        if(fullscreenRoot){
+          fullscreenRoot.classList.add("gle-zdf-fullscreen-panel-open");
+          fullscreenRoot.style.setProperty("--gle-zdf-fullscreen-panel-width",panelWidth+"px");
+        }else{
+          document.documentElement.classList.add("gle-zdf-panel-open");
+          document.documentElement.style.setProperty("--gle-zdf-panel-space",(panelWidth+24)+"px");
+        }
+      }else if(fullscreenRoot){
+        fullscreenRoot.classList.add("gle-zdf-fullscreen-panel-collapsed");
       }
       state.youtube.panelDocked=Boolean(fullscreenRoot);
       return;
@@ -1087,8 +1119,14 @@
     panel.id="gle-youtube-panel";
     panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙ Ayarlar</button><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
 
-    panel.querySelector(".gle-panel-toggle").addEventListener("click",()=>{
+    panel.querySelector(".gle-panel-toggle").addEventListener("click",event=>{
+      event.stopPropagation();
       setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
+    });
+    panel.addEventListener("click",event=>{
+      if(!state.youtube.panelCollapsed) return;
+      if(event.target.closest(".gle-panel-toggle")) return;
+      setYouTubePanelCollapsed(false);
     });
     panel.querySelector(".gle-header-main-toggle").addEventListener("change",async event=>{
       state.settings.extensionEnabled=event.target.checked;
