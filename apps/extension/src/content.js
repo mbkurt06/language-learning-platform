@@ -599,6 +599,7 @@
       const learningItem=expressionMembers.get(i)||learningWordLabels.get(i);
       if(learningItem){
         span.classList.add("gle-learning-item");
+        if(learningItem.kind==="video-unknown") span.classList.add("gle-video-unknown-item");
       }
       const badgeItem=expressionBadges.get(i)||learningWordLabels.get(i);
       if(badgeItem){
