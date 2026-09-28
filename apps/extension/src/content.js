@@ -534,6 +534,22 @@
       });
     }
 
+    for(const token of tokens){
+      const lemma=String(token.lemma||"").toLocaleLowerCase("de-DE");
+      if(!state.youtube.videoUnknownLemmas.has(lemma)) continue;
+      const i=tokens.indexOf(token);
+      const mapped=mappedTokens[i]||token;
+      const currentHover=hoverData.hover?.[String(mapped.i)]||hoverData.hover?.[mapped.i]||{};
+      const meaning=currentHover.contextual_word_meaning_tr||(currentHover.dictionary_meanings_tr||[])[0]||"";
+      learningWordLabels.set(i,{
+        id:null,
+        kind:"video-unknown",
+        key:lemma,
+        label:lemma,
+        meaning_tr:meaning,
+      });
+    }
+
     const seenLearningItems=new Map();
     for(const [index,item] of learningWordLabels){
       const token=tokens[index];
@@ -763,6 +779,7 @@
     state.youtube.transcriptAnalysisVideoId="";
     state.youtube.transcriptAnalysisRun+=1;
     state.youtube.panelSelectedLemma="";
+    state.youtube.videoUnknownLemmas=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
     if(state.youtube.panel) renderYouTubeSidePanel();
@@ -1031,7 +1048,11 @@
     if(!entries.length) return "";
     const chips=entries.map(entry=>{
       const learning=Boolean(learningItemForLemma(entry.lemma));
-      return '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>';
+      const unknown=state.youtube.videoUnknownLemmas.has(entry.lemma);
+      return '<div class="gle-word-chip-wrap'+(unknown?" unknown":"")+'">'+
+        '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
+        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Bu video için işareti kaldır":"Bu videoda anlamını göster")+'">'+(unknown?"✓":"+")+'</button>'+
+      '</div>';
     }).join("");
     return '<section class="gle-word-group"><h3>'+esc(title)+'</h3><div class="gle-word-grid">'+chips+'</div></section>';
   }
@@ -1082,6 +1103,12 @@
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedLemma=button.dataset.lemma;
         renderYouTubeSidePanel();
+      });
+    });
+    body.querySelectorAll(".gle-word-mark").forEach(button=>{
+      button.addEventListener("click",event=>{
+        event.stopPropagation();
+        toggleVideoUnknownLemma(button.dataset.markLemma);
       });
     });
   }
@@ -1305,6 +1332,10 @@
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
       ensureYouTubeSidePanel();
+      loadVideoUnknownLemmas().then(()=>{
+        renderYouTubeSidePanel();
+        refreshLearningHighlights();
+      });
       renderYouTubeSidePanel();
       analyzeWholeYouTubeTranscript();
       bindYouTubeVideo();
