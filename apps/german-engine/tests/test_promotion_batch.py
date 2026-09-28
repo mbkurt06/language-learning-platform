@@ -17,12 +17,13 @@ def candidate(
     slots: list[dict],
     evidence: int = 10,
     source_category: list[str] | None = None,
+    head_lemma: str = "gehen",
 ) -> dict:
     return {
         "id": f"test.{canonical}",
         "canonical": canonical,
         "type": expression_type,
-        "head_lemma": "gehen",
+        "head_lemma": head_lemma,
         "slots": slots,
         "meaning_tr": [],
         "priority": 70,
@@ -38,6 +39,7 @@ def test_tier_a_is_parseme_with_at_least_ten_observations():
         "PARTICLE_VERB",
         [{"id": "particle", "type": "PARTICLE", "lemma": "statt"}],
         evidence=27,
+        head_lemma="finden",
     )
     assert MODULE.promotion_tier(item) == "A"
 
@@ -59,6 +61,7 @@ def test_particle_verb_requires_particle_slots():
         "PARTICLE_VERB",
         [{"id": "prep", "type": "PREPOSITION", "prep": "statt"}],
         evidence=27,
+        head_lemma="finden",
     )
     reasons = MODULE.quality_reasons(item)
     assert "particle_verb_without_particle_slot" in reasons
@@ -82,6 +85,7 @@ def test_build_batch_separates_ready_from_review():
         "PARTICLE_VERB",
         [{"id": "particle", "type": "PARTICLE", "lemma": "statt"}],
         evidence=27,
+        head_lemma="finden",
     )
     review_item = candidate(
         "es gehen",
