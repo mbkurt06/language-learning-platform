@@ -359,3 +359,60 @@ def test_parseme_vid_normalized_canonical_infers_joined_particle(tmp_path: Path)
         slot.get("type") == "PREPOSITION" and slot.get("prep") == "aus"
         for slot in items[0].slots
     )
+
+
+def test_parseme_preposition_uses_governed_case_not_adp_token_case(tmp_path: Path):
+    cupt = tmp_path / "governed_case.cupt"
+    cupt.write_text(
+        "1\\tsteht\\tstehen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:LVC.full\\n"
+        "2\\tzur\\tzur\\tADP\\t_\\tCase=Acc\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tVerfügung\\tVerfügung\\tNOUN\\t_\\tCase=Dat\\t1\\tobl\\t_\\t_\\t1\\n\\n"
+        "1\\tsteht\\tstehen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:LVC.full\\n"
+        "2\\tzur\\tzur\\tADP\\t_\\tCase=Acc\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tVerfügung\\tVerfügung\\tNOUN\\t_\\tCase=Dat\\t1\\tobl\\t_\\t_\\t1\\n\\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    prep = next(slot for slot in items[0].slots if slot["type"] == "PREPOSITION")
+    assert prep["prep"] == "zur"
+    assert prep["case"] == ["Dat"]
+
+
+def test_parseme_single_case_preposition_fills_missing_case(tmp_path: Path):
+    cupt = tmp_path / "missing_case.cupt"
+    cupt.write_text(
+        "1\\tbringt\\tbringen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:VID\\n"
+        "2\\tmit\\tmit\\tADP\\t_\\t_\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tsich\\tsich\\tPRON\\t_\\tCase=Dat\\t1\\texpl:pv\\t_\\t_\\t1\\n\\n"
+        "1\\tbringt\\tbringen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:VID\\n"
+        "2\\tmit\\tmit\\tADP\\t_\\t_\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tsich\\tsich\\tPRON\\t_\\tCase=Dat\\t1\\texpl:pv\\t_\\t_\\t1\\n\\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    prep = next(slot for slot in items[0].slots if slot["type"] == "PREPOSITION")
+    assert prep["case"] == ["Dat"]
+
+
+def test_parseme_two_way_preposition_does_not_guess_case(tmp_path: Path):
+    cupt = tmp_path / "two_way.cupt"
+    cupt.write_text(
+        "1\\tnimmt\\tnehmen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:LVC.full\\n"
+        "2\\tin\\tin\\tADP\\t_\\tCase=Nom\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tBetrieb\\tBetrieb\\tNOUN\\t_\\tCase=Acc\\t1\\tobl\\t_\\t_\\t1\\n\\n"
+        "1\\tnimmt\\tnehmen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:LVC.full\\n"
+        "2\\tin\\tin\\tADP\\t_\\tCase=Nom\\t1\\tobl\\t_\\t_\\t1\\n"
+        "3\\tBetrieb\\tBetrieb\\tNOUN\\t_\\tCase=Acc\\t1\\tobl\\t_\\t_\\t1\\n\\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    prep = next(slot for slot in items[0].slots if slot["type"] == "PREPOSITION")
+    assert prep["prep"] == "in"
+    assert "case" not in prep
