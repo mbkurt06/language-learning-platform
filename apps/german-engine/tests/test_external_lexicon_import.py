@@ -336,3 +336,26 @@ def test_parseme_es_handelt_sich_gets_um_slot(tmp_path: Path):
     assert len(items) == 1
     assert items[0].canonical == "es handelt sich um etwas"
     assert {"id": "um", "type": "PREPOSITION", "prep": "um", "case": ["Acc"]} in items[0].slots
+
+
+def test_parseme_vid_normalized_canonical_infers_joined_particle(tmp_path: Path):
+    cupt = tmp_path / "vid_davon_ausgehen.cupt"
+    cupt.write_text(
+        "1\tDavon\tdavon\tADV\t_\t_\t2\tadvmod\t_\t_\t1:VID\n"
+        "2\tgehen\tgehen\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\taus\taus\tADP\t_\t_\t2\tcompound:prt\t_\t_\t1\n\n"
+        "1\tDavon\tdavon\tADV\t_\t_\t2\tadvmod\t_\t_\t1:VID\n"
+        "2\tgehen\tgehen\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\taus\taus\tADP\t_\t_\t2\tcompound:prt\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "davon ausgehen"
+    assert {"id": "particle_2", "type": "PARTICLE", "lemma": "aus"} in items[0].slots
+    assert not any(
+        slot.get("type") == "PREPOSITION" and slot.get("prep") == "aus"
+        for slot in items[0].slots
+    )
