@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse, json, os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .engine import GermanLanguageEngine
-from .translation import LibreTranslateProvider
+from .translation import LibreTranslateProvider\nfrom .lexical_senses import SQLiteLexicalSenseProvider
 
 def make_handler(engine):
  class Handler(BaseHTTPRequestHandler):
