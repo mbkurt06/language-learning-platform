@@ -123,6 +123,9 @@ VID_CANONICAL_RULES = {
     ("es", "geben"): ("es gibt", "FIXED_CONSTRUCTION"),
     ("heißen", "es"): ("es heißt", "FIXED_CONSTRUCTION"),
     ("es", "heißen"): ("es heißt", "FIXED_CONSTRUCTION"),
+    # PARSEME lemmatizes demonstrative "das" as "der" in these VID examples.
+    ("heißen", "der"): ("das heißt", "FIXED_CONSTRUCTION"),
+    ("der", "heißen"): ("das heißt", "FIXED_CONSTRUCTION"),
     ("kommen", "es"): ("es kommt zu etwas", "FIXED_CONSTRUCTION"),
     ("es", "kommen"): ("es kommt zu etwas", "FIXED_CONSTRUCTION"),
     ("gelten", "es"): ("es gilt, etwas zu tun", "FIXED_CONSTRUCTION"),
@@ -131,6 +134,7 @@ VID_CANONICAL_RULES = {
     ("es", "handeln", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
     ("gehen", "davon", "aus"): ("davon ausgehen", "FIXED_CONSTRUCTION"),
     ("stehen", "fest"): ("feststehen", "PARTICLE_VERB"),
+    ("stehen", "bereit"): ("bereitstehen", "PARTICLE_VERB"),
     ("stellen", "fest"): ("feststellen", "PARTICLE_VERB"),
     ("haben", "zu", "tun"): ("mit etwas zu tun haben", "IDIOM"),
     ("stehen", "zur", "verfügung"): ("zur Verfügung stehen", "FUNCTION_VERB"),
