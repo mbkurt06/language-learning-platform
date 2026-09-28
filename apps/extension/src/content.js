@@ -33,6 +33,7 @@
       hideTimer:null,
       corpusIndexing:new Set(),
       panel:null,
+      panelHandle:null,
       panelTab:"subtitles",
       transcriptAnalysis:null,
       transcriptAnalysisVideoId:"",
@@ -1009,11 +1010,13 @@
     const panel=state.youtube.panel;
     if(!panel) return;
     panel.classList.toggle("collapsed",state.youtube.panelCollapsed);
-    panel.querySelectorAll(".gle-panel-edge-toggle").forEach(toggle=>{
-      toggle.textContent=state.youtube.panelCollapsed?"‹":"›";
-      toggle.title=state.youtube.panelCollapsed?"Language Learning panelini aç":"Paneli küçült";
-      toggle.setAttribute("aria-label",toggle.title);
-    });
+    const handle=state.youtube.panelHandle;
+    if(handle){
+      handle.textContent=state.youtube.panelCollapsed?"‹":"›";
+      handle.title=state.youtube.panelCollapsed?"Language Learning panelini aç":"Paneli küçült";
+      handle.setAttribute("aria-label",handle.title);
+      handle.classList.toggle("collapsed",state.youtube.panelCollapsed);
+    }
     syncYouTubePanelHost();
   }
 
@@ -1141,14 +1144,21 @@
 
     const panel=document.createElement("aside");
     panel.id="gle-youtube-panel";
-    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙ Ayarlar</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div><button type="button" class="gle-panel-edge-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button>';
+    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙ Ayarlar</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
 
-    panel.querySelectorAll(".gle-panel-edge-toggle").forEach(button=>{
-      button.addEventListener("click",event=>{
+    let handle=state.youtube.panelHandle;
+    if(!handle?.isConnected){
+      handle=document.createElement("button");
+      handle.type="button";
+      handle.id="gle-panel-edge-handle";
+      handle.className="gle-panel-edge-handle";
+      handle.addEventListener("click",event=>{
         event.stopPropagation();
         setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
       });
-    });
+      document.documentElement.appendChild(handle);
+      state.youtube.panelHandle=handle;
+    }
     panel.querySelector(".gle-header-main-toggle").addEventListener("change",async event=>{
       state.settings.extensionEnabled=event.target.checked;
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
