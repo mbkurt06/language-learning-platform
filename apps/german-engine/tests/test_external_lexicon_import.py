@@ -191,3 +191,20 @@ def test_parseme_vpc_known_prefix_fallback(tmp_path: Path):
     items = MODULE.parse_parseme_files([cupt], min_count=2)
     assert len(items) == 1
     assert items[0].canonical == "einräumen"
+
+
+def test_parseme_vid_rule_keys_are_casefolded_for_german_sharp_s(tmp_path: Path):
+    cupt = tmp_path / "vid_casefold.cupt"
+    cupt.write_text(
+        "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tes\tes\tPRON\t_\t_\t1\texpl\t_\t_\t1\n\n"
+        "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tes\tes\tPRON\t_\t_\t1\texpl\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "es heißt"
+    assert items[0].type == "FIXED_CONSTRUCTION"
