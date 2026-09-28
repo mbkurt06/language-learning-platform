@@ -176,6 +176,15 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
             canonical, type_override = rule
             return canonical, head_lemma, type_override
 
+        # VID token order can vary around finite verbs/particles. Try a
+        # small order-insensitive lookup, but only for explicit high-confidence
+        # rules to avoid broad heuristic rewrites.
+        member_multiset = Counter(normalized_key)
+        for rule_key, rule in VID_CANONICAL_RULES.items():
+            if Counter(rule_key) == member_multiset:
+                canonical, type_override = rule
+                return canonical, head_lemma, type_override
+
     return " ".join(parts), head_lemma, None
 
 
