@@ -148,30 +148,35 @@
       return;
     }
 
-    const pot = potByVideoId.get(videoId) || await waitForPot(videoId);
-    if (!pot) {
-      const missingKey = `${videoId}|${track.vssId || track.languageCode || ""}`;
-      if (missingKey !== lastMissingPotKey) {
-        lastMissingPotKey = missingKey;
-        post({type:"track-error", videoId, reason:"missing-pot"});
-      }
-      return;
-    }
-
     url.searchParams.set("fmt", "json3");
     url.searchParams.set("c", "WEB");
-    url.searchParams.set("pot", pot);
+
+    const knownPot = potByVideoId.get(videoId);
+    if (knownPot) url.searchParams.set("pot", knownPot);
 
     const key = `${videoId}|${track.vssId || track.languageCode || ""}|${url.href}`;
     if (key === lastTrackKey || key === inflightKey) return;
 
     inflightKey = key;
     try {
-      const response = await fetch(url.href, {
+      let response = await fetch(url.href, {
         credentials: "include",
         cache: "no-store",
         redirect: "follow",
       });
+
+      if (!response.ok && !url.searchParams.get("pot")) {
+        const pot = await waitForPot(videoId, 1200);
+        if (pot) {
+          url.searchParams.set("pot", pot);
+          response = await fetch(url.href, {
+            credentials: "include",
+            cache: "no-store",
+            redirect: "follow",
+          });
+        }
+      }
+
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const raw = (await response.text()).replace(/^\)\]\}'\s*/, "");
@@ -216,7 +221,7 @@
       kind:track?.kind || "",
     });
 
-    if (enabled && videoId && track?.baseUrl) fetchTrack(videoId, track);
+    if (videoId && track?.baseUrl) fetchTrack(videoId, track);
   }
 
   function reset() {
