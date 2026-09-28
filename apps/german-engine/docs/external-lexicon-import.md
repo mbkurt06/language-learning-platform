@@ -151,3 +151,15 @@ and known context-sensitive corpus groupings such as `es gehen` stay in the revi
 A candidate marked `ready_for_translation` is **not yet a runtime lexicon entry**. It still needs
 a curated Turkish learner-facing meaning before its runtime fields are copied into
 `src/german_language_engine/data/*.yml`.
+
+
+## First promoted A-tier batch
+
+The first curated PARSEME A-tier production batch lives in
+`src/german_language_engine/data/promoted_parseme_a.yml`.
+
+It contains 16 structurally reviewed German expressions with curated Turkish learner meanings.
+The context-sensitive `es gehen` grouping remains outside the runtime lexicon.
+
+Provenance: the candidates were discovered from the German PARSEME shared-task 1.2 corpus and then
+normalized and curated by this project. Raw corpus files are not vendored in this repository.
