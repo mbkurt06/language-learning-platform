@@ -41,7 +41,7 @@ class StructuralMatcher:
         joined_particle_forms={
             f"{slot.lemma}{pattern.head_lemma}".lower()
             for slot in particle_slots
-        } if pattern.type.value == "PARTICLE_VERB" else set()
+        }
 
         heads=[
             t for t in tokens
