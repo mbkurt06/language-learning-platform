@@ -41,6 +41,7 @@
       panelCollapsed:false,
       panelDocked:false,
       videoUnknownLemmas:new Set(),
+      transcriptAnalysisPromise:null,
     }
   };
 
@@ -779,6 +780,7 @@
     state.youtube.transcriptAnalysis=null;
     state.youtube.transcriptAnalysisVideoId="";
     state.youtube.transcriptAnalysisRun+=1;
+    state.youtube.transcriptAnalysisPromise=null;
     state.youtube.panelSelectedLemma="";
     state.youtube.videoUnknownLemmas=new Set();
     stopYouTubePreview();
@@ -980,60 +982,90 @@
     const cues=state.youtube.cues||[];
     if(!videoId || !cues.length) return;
     if(state.youtube.transcriptAnalysisVideoId===videoId && state.youtube.transcriptAnalysis) return;
+    if(state.youtube.transcriptAnalysisVideoId===videoId && state.youtube.transcriptAnalysisPromise){
+      return state.youtube.transcriptAnalysisPromise;
+    }
 
     const run=++state.youtube.transcriptAnalysisRun;
     state.youtube.transcriptAnalysisVideoId=videoId;
     state.youtube.transcriptAnalysis=null;
 
-    const cacheKey=transcriptAnalysisCacheKey();
-    try{
-      const cached=await chrome.storage.local.get(cacheKey);
-      if(run!==state.youtube.transcriptAnalysisRun) return;
-      if(Array.isArray(cached[cacheKey])){
-        state.youtube.transcriptAnalysis=cached[cacheKey];
-        if(state.youtube.panel) renderYouTubeSidePanel();
-        return;
-      }
-    }catch(_error){}
-
-    try{
-      const apiBase=await platformApiBase();
-      const response=await fetch(apiBase+"/api/v1/tokens-batch",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({source_language:"de",texts:cues.map(cue=>cue.text)}),
-      });
-      if(!response.ok) throw new Error("batch token analysis "+response.status);
-      const payload=await response.json();
-      if(run!==state.youtube.transcriptAnalysisRun) return;
-
-      const words=new Map();
-      (payload.items||[]).forEach((item,index)=>{
-        for(const token of item.tokens||[]){
-          const pos=String(token.pos||"").toUpperCase();
-          if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
-          const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
-          if(!lemma || !/[\p{L}]/u.test(lemma)) continue;
-          let entry=words.get(lemma);
-          if(!entry){
-            entry={lemma,pos,count:0,forms:new Set(),occurrences:[]};
-            words.set(lemma,entry);
-          }
-          entry.count+=1;
-          entry.forms.add(String(token.text||lemma));
-          if(!entry.occurrences.includes(index)) entry.occurrences.push(index);
+    const task=(async()=>{
+      const cacheKey=transcriptAnalysisCacheKey();
+      try{
+        const cached=await chrome.storage.local.get(cacheKey);
+        if(run!==state.youtube.transcriptAnalysisRun) return;
+        if(Array.isArray(cached[cacheKey])){
+          state.youtube.transcriptAnalysis=cached[cacheKey];
+          if(state.youtube.panel) renderYouTubeSidePanel();
+          return;
         }
-      });
+      }catch(_error){}
 
-      const analysis=[...words.values()]
-        .map(entry=>({lemma:entry.lemma,pos:entry.pos,count:entry.count,forms:[...entry.forms],occurrences:entry.occurrences}))
-        .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
-      state.youtube.transcriptAnalysis=analysis;
-      chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
-      if(state.youtube.panel) renderYouTubeSidePanel();
-    }catch(error){
-      console.warn("Video word analysis failed",error);
-    }
+      try{
+        const apiBase=await platformApiBase();
+        const batchSize=200;
+        const items=[];
+
+        for(let offset=0;offset<cues.length;offset+=batchSize){
+          if(run!==state.youtube.transcriptAnalysisRun) return;
+          const chunk=cues.slice(offset,offset+batchSize);
+          const response=await fetch(apiBase+"/api/v1/tokens-batch",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+              source_language:"de",
+              texts:chunk.map(cue=>cue.text),
+            }),
+          });
+          if(!response.ok){
+            const detail=await response.text().catch(()=>"");
+            throw new Error("batch token analysis "+response.status+" "+detail);
+          }
+          const payload=await response.json();
+          items.push(...(payload.items||[]));
+        }
+
+        if(run!==state.youtube.transcriptAnalysisRun) return;
+
+        const words=new Map();
+        items.forEach((item,index)=>{
+          for(const token of item.tokens||[]){
+            const pos=String(token.pos||"").toUpperCase();
+            if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
+            const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
+            if(!lemma || !/[\p{L}]/u.test(lemma)) continue;
+            let entry=words.get(lemma);
+            if(!entry){
+              entry={lemma,pos,count:0,forms:new Set(),occurrences:[]};
+              words.set(lemma,entry);
+            }
+            entry.count+=1;
+            entry.forms.add(String(token.text||lemma));
+            if(!entry.occurrences.includes(index)) entry.occurrences.push(index);
+          }
+        });
+
+        const analysis=[...words.values()]
+          .map(entry=>({lemma:entry.lemma,pos:entry.pos,count:entry.count,forms:[...entry.forms],occurrences:entry.occurrences}))
+          .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+
+        state.youtube.transcriptAnalysis=analysis;
+        chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
+        if(state.youtube.panel) renderYouTubeSidePanel();
+      }catch(error){
+        console.warn("Video word analysis failed",error);
+        if(state.youtube.panel && state.youtube.panelTab==="words"){
+          const body=state.youtube.panel.querySelector(".gle-panel-body");
+          if(body) body.innerHTML='<div class="gle-panel-empty"><b>Kelime analizi başarısız.</b><span>'+esc(String(error?.message||error))+'</span></div>';
+        }
+      }finally{
+        if(run===state.youtube.transcriptAnalysisRun) state.youtube.transcriptAnalysisPromise=null;
+      }
+    })();
+
+    state.youtube.transcriptAnalysisPromise=task;
+    return task;
   }
 
   function renderPanelSubtitles(body){
