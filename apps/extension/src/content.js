@@ -788,6 +788,14 @@
     if(state.youtube.panel) renderYouTubeSidePanel();
   }
 
+  function currentYouTubeVideoId(){
+    try{
+      return new URL(location.href).searchParams.get("v") || "";
+    }catch(_error){
+      return "";
+    }
+  }
+
   function currentYouTubeTitle(){
     const heading=document.querySelector("ytd-watch-metadata h1 yt-formatted-string");
     const headingText=(heading?.textContent||"").trim();
@@ -1398,6 +1406,17 @@
     window.postMessage({source:"gle-youtube-content",type:"refresh"},location.origin);
   }
 
+  document.addEventListener("yt-navigate-finish",()=>{
+    requestAnimationFrame(()=>{
+      const videoId=currentYouTubeVideoId();
+      if(videoId && videoId!==state.youtube.videoId) resetYouTube(videoId);
+      ensureYouTubeSidePanel();
+      syncYouTubePanelHost();
+      window.postMessage({source:"gle-youtube-content",type:"refresh"},location.origin);
+      scanYouTube();
+    });
+  });
+
   document.addEventListener("fullscreenchange",()=>requestAnimationFrame(syncYouTubePanelHost));
   window.addEventListener("resize",()=>requestAnimationFrame(syncYouTubePanelHost));
 
@@ -1458,8 +1477,15 @@
   }
 
   function scanYouTube(){
+    const currentVideoId=currentYouTubeVideoId();
+    if(currentVideoId && currentVideoId!==state.youtube.videoId){
+      resetYouTube(currentVideoId);
+      window.postMessage({source:"gle-youtube-content",type:"refresh"},location.origin);
+    }
+
     ensureYouTubeOverlay();
-    if(state.youtube.panel) syncYouTubePanelHost();
+    ensureYouTubeSidePanel();
+    syncYouTubePanelHost();
 
     if(state.youtube.timedAvailable){
       bindYouTubeVideo();
