@@ -6,7 +6,8 @@ from .hover import HoverBuilder
 from .lexicon import ExpressionLexicon
 from .matcher import StructuralMatcher
 from .meaning import MeaningResolver
-from .learning_units import LearningUnitResolver\nfrom .lexical_senses import LexicalSenseProvider
+from .learning_units import LearningUnitResolver
+from .lexical_senses import LexicalSenseProvider
 from .models import Analysis, ExpressionType
 from .nlp import NLPAdapter, SpacyGermanAdapter
 from .resolver import MatchResolver
