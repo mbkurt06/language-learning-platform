@@ -38,6 +38,8 @@
       transcriptAnalysisRun:0,
       previewTimer:null,
       panelSelectedLemma:"",
+      panelCollapsed:false,
+      panelDocked:false,
     }
   };
 
@@ -762,7 +764,7 @@
     state.youtube.panelSelectedLemma="";
     stopYouTubePreview();
     hideYouTubeOverlay();
-    if(state.youtube.panel && !state.youtube.panel.hidden) renderYouTubeSidePanel();
+    if(state.youtube.panel) renderYouTubeSidePanel();
   }
 
   function currentYouTubeTitle(){
@@ -829,28 +831,55 @@
     },80);
   }
 
+  function setYouTubePanelCollapsed(collapsed){
+    state.youtube.panelCollapsed=Boolean(collapsed);
+    const panel=state.youtube.panel;
+    if(!panel) return;
+    panel.classList.toggle("collapsed",state.youtube.panelCollapsed);
+    const toggle=panel.querySelector(".gle-panel-toggle");
+    if(toggle){
+      toggle.textContent=state.youtube.panelCollapsed?"‹":"›";
+      toggle.title=state.youtube.panelCollapsed?"Paneli aç":"Paneli küçült";
+      toggle.setAttribute("aria-label",toggle.title);
+    }
+    syncYouTubePanelHost();
+  }
+
+  function syncYouTubePanelHost(){
+    const panel=state.youtube.panel;
+    const player=document.querySelector(".html5-video-player");
+    if(!panel || !player) return;
+
+    const flexy=document.querySelector("ytd-watch-flexy");
+    const fullscreen=Boolean(document.fullscreenElement) || player.classList.contains("ytp-fullscreen");
+    const theater=Boolean(flexy?.hasAttribute("theater")) && player.getBoundingClientRect().width>=900;
+    const shouldDock=fullscreen || theater;
+
+    if(shouldDock && panel.parentElement!==player){
+      player.appendChild(panel);
+    }else if(!shouldDock && panel.parentElement!==document.documentElement){
+      document.documentElement.appendChild(panel);
+    }
+
+    state.youtube.panelDocked=shouldDock;
+    panel.classList.toggle("docked",shouldDock);
+    player.classList.toggle("gle-panel-docked",shouldDock && !state.youtube.panelCollapsed);
+    player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.youtube.panelCollapsed);
+  }
+
   function ensureYouTubeSidePanel(){
     if(adapter.id!=="youtube") return null;
-    if(state.youtube.panel?.isConnected) return state.youtube.panel;
-
-    const launcher=document.createElement("button");
-    launcher.type="button";
-    launcher.id="gle-panel-launcher";
-    launcher.textContent="LL";
-    launcher.title="Dil öğrenme panelini aç";
+    if(state.youtube.panel?.isConnected){
+      syncYouTubePanelHost();
+      return state.youtube.panel;
+    }
 
     const panel=document.createElement("aside");
     panel.id="gle-youtube-panel";
-    panel.innerHTML='<div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div><button type="button" class="gle-panel-close" aria-label="Paneli kapat">×</button></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div><div class="gle-panel-body"></div>';
 
-    launcher.addEventListener("click",()=>{
-      panel.hidden=false;
-      launcher.hidden=true;
-      renderYouTubeSidePanel();
-    });
-    panel.querySelector(".gle-panel-close").addEventListener("click",()=>{
-      panel.hidden=true;
-      launcher.hidden=false;
+    panel.querySelector(".gle-panel-toggle").addEventListener("click",()=>{
+      setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
     });
     panel.querySelectorAll("[data-tab]").forEach(button=>{
       button.addEventListener("click",()=>{
@@ -860,15 +889,16 @@
       });
     });
 
-    document.documentElement.append(launcher,panel);
-    launcher.hidden=true;
+    document.documentElement.appendChild(panel);
     state.youtube.panel=panel;
+    setYouTubePanelCollapsed(state.youtube.panelCollapsed);
+    syncYouTubePanelHost();
     return panel;
   }
 
   function updatePanelActiveCue(){
     const panel=state.youtube.panel;
-    if(!panel || panel.hidden || state.youtube.panelTab!=="subtitles") return;
+    if(!panel || state.youtube.panelCollapsed || state.youtube.panelTab!=="subtitles") return;
     panel.querySelectorAll(".gle-transcript-row.active").forEach(row=>row.classList.remove("active"));
     const active=panel.querySelector('[data-cue-index="'+state.youtube.cueIndex+'"]');
     if(active){
@@ -923,7 +953,7 @@
     state.youtube.transcriptAnalysis=[...words.values()]
       .map(entry=>({lemma:entry.lemma,pos:entry.pos,count:entry.count,forms:[...entry.forms],occurrences:entry.occurrences}))
       .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
-    if(state.youtube.panel && !state.youtube.panel.hidden) renderYouTubeSidePanel();
+    if(state.youtube.panel) renderYouTubeSidePanel();
   }
 
   function renderPanelSubtitles(body){
@@ -1242,6 +1272,9 @@
     window.postMessage({source:"gle-youtube-content",type:"refresh"},location.origin);
   }
 
+  document.addEventListener("fullscreenchange",()=>requestAnimationFrame(syncYouTubePanelHost));
+  window.addEventListener("resize",()=>requestAnimationFrame(syncYouTubePanelHost));
+
   function collectYouTubeDomText(){
     const containers=[...document.querySelectorAll(".ytp-caption-window-bottom")];
     const entries=containers.map(container=>{
@@ -1300,6 +1333,7 @@
 
   function scanYouTube(){
     ensureYouTubeOverlay();
+    if(state.youtube.panel) syncYouTubePanelHost();
 
     if(state.youtube.timedAvailable){
       bindYouTubeVideo();
