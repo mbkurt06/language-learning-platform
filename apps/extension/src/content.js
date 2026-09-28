@@ -1020,12 +1020,22 @@
     const panel=state.youtube.panel;
     if(adapter.id==="zdf"){
       if(!panel) return;
-      if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
+      const fullscreenRoot=document.fullscreenElement;
+      const host=fullscreenRoot || document.documentElement;
+      if(panel.parentElement!==host) host.appendChild(panel);
       panel.classList.add("gle-zdf-shared-panel");
+      panel.classList.toggle("docked",Boolean(fullscreenRoot));
       const open=!state.youtube.panelCollapsed;
-      document.documentElement.classList.toggle("gle-zdf-panel-open",open);
-      document.documentElement.style.setProperty("--gle-zdf-panel-space",open?"432px":"0px");
-      state.youtube.panelDocked=true;
+      document.documentElement.classList.toggle("gle-zdf-panel-open",open && !fullscreenRoot);
+      document.documentElement.style.setProperty("--gle-zdf-panel-space",open && !fullscreenRoot?"432px":"0px");
+      if(fullscreenRoot){
+        fullscreenRoot.classList.toggle("gle-zdf-fullscreen-panel-open",open);
+        fullscreenRoot.classList.toggle("gle-zdf-fullscreen-panel-collapsed",!open);
+        const width=fullscreenRoot.getBoundingClientRect().width || innerWidth || 1;
+        const panelWidth=Math.min(420,width*0.35);
+        fullscreenRoot.style.setProperty("--gle-zdf-fullscreen-panel-width",panelWidth+"px");
+      }
+      state.youtube.panelDocked=Boolean(fullscreenRoot);
       return;
     }
     const player=document.querySelector(".html5-video-player");
