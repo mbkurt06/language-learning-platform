@@ -33,6 +33,7 @@
       ],
       "js": [
         "src/youtube-cues.js",
+        "src/zdf-provider.js",
         "src/content.js"
       ],
       "css": [
