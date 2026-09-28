@@ -18,10 +18,12 @@ class LexicalSense:
 class LexicalSenseProvider(Protocol):
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]: ...
     def canonical_lemma(self,surface:str,lemma:str)->str: ...
+    def select(self,lemma:str,pos:str,surface:str,tokens:list,token_index:int)->LexicalSense|None: ...
 
 class NullLexicalSenseProvider:
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]: return []
     def canonical_lemma(self,surface:str,lemma:str)->str: return lemma
+    def select(self,lemma:str,pos:str,surface:str,tokens:list,token_index:int)->LexicalSense|None: return None
     def close(self)->None: pass
 
 class SQLiteLexicalSenseProvider:
