@@ -1082,7 +1082,7 @@
     const cues=state.youtube.cues||[];
     const first=cues[0];
     const last=cues[cues.length-1];
-    return "gleExpressionGroups:v1:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
+    return "gleExpressionGroups:v2:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
   }
 
   async function analyzeWholeYouTubeExpressionGroups(){
