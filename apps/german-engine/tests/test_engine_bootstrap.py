@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import patch
 
 from german_language_engine.api import build_engine
 from german_language_engine.lexical_senses import SQLiteLexicalSenseProvider
@@ -33,6 +34,8 @@ def test_build_engine_loads_lexical_database_from_environment(tmp_path, monkeypa
     monkeypatch.setenv("GLE_LEXICAL_DB", str(db))
     monkeypatch.delenv("GLE_TRANSLATION_URL", raising=False)
 
-    engine = build_engine()
+    with patch("german_language_engine.api.GermanLanguageEngine") as engine_cls:
+        build_engine()
 
-    assert isinstance(engine.meaning.lexical_sense_provider, SQLiteLexicalSenseProvider)
+    provider = engine_cls.call_args.kwargs["lexical_sense_provider"]
+    assert isinstance(provider, SQLiteLexicalSenseProvider)
