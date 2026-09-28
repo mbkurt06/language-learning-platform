@@ -6,7 +6,7 @@ from .hover import HoverBuilder
 from .lexicon import ExpressionLexicon
 from .matcher import StructuralMatcher
 from .meaning import MeaningResolver
-from .models import Analysis
+from .models import Analysis, ExpressionType
 from .nlp import NLPAdapter, SpacyGermanAdapter
 from .resolver import MatchResolver
 
@@ -31,7 +31,10 @@ class GermanLanguageEngine:
   return self.resolver.resolve(candidates,patterns), candidates, patterns
 
  def analyze_expression_groups_batch(self,texts:list[str])->list[dict]:
-  wanted={"VERB_PREPOSITION","REFLEXIVE_VERB","REFLEXIVE_VERB_PREPOSITION","IDIOM","NOUN_PREPOSITION","ADJECTIVE_PREPOSITION"}
+  # Surface every expression class that represents a multi-word lexical or
+  # grammatical unit. The lexicon/detectors decide whether the combination is
+  # meaningful; the UI should not silently drop supported classes.
+  wanted={item.value for item in ExpressionType}
   parsed=self.nlp.parse_many_with_dependencies(texts)
   items=[]
   for text,tokens in zip(texts,parsed):
