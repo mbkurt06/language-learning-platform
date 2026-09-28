@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, gzip, json, sqlite3, xml.etree.ElementTree as ET
+import argparse, gzip, hashlib, json, sqlite3, xml.etree.ElementTree as ET
 from pathlib import Path
 
 POS_MAP={"noun":"NOUN","verb":"VERB","adj":"ADJ","adv":"ADV","name":"PROPN","proper-noun":"PROPN"}
@@ -39,6 +39,29 @@ def _translations_for(gloss,mapped):
             candidates.extend(values)
     return list(dict.fromkeys(candidates))
 
+def _case_disambiguated_sense_id(base,word):
+    suffix=hashlib.sha1(word.encode("utf-8")).hexdigest()[:8]
+    return f"{base}:case:{suffix}"
+
+def _fallback_sense_id(db,word,pos,idx):
+    base=f"wiktextract:{word.casefold()}:{pos}:{idx}"
+    row=db.execute("select lemma from senses where sense_id=?",(base,)).fetchone()
+    if not row or str(row[0])==word:
+        return base
+
+    existing=str(row[0])
+    # Keep the all-lowercase lexical entry on the historical base ID when a
+    # case-only collision exists (er/Er, ach/ACh). Disambiguate the other entry.
+    preferred=min((existing,word),key=lambda value:(value!=value.casefold(),value))
+    if preferred==existing:
+        return _case_disambiguated_sense_id(base,word)
+
+    db.execute(
+        "update senses set sense_id=? where sense_id=?",
+        (_case_disambiguated_sense_id(base,existing),base),
+    )
+    return base
+
 def import_wiktextract(path,db):
     count=0
     with _open_text(path) as fh:
@@ -71,7 +94,7 @@ def import_wiktextract(path,db):
           glosses=sense.get("glosses") or sense.get("raw_glosses") or []
           gloss=str(glosses[0] if glosses else "").strip()
           sid=str(sense.get("id") or sense.get("senseid") or "").strip()
-          if not sid: sid=f"wiktextract:{word.casefold()}:{pos}:{idx}"
+          if not sid: sid=_fallback_sense_id(db,word,pos,idx)
           meanings=_translations_for(gloss,turkish)
           db.execute("""insert or replace into senses(sense_id,lemma,pos,ordinal,gloss,meanings_tr,tags,article,plural)
              values(?,?,?,?,?,?,?,?,?)""",(sid,word,pos,idx,gloss,json.dumps(meanings,ensure_ascii=False),json.dumps(list(tags),ensure_ascii=False),article,plural))
@@ -93,11 +116,26 @@ def import_freedict(path,db):
     return count
 
 def attach_freedict_fallbacks(db):
-    rows=db.execute("select lemma,group_concat(meaning_tr,char(31)) meanings from translations group by lemma").fetchall()
+    rows=db.execute("select lemma,group_concat(meaning_tr,char(31)) meanings from translations group by lemma collate binary").fetchall()
     for lemma,joined in rows:
       values=list(dict.fromkeys(x.strip() for x in (joined or "").split(chr(31)) if x.strip()))
       payload=json.dumps(values,ensure_ascii=False)
-      db.execute("update senses set meanings_tr=? where lemma=? collate nocase and meanings_tr='[]'",(payload,lemma))
+      variants=[
+          str(row[0]) for row in db.execute(
+              "select distinct lemma from senses where lemma=? collate nocase",(lemma,)
+          ).fetchall()
+      ]
+      if lemma in variants:
+          target=lemma
+      elif len(variants)==1:
+          target=variants[0]
+      else:
+          # Ambiguous case-only lexical entries must not share a fallback gloss.
+          continue
+      db.execute(
+          "update senses set meanings_tr=? where lemma=? collate binary and meanings_tr='[]'",
+          (payload,target),
+      )
 
 def main():
     p=argparse.ArgumentParser(description="Build offline German lexical sense SQLite index")
