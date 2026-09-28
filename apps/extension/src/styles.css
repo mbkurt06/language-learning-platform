@@ -334,3 +334,63 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
   left:calc((100% - var(--gle-zdf-fullscreen-panel-width,420px))/2)!important;
   max-width:calc(92% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
 }
+
+/* Panel information architecture: product controls above content tabs. */
+.gle-panel-productbar{
+  min-height:46px;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:0 8px 0 12px;border-bottom:1px solid #303038;background:#17171c
+}
+.gle-panel-productbar>strong{font:700 12px/1.2 system-ui;color:#f4f4f5;white-space:nowrap}
+.gle-panel-productbar .gle-panel-actions{height:46px;gap:5px}
+.gle-master-switch{display:flex;align-items:center;gap:5px;color:#a1a1aa;font:600 10px/1 system-ui;cursor:pointer}
+.gle-master-switch input{position:absolute;opacity:0;pointer-events:none}
+.gle-master-switch>span,.gle-translation-switch>span{
+  width:30px;height:17px;border-radius:999px;background:#52525b;position:relative;transition:.15s
+}
+.gle-master-switch>span:after,.gle-translation-switch>span:after{
+  content:"";position:absolute;width:13px;height:13px;left:2px;top:2px;border-radius:50%;
+  background:#fff;transition:.15s
+}
+.gle-master-switch input:checked+span,.gle-translation-switch input:checked+span{background:#7c3aed}
+.gle-master-switch input:checked+span:after,.gle-translation-switch input:checked+span:after{transform:translateX(13px)}
+.gle-header-settings{
+  width:auto!important;padding:0 8px!important;border:1px solid #3f3f46!important;
+  border-radius:7px!important;background:#232329!important;color:#e4e4e7!important;
+  font:600 10px/1 system-ui!important
+}
+.gle-panel-productbar+.gle-panel-head{height:42px;min-height:42px}
+.gle-panel-productbar+.gle-panel-head .gle-panel-tabs{height:42px}
+
+/* Subtitle-tab translation control and bilingual rows. */
+.gle-transcript-controls{
+  position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;
+  padding:9px 11px;background:#18181d;border-bottom:1px solid #303038;color:#d4d4d8;
+  font:600 11px/1 system-ui
+}
+.gle-translation-switch{display:flex;align-items:center;gap:6px;cursor:pointer;color:#a1a1aa;font:600 10px/1 system-ui}
+.gle-translation-switch input{position:absolute;opacity:0;pointer-events:none}
+.gle-transcript-list{height:100%;overflow:auto}
+.gle-row-text{display:flex!important;flex-direction:column;gap:3px;align-items:flex-start}
+.gle-row-source{display:block}
+.gle-row-translation{display:block;color:#c4b5fd;font-size:10px;line-height:1.35;font-weight:500}
+
+/* ZDF player host must reserve physical content width; changing body width alone
+   is insufficient because the player shell uses its own viewport sizing. */
+.gle-zdf-media-host-panel-open{
+  box-sizing:border-box!important;
+  padding-right:var(--gle-zdf-panel-space,432px)!important;
+  overflow:hidden!important;
+}
+.gle-zdf-media-host-panel-open>video{
+  width:100%!important;max-width:100%!important;height:100%!important;object-fit:contain!important;
+  object-position:left center!important
+}
+:fullscreen.gle-zdf-fullscreen-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen{
+  box-sizing:border-box!important;
+  padding-right:var(--gle-zdf-fullscreen-panel-width,420px)!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open>video,
+.gle-zdf-fullscreen-panel-open:fullscreen>video{
+  width:100%!important;max-width:100%!important
+}

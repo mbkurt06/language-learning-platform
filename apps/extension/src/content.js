@@ -7,6 +7,7 @@
 
   const state = {
     cache:new Map(),
+    panelTranslationCache:new Map(),
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
@@ -75,9 +76,10 @@
     const toggle=panel.querySelector(".gle-header-main-toggle");
     if(toggle){
       const active=state.settings.extensionEnabled!==false;
-      toggle.classList.toggle("is-active",active);
-      toggle.setAttribute("aria-pressed",String(active));
-      toggle.title=active?"Language Learning aktif":"Language Learning pasif";
+      toggle.checked=active;
+      toggle.closest(".gle-master-switch")?.classList.toggle("is-active",active);
+      const label=toggle.closest(".gle-master-switch")?.querySelector("em");
+      if(label) label.textContent=active?"Aktif":"Pasif";
     }
     applySharedAppearance();
   }
@@ -987,7 +989,7 @@
   }
 
   function playYouTubeCue(index){
-    const video=bindYouTubeVideo();
+    const video=adapter.id==="zdf" ? bindZdfVideo() : bindYouTubeVideo();
     const range=contextualCueWindow(index);
     if(!video || !range) return;
     stopYouTubePreview();
@@ -1009,7 +1011,7 @@
     panel.classList.toggle("collapsed",state.youtube.panelCollapsed);
     const toggle=panel.querySelector(".gle-panel-toggle");
     if(toggle){
-      toggle.textContent=state.youtube.panelCollapsed?"G":"›";
+      toggle.textContent=state.youtube.panelCollapsed?"‹":"›";
       toggle.title=state.youtube.panelCollapsed?"Language Learning panelini aç":"Paneli küçült";
       toggle.setAttribute("aria-label",toggle.title);
     }
@@ -1021,11 +1023,16 @@
     if(adapter.id==="zdf"){
       if(!panel) return;
       const fullscreenRoot=document.fullscreenElement;
+      const mediaHost=state.zdf.video?.parentElement;
+      document.querySelectorAll(".gle-zdf-media-host-panel-open").forEach(node=>{
+        if(node!==mediaHost) node.classList.remove("gle-zdf-media-host-panel-open");
+      });
       const host=fullscreenRoot || document.documentElement;
       if(panel.parentElement!==host) host.appendChild(panel);
       panel.classList.add("gle-zdf-shared-panel");
       panel.classList.toggle("docked",Boolean(fullscreenRoot));
       const open=!state.youtube.panelCollapsed;
+      mediaHost?.classList.toggle("gle-zdf-media-host-panel-open",open);
       document.documentElement.classList.toggle("gle-zdf-panel-open",open && !fullscreenRoot);
       document.documentElement.style.setProperty("--gle-zdf-panel-space",open && !fullscreenRoot?"432px":"0px");
       if(fullscreenRoot){
@@ -1078,17 +1085,13 @@
 
     const panel=document.createElement("aside");
     panel.id="gle-youtube-panel";
-    panel.innerHTML='<div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div><div class="gle-panel-actions"><button type="button" class="gle-header-main-toggle" aria-label="Language Learning aç/kapat" title="Language Learning aktif">G</button><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙</button><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙ Ayarlar</button><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
 
     panel.querySelector(".gle-panel-toggle").addEventListener("click",()=>{
       setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
     });
-    panel.querySelector(".gle-header-main-toggle").addEventListener("click",async()=>{
-      if(state.youtube.panelCollapsed){
-        setYouTubePanelCollapsed(false);
-        return;
-      }
-      state.settings.extensionEnabled=state.settings.extensionEnabled===false;
+    panel.querySelector(".gle-header-main-toggle").addEventListener("change",async event=>{
+      state.settings.extensionEnabled=event.target.checked;
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
       renderPlayerControls();
     });
@@ -1368,18 +1371,64 @@
       body.innerHTML='<div class="gle-panel-empty">Altyazı bekleniyor…</div>';
       return;
     }
-    const frag=document.createDocumentFragment();
+    const controls=document.createElement("div");
+    controls.className="gle-transcript-controls";
+    controls.innerHTML='<span>Türkçe çeviri</span><label class="gle-translation-switch"><input type="checkbox" '+(state.settings.showSentenceTranslation!==false?"checked":"")+'><span></span><em>'+(state.settings.showSentenceTranslation!==false?"Göster":"Gizle")+'</em></label>';
+    controls.querySelector("input").addEventListener("change",async event=>{
+      state.settings.showSentenceTranslation=event.target.checked;
+      await chrome.storage.sync.set({showSentenceTranslation:event.target.checked});
+      renderYouTubeSidePanel();
+      if(adapter.id==="zdf"){
+        state.zdf.germanLine?.querySelector(".gle-subtitle-translation")?.remove();
+        if(event.target.checked && state.zdf.cueIndex>=0){
+          const cue=state.zdf.cues?.[state.zdf.cueIndex];
+          if(cue) renderSentenceTranslation(state.zdf.germanLine,cue.text,cue.text);
+        }
+      }
+    });
+    const list=document.createElement("div");
+    list.className="gle-transcript-list";
     cues.forEach((cue,index)=>{
       const row=document.createElement("button");
       row.type="button";
       row.className="gle-transcript-row"+(index===state.youtube.cueIndex?" active":"");
       row.dataset.cueIndex=String(index);
-      row.innerHTML='<span class="gle-row-time">'+panelClock(cue.startMs)+'</span><span class="gle-row-text">'+esc(cue.text)+'</span><span class="gle-row-play">▶</span>';
+      const cached=state.panelTranslationCache.get(cue.text)||"";
+      row.innerHTML='<span class="gle-row-time">'+panelClock(cue.startMs)+'</span><span class="gle-row-text"><span class="gle-row-source">'+esc(cue.text)+'</span>'+(state.settings.showSentenceTranslation!==false?'<span class="gle-row-translation" data-translation-index="'+index+'">'+esc(cached)+'</span>':"")+'</span><span class="gle-row-play">▶</span>';
       row.addEventListener("click",()=>playYouTubeCue(index));
-      frag.appendChild(row);
+      list.appendChild(row);
     });
-    body.replaceChildren(frag);
+    body.replaceChildren(controls,list);
+    if(state.settings.showSentenceTranslation!==false) hydratePanelTranslations(list,cues);
     updatePanelActiveCue();
+  }
+
+  function hydratePanelTranslations(list,cues){
+    const nodes=[...list.querySelectorAll(".gle-row-translation")];
+    const load=async node=>{
+      const index=Number(node.dataset.translationIndex);
+      const cue=cues[index];
+      if(!cue || node.dataset.loaded==="1") return;
+      node.dataset.loaded="1";
+      let translation=state.panelTranslationCache.get(cue.text)||"";
+      if(!translation){
+        try{
+          const data=await analyze(cue.text);
+          translation=cleanTranslationText(data?.sentence_meaning_tr||"");
+          if(translation) state.panelTranslationCache.set(cue.text,translation);
+        }catch(_error){}
+      }
+      if(node.isConnected) node.textContent=translation;
+    };
+    if(!("IntersectionObserver" in window)){ nodes.slice(0,30).forEach(load); return; }
+    const observer=new IntersectionObserver(entries=>{
+      for(const entry of entries){
+        if(!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        load(entry.target);
+      }
+    },{root:list,rootMargin:"300px 0px"});
+    nodes.forEach(node=>observer.observe(node));
   }
 
   function wordGroup(title,entries){
@@ -2198,6 +2247,9 @@
       state.zdf.cueIndex=cue.index;
       state.youtube.cueIndex=cue.index;
       decorate(ui.germanLine,cue.text);
+      if(state.settings.showSentenceTranslation!==false){
+        renderSentenceTranslation(ui.germanLine,cue.text,cue.text);
+      }
       updatePanelActiveCue();
     }
     return true;
@@ -2341,7 +2393,8 @@
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
     if(changes.youtubeSubtitlePositionY) state.settings.youtubeSubtitlePositionY=changes.youtubeSubtitlePositionY.newValue;
-    applyYouTubeAppearance();
+    applySharedAppearance();
+    if(changes.showSentenceTranslation && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
 
     document.querySelectorAll(".gle-subtitle-translation").forEach(el=>el.remove());
     document.querySelectorAll("[data-gle-text]").forEach(node=>{
