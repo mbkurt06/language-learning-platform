@@ -120,3 +120,34 @@ review.
 
 This separation gives us a scalable path to thousands of candidates without degrading the
 runtime matcher with noisy or mistranslated entries.
+
+
+## Bulk promotion workflow
+
+After generating `build/external_lexicon_candidates.yml`, use the promotion-stage script to
+create a structurally clean batch instead of reviewing every entry one by one:
+
+```bash
+python scripts/build_promotion_batch.py \
+  --input build/external_lexicon_candidates.yml \
+  --tier A \
+  --output build/promotion_a_ready.yml \
+  --review-output build/promotion_a_review.yml \
+  --report build/promotion_a_report.json
+```
+
+Tier definitions:
+
+- **A**: PARSEME-derived candidates observed at least 10 times.
+- **B**: PARSEME-derived candidates observed 3–9 times.
+- **C**: remaining PARSEME-derived candidates.
+- VerbframesDE candidates are intentionally excluded from automatic PARSEME promotion tiers and
+  remain in their own review path.
+
+The promotion stage applies repeatable structural quality gates. For example, particle verbs must
+have PARTICLE slots, reflexive verbs must have a REFLEXIVE slot, malformed canonicals are rejected,
+and known context-sensitive corpus groupings such as `es gehen` stay in the review queue.
+
+A candidate marked `ready_for_translation` is **not yet a runtime lexicon entry**. It still needs
+a curated Turkish learner-facing meaning before its runtime fields are copied into
+`src/german_language_engine/data/*.yml`.
