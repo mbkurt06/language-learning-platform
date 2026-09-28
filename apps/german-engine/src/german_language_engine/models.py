@@ -70,6 +70,7 @@ class LearningUnit(BaseModel):
     pattern_id:str|None=None
     lexical_form:LexicalForm|None=None
     grammar_hint:str|None=None
+    sense_id:str|None=None
 
 class Analysis(BaseModel):
     text:str; sentence_meaning_tr:str|None=None; tokens:list[Token]; expressions:list[ExpressionMatch]
