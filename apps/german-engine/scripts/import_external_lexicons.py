@@ -47,6 +47,30 @@ REFLEXIVE_LEMMAS = {"sich", "mich", "mir", "dich", "dir", "uns", "euch"}
 PREPOSITION_UPOS = {"ADP"}
 VERB_UPOS = {"VERB", "AUX"}
 
+# Case governed by German prepositions that have one stable government.
+# Two-way prepositions (e.g. an/auf/in) are deliberately absent because their
+# case depends on sentence semantics and must not be guessed from the ADP token.
+PREPOSITION_GOVERNED_CASE = {
+    "aus": "Dat",
+    "außer": "Dat",
+    "bei": "Dat",
+    "beim": "Dat",
+    "gegenüber": "Dat",
+    "mit": "Dat",
+    "nach": "Dat",
+    "seit": "Dat",
+    "von": "Dat",
+    "vom": "Dat",
+    "zu": "Dat",
+    "zum": "Dat",
+    "zur": "Dat",
+    "durch": "Acc",
+    "für": "Acc",
+    "gegen": "Acc",
+    "ohne": "Acc",
+    "um": "Acc",
+}
+
 
 @dataclass
 class Candidate:
@@ -329,10 +353,10 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
             elif lemma in REFLEXIVE_LEMMAS:
                 slots.append({"id": f"reflexive_{slot_seq}", "type": "REFLEXIVE"})
             elif item["upos"] in PREPOSITION_UPOS:
-                case = item["feats"].get("Case")
                 slot = {"id": f"prep_{slot_seq}", "type": "PREPOSITION", "prep": lemma}
-                if case:
-                    slot["case"] = [case]
+                governed_case = PREPOSITION_GOVERNED_CASE.get(lemma.casefold())
+                if governed_case:
+                    slot["case"] = [governed_case]
                 slots.append(slot)
             else:
                 # For IRV, the reflexive pronoun is structural rather than a lexical lemma.
