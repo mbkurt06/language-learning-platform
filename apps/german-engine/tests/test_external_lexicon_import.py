@@ -208,3 +208,37 @@ def test_parseme_vid_rule_keys_are_casefolded_for_german_sharp_s(tmp_path: Path)
     assert len(items) == 1
     assert items[0].canonical == "es heißt"
     assert items[0].type == "FIXED_CONSTRUCTION"
+
+
+def test_parseme_vid_demonstrative_das_heisst_normalization(tmp_path: Path):
+    cupt = tmp_path / "vid_das_heisst.cupt"
+    cupt.write_text(
+        "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tdas\tder\tPRON\t_\t_\t1\tobj\t_\t_\t1\n\n"
+        "1\theißt\theißen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tdas\tder\tPRON\t_\t_\t1\tobj\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "das heißt"
+    assert items[0].type == "FIXED_CONSTRUCTION"
+
+
+def test_parseme_vid_bereitstehen_normalization(tmp_path: Path):
+    cupt = tmp_path / "vid_bereitstehen.cupt"
+    cupt.write_text(
+        "1\tsteht\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tbereit\tbereit\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n"
+        "1\tstehen\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tbereit\tbereit\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "bereitstehen"
+    assert items[0].type == "PARTICLE_VERB"
