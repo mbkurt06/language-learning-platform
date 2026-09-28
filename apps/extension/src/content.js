@@ -1017,11 +1017,33 @@
     syncYouTubePanelHost();
   }
 
+  function zdfPlayerShell(video){
+    if(!video) return null;
+    const fullscreenRoot=document.fullscreenElement;
+    if(fullscreenRoot?.contains(video)) return fullscreenRoot;
+    let node=video.parentElement;
+    let fallback=node;
+    while(node && node!==document.body && node!==document.documentElement){
+      const rect=node.getBoundingClientRect();
+      if(rect.width>=video.getBoundingClientRect().width*0.9) fallback=node;
+      const controls=[...node.querySelectorAll("button,[role=button]")];
+      const hasFullscreenControl=controls.some(control=>
+        /vollbild|fullscreen|full screen/i.test(
+          [control.getAttribute("aria-label"),control.getAttribute("title"),control.textContent]
+            .filter(Boolean).join(" ")
+        )
+      );
+      if(hasFullscreenControl) return node;
+      node=node.parentElement;
+    }
+    return fallback;
+  }
+
   function clearZdfPanelLayout(){
     document.documentElement.classList.remove("gle-zdf-panel-open");
     document.documentElement.style.removeProperty("--gle-zdf-panel-space");
-    document.querySelectorAll(".gle-zdf-media-host-panel-open").forEach(node=>{
-      node.classList.remove("gle-zdf-media-host-panel-open");
+    document.querySelectorAll(".gle-zdf-player-shell-panel-open,.gle-zdf-media-host-panel-open").forEach(node=>{
+      node.classList.remove("gle-zdf-player-shell-panel-open","gle-zdf-media-host-panel-open");
       node.style.removeProperty("--gle-zdf-panel-width");
     });
     document.querySelectorAll(".gle-zdf-video-panel-open").forEach(node=>{
@@ -1042,6 +1064,7 @@
       const fullscreenRoot=document.fullscreenElement;
       const video=bindZdfVideo() || state.zdf.video;
       const mediaHost=video?.parentElement;
+      const playerShell=zdfPlayerShell(video);
       const open=!state.youtube.panelCollapsed;
       const host=fullscreenRoot || document.documentElement;
 
@@ -1059,8 +1082,11 @@
         video?.classList.add("gle-zdf-video-panel-open");
         video?.style.removeProperty("--gle-zdf-video-scale");
         video?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
-        mediaHost?.classList.add("gle-zdf-media-host-panel-open");
-        mediaHost?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
+        playerShell?.classList.add("gle-zdf-player-shell-panel-open");
+        playerShell?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
+        if(playerShell===mediaHost){
+          mediaHost?.classList.add("gle-zdf-media-host-panel-open");
+        }
 
         if(fullscreenRoot){
           fullscreenRoot.classList.add("gle-zdf-fullscreen-panel-open");
