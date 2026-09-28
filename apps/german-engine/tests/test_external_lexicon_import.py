@@ -280,3 +280,23 @@ def test_parseme_vpc_semi_slots_are_particles(tmp_path: Path):
     assert items[0].slots == [
         {"id": "particle_1", "type": "PARTICLE", "lemma": "an"}
     ]
+
+
+def test_parseme_vid_particle_override_emits_particle_slot(tmp_path: Path):
+    cupt = tmp_path / "vid_particle.cupt"
+    cupt.write_text(
+        "1\tsteht\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tfest\tfest\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n"
+        "1\tsteht\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tfest\tfest\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "feststehen"
+    assert items[0].type == "PARTICLE_VERB"
+    assert items[0].slots == [
+        {"id": "particle_1", "type": "PARTICLE", "lemma": "fest"}
+    ]

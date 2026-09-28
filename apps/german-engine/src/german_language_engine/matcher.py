@@ -37,12 +37,26 @@ class StructuralMatcher:
     from becoming false negatives.
     """
     def match(self, tokens: list[Token], pattern: ExpressionPattern) -> list[ExpressionMatch]:
-        heads=[t for t in tokens if t.lemma.lower()==pattern.head_lemma.lower()]
+        particle_slots=[slot for slot in pattern.slots if slot.type == SlotType.PARTICLE and slot.lemma]
+        joined_particle_forms={
+            f"{slot.lemma}{pattern.head_lemma}".lower()
+            for slot in particle_slots
+        } if pattern.type.value == "PARTICLE_VERB" else set()
+
+        heads=[
+            t for t in tokens
+            if t.lemma.lower()==pattern.head_lemma.lower()
+            or t.lemma.lower() in joined_particle_forms
+        ]
         matches=[]
         for head in heads:
             hits=[]; used={head.i}; failed=False
             domain=_descendants(tokens, head.i) | {t.i for t in tokens if t.head==head.head}
+            joined_head=head.lemma.lower() in joined_particle_forms
             for slot in pattern.slots:
+                if joined_head and slot.type == SlotType.PARTICLE and slot.lemma:
+                    hits.append(SlotHit(slot,[head.i],"particle incorporated in verb lemma"))
+                    continue
                 hit=self._slot(tokens, head, slot, used, domain)
                 if hit is None:
                     if slot.optional: continue
