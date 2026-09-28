@@ -595,3 +595,73 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
 .gle-zdf-player-shell-panel-open:fullscreen video{
   width:100%!important;max-width:100%!important;height:100%!important;object-fit:contain!important
 }
+
+
+/* Single persistent panel handle.
+   Open: protrudes from the panel's left edge.
+   Closed: the same control stays at the viewport's right edge. */
+#gle-youtube-panel.gle-zdf-shared-panel .gle-panel-toggle{display:none!important}
+#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-edge-toggle{
+  display:flex!important;
+  position:absolute!important;
+  left:-24px!important;
+  top:28%!important;
+  right:auto!important;
+  width:24px!important;
+  height:72px!important;
+  transform:translateY(-50%)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border:1px solid #4c1d95!important;
+  border-right:0!important;
+  border-radius:12px 0 0 12px!important;
+  background:#6d28d9!important;
+  color:#fff!important;
+  box-shadow:-3px 0 10px rgba(0,0,0,.32)!important;
+  font:800 24px/1 system-ui!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  z-index:10!important
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:0!important;
+  min-width:0!important;
+  height:100%!important;
+  min-height:0!important;
+  transform:none!important;
+  overflow:visible!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  pointer-events:none!important
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-head,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-body{
+  display:none!important
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-edge-toggle{
+  display:flex!important;
+  position:absolute!important;
+  right:0!important;
+  left:auto!important;
+  top:28%!important;
+  width:24px!important;
+  height:72px!important;
+  transform:translateY(-50%)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border:1px solid #4c1d95!important;
+  border-right:0!important;
+  border-radius:12px 0 0 12px!important;
+  background:#6d28d9!important;
+  color:#fff!important;
+  box-shadow:-3px 0 10px rgba(0,0,0,.32)!important;
+  font:800 24px/1 system-ui!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  z-index:10!important
+}
