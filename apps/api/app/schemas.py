@@ -14,6 +14,11 @@ class AnalyzeResponse(BaseModel):
     analysis: dict[str, Any]
 
 
+class TokenBatchRequest(BaseModel):
+    source_language: str = Field(min_length=2, max_length=16)
+    texts: list[str] = Field(min_length=1, max_length=500)
+
+
 class AnalyzeAndMatchRequest(AnalyzeRequest):
     profile_id: UUID
 
