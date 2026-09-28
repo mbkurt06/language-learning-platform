@@ -1,6 +1,7 @@
 from __future__ import annotations
 from .models import ExpressionMatch, LexicalForm, Token, TokenMeaning, UsageNote
-from .translation import NullTranslationProvider, TranslationProvider\nfrom .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
+from .translation import NullTranslationProvider, TranslationProvider
+from .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
 
 SEED_WORDS={
  "gefallen":{"meanings":["iyilik","jest"],"noun":("der","Gefallen","Gefallen")},
@@ -262,7 +263,8 @@ class MeaningResolver:
    output.append(TokenMeaning(token_index=token.i,lemma=canonical_lemma,contextual_meaning_tr=contextual,dictionary_meanings_tr=dictionary,lexical_form=lexical,usage_notes=notes,sense_id=selected_sense.sense_id if selected_sense else None,canonical_lemma=canonical_lemma))
   return outputimport annotations
 from .models import ExpressionMatch, LexicalForm, Token, TokenMeaning, UsageNote
-from .translation import NullTranslationProvider, TranslationProvider\nfrom .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
+from .translation import NullTranslationProvider, TranslationProvider
+from .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
 
 SEED_WORDS={
  "gefallen":{"meanings":["iyilik","jest"],"noun":("der","Gefallen","Gefallen")},
