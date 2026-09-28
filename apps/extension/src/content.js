@@ -11,7 +11,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82},
+    settings:{extensionEnabled:true,showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -2290,14 +2290,52 @@
       overlay=document.createElement("div");
       overlay.className="gle-youtube-overlay gle-zdf-overlay";
       overlay.hidden=true;
+      const handle=document.createElement("button");
+      handle.type="button";
+      handle.className="gle-youtube-drag-handle";
+      handle.textContent="↕";
+      handle.title="Altyazıyı yukarı/aşağı taşı";
+      handle.setAttribute("aria-label","Altyazıyı yukarı veya aşağı taşı");
+      overlay.appendChild(handle);
       const germanLine=document.createElement("div");
       germanLine.className="gle-youtube-german";
       overlay.appendChild(germanLine);
       host.appendChild(overlay);
+      installZdfDragHandle(video,overlay,handle);
     }
     state.zdf.overlay=overlay;
     state.zdf.germanLine=overlay.querySelector(".gle-youtube-german");
+    overlay.style.top=clamp(Number(state.settings.zdfSubtitlePositionY)||88,8,92)+"%";
     return {video,overlay,germanLine:state.zdf.germanLine};
+  }
+
+  function installZdfDragHandle(video,overlay,handle){
+    handle.addEventListener("pointerdown",event=>{
+      if(event.button!==0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect=video.getBoundingClientRect();
+      if(!rect.height) return;
+      const startY=event.clientY;
+      const startPosition=clamp(Number(state.settings.zdfSubtitlePositionY)||88,8,92);
+      handle.setPointerCapture?.(event.pointerId);
+      overlay.classList.add("gle-dragging");
+      const onMove=moveEvent=>{
+        const next=clamp(startPosition+((moveEvent.clientY-startY)/rect.height)*100,8,92);
+        state.settings.zdfSubtitlePositionY=next;
+        overlay.style.top=next+"%";
+      };
+      const finish=()=>{
+        handle.removeEventListener("pointermove",onMove);
+        handle.removeEventListener("pointerup",finish);
+        handle.removeEventListener("pointercancel",finish);
+        overlay.classList.remove("gle-dragging");
+        chrome.storage.sync.set({zdfSubtitlePositionY:state.settings.zdfSubtitlePositionY});
+      };
+      handle.addEventListener("pointermove",onMove);
+      handle.addEventListener("pointerup",finish);
+      handle.addEventListener("pointercancel",finish);
+    });
   }
 
   function renderZdfCue(mediaTime){
@@ -2441,7 +2479,8 @@
     showSentenceTranslation:true,
     germanFontSize:100,
     translationFontSize:100,
-    youtubeSubtitlePositionY:82
+    youtubeSubtitlePositionY:82,
+    zdfSubtitlePositionY:88
   },settings=>{
     state.settings=settings;
     if(adapter.id==="zdf" && Number(state.settings.germanFontSize)===100 && Number(state.settings.translationFontSize)===100){
