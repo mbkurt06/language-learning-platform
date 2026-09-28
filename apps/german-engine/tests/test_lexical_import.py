@@ -31,7 +31,7 @@ def test_freedict_only_fills_empty_sense_translations(tmp_path):
     assert json.loads(db.execute("select meanings_tr from senses where sense_id='s2'").fetchone()[0])==["arı"]
 
 
-def test_case_distinct_wiktionary_entries_keep_distinct_fallback_ids(tmp_path):
+def test_case_only_pronoun_variants_collapse_to_one_sense(tmp_path):
     source=tmp_path/"de.jsonl"
     rows=[
       {
@@ -42,19 +42,17 @@ def test_case_distinct_wiktionary_entries_keep_distinct_fallback_ids(tmp_path):
       {
         "lang_code":"de","word":"Er","pos":"pron",
         "translations":[],
-        "senses":[{"glosses":["male form of address"]}],
+        "senses":[{"glosses":["historical form of address"]}],
       },
     ]
     source.write_text("\n".join(json.dumps(row,ensure_ascii=False) for row in rows)+"\n",encoding="utf-8")
     db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
-    assert import_wiktextract(source,db)==2
-    senses=db.execute("select sense_id,lemma,meanings_tr from senses where lemma=? collate nocase and pos='PRON' order by lemma collate binary",("er",)).fetchall()
-    assert len(senses)==2
-    by_lemma={lemma:(sense_id,json.loads(meanings)) for sense_id,lemma,meanings in senses}
-    assert by_lemma["er"][0]=="wiktextract:er:PRON:0"
-    assert by_lemma["er"][1]==["o"]
-    assert by_lemma["Er"][0]!="wiktextract:er:PRON:0"
-    assert by_lemma["Er"][1]==[]
+    import_wiktextract(source,db)
+    senses=db.execute(
+        "select sense_id,lemma,meanings_tr from senses where lemma=? collate nocase and pos='PRON'",
+        ("er",),
+    ).fetchall()
+    assert senses==[("wiktextract:er:PRON:0","er",'["o"]')]
     db.close()
 
 
@@ -82,4 +80,22 @@ def test_freedict_fallback_preserves_exact_case_groups(tmp_path):
     upper=json.loads(db.execute("select meanings_tr from senses where sense_id='upper-er'").fetchone()[0])
     assert lower==["o"]
     assert upper==["Bay"]
+    db.close()
+
+
+def test_case_only_noun_variants_can_remain_distinct(tmp_path):
+    source=tmp_path/"de.jsonl"
+    rows=[
+      {"lang_code":"de","word":"arm","pos":"noun","senses":[{"glosses":["test lower"]}]},
+      {"lang_code":"de","word":"Arm","pos":"noun","senses":[{"glosses":["body part"]}]},
+    ]
+    source.write_text("\n".join(json.dumps(row,ensure_ascii=False) for row in rows)+"\n",encoding="utf-8")
+    db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
+    import_wiktextract(source,db)
+    senses=db.execute(
+        "select sense_id,lemma from senses where lemma=? collate nocase and pos='NOUN' order by lemma collate binary",
+        ("arm",),
+    ).fetchall()
+    assert len(senses)==2
+    assert {lemma for _,lemma in senses}=={"arm","Arm"}
     db.close()
