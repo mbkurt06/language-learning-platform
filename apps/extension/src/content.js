@@ -1502,7 +1502,7 @@
         observer.unobserve(entry.target);
         load(entry.target);
       }
-    },{root:list,rootMargin:"300px 0px"});
+    },{root:list.closest(".gle-panel-body"),rootMargin:"300px 0px"});
     nodes.forEach(node=>observer.observe(node));
   }
 
