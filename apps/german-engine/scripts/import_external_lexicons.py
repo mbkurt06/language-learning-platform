@@ -182,7 +182,15 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
 
     if category == "VID":
         normalized_key = tuple(part.casefold() for part in parts)
-        rule = VID_CANONICAL_RULES.get(normalized_key)
+
+        # Casefold the rule keys too. This matters in German because e.g.
+        # "heißen".casefold() == "heissen".
+        normalized_rules = {
+            tuple(part.casefold() for part in rule_key): rule
+            for rule_key, rule in VID_CANONICAL_RULES.items()
+        }
+
+        rule = normalized_rules.get(normalized_key)
         if rule:
             canonical, type_override = rule
             return canonical, head_lemma, type_override
@@ -191,7 +199,7 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
         # small order-insensitive lookup, but only for explicit high-confidence
         # rules to avoid broad heuristic rewrites.
         member_multiset = Counter(normalized_key)
-        for rule_key, rule in VID_CANONICAL_RULES.items():
+        for rule_key, rule in normalized_rules.items():
             if Counter(rule_key) == member_multiset:
                 canonical, type_override = rule
                 return canonical, head_lemma, type_override
