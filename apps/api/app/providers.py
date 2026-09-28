@@ -32,6 +32,7 @@ PROVIDERS = {
                 MediaCapability.SEARCH,
                 MediaCapability.METADATA,
                 MediaCapability.PLAYBACK,
+                MediaCapability.SUBTITLES,
                 MediaCapability.BROWSER_OVERLAY,
             }
         ),
