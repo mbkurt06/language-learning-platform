@@ -2228,7 +2228,9 @@
     }
 
     if(message.type==="track-status" && message.enabled===false){
-      resetYouTube(message.videoId || state.youtube.videoId);
+      // The MAIN-world bridge may briefly enable YouTube captions to obtain
+      // the signed timedtext request/POT. Do not erase video state while that
+      // bootstrap is in progress.
       return;
     }
 
