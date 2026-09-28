@@ -148,43 +148,31 @@
       return;
     }
 
+    const pot = potByVideoId.get(videoId) || await waitForPot(videoId);
+    if (!pot) {
+      const missingKey = `${videoId}|${track.vssId || track.languageCode || ""}`;
+      if (missingKey !== lastMissingPotKey) {
+        lastMissingPotKey = missingKey;
+        post({type:"track-error", videoId, reason:"missing-pot"});
+      }
+      return;
+    }
+
     url.searchParams.set("fmt", "json3");
     url.searchParams.set("c", "WEB");
-
-    const knownPot = potByVideoId.get(videoId);
-    if (knownPot) url.searchParams.set("pot", knownPot);
+    url.searchParams.set("pot", pot);
 
     const key = `${videoId}|${track.vssId || track.languageCode || ""}|${url.href}`;
     if (key === lastTrackKey || key === inflightKey) return;
 
     inflightKey = key;
     try {
-      let response = await fetch(url.href, {
+      const response = await fetch(url.href, {
         credentials: "include",
         cache: "no-store",
         redirect: "follow",
       });
-
-      if (!response.ok && !url.searchParams.get("pot")) {
-        const pot = await waitForPot(videoId, 3500);
-        if (pot) {
-          url.searchParams.set("pot", pot);
-          response = await fetch(url.href, {
-            credentials: "include",
-            cache: "no-store",
-            redirect: "follow",
-          });
-        }
-      }
-
-      if (!response.ok) {
-        const pot = potByVideoId.get(videoId);
-        if (!pot) {
-          setTimeout(inspectPlayer, 700);
-          setTimeout(inspectPlayer, 1800);
-        }
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const raw = (await response.text()).replace(/^\)\]\}'\s*/, "");
       if (!raw.trim()) throw new Error("empty-caption-response");
@@ -228,7 +216,7 @@
       kind:track?.kind || "",
     });
 
-    if (videoId && track?.baseUrl) fetchTrack(videoId, track);
+    if (enabled && videoId && track?.baseUrl) fetchTrack(videoId, track);
   }
 
   function reset() {
