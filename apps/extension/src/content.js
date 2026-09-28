@@ -50,7 +50,7 @@
       wordsView:"overview",
       wordsSearch:"",
     },
-    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null}
+    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null,panel:null}
   };
 
   const adapter=ADAPTERS.find(a=>a.host.test(location.hostname));
@@ -2048,6 +2048,55 @@
   }
 
 
+
+  function ensureZdfPanel(){
+    if(adapter.id!=="zdf") return null;
+    if(state.zdf.panel?.isConnected) return state.zdf.panel;
+    const panel=document.createElement("aside");
+    panel.id="gle-zdf-panel";
+    panel.innerHTML='<div class="gle-zdf-panel-head"><strong>Language Learning · ZDF</strong></div><div class="gle-zdf-panel-body"></div>';
+    document.documentElement.appendChild(panel);
+    state.zdf.panel=panel;
+    renderZdfPanel();
+    return panel;
+  }
+
+  function renderZdfPanel(){
+    const panel=state.zdf.panel;
+    if(!panel) return;
+    const body=panel.querySelector(".gle-zdf-panel-body");
+    if(!body) return;
+    const status=state.zdf.loading
+      ? "Altyazı yükleniyor…"
+      : state.zdf.loaded
+        ? "Altyazı hazır · "+(state.zdf.cues?.length||0)+" cue"
+        : state.zdf.error
+          ? "Altyazı hatası"
+          : "ZDF videosu algılandı";
+    body.textContent="";
+    const statusNode=document.createElement("div");
+    statusNode.className="gle-zdf-status";
+    statusNode.textContent=status;
+    body.appendChild(statusNode);
+    const idNode=document.createElement("div");
+    idNode.className="gle-zdf-video-id";
+    idNode.textContent="Video: "+(state.zdf.videoId||globalThis.GLEZdfProvider?.zdfVideoId(location.href)||"—");
+    body.appendChild(idNode);
+    if(state.zdf.error){
+      const errorNode=document.createElement("pre");
+      errorNode.className="gle-zdf-error";
+      errorNode.textContent=state.zdf.error;
+      body.appendChild(errorNode);
+    }
+    if(state.zdf.loaded && state.zdf.cues?.length){
+      const cue=state.zdf.cues[state.zdf.cueIndex] || state.zdf.cues[0];
+      const cueNode=document.createElement("div");
+      cueNode.className="gle-zdf-current-cue";
+      cueNode.textContent=cue?.text||"";
+      body.appendChild(cueNode);
+    }
+  }
+
   function cueAtTime(cues,timeMs){
     if(!Array.isArray(cues)) return null;
     return cues.find(cue=>timeMs>=cue.startMs && timeMs<cue.endMs) || null;
@@ -2081,12 +2130,14 @@
     if(!cue){
       ui.overlay.hidden=true;
       state.zdf.cueIndex=-1;
+      renderZdfPanel();
       return true;
     }
     ui.overlay.hidden=false;
     if(state.zdf.cueIndex!==cue.index){
       state.zdf.cueIndex=cue.index;
       decorate(ui.germanLine,cue.text);
+      renderZdfPanel();
     }
     return true;
   }
@@ -2127,8 +2178,10 @@
       renderZdfCue();
       return;
     }
+    ensureZdfPanel();
     state.zdf.loading=true;
     state.zdf.videoId=videoId;
+    renderZdfPanel();
     state.zdf.error="";
     try{
       const tracks=await globalThis.GLEZdfProvider.discoverSubtitleTracks(videoId);
@@ -2141,14 +2194,17 @@
       state.zdf.cues=cues;
       state.zdf.cueIndex=-1;
       state.zdf.loaded=true;
+      renderZdfPanel();
       bindZdfVideo();
       renderZdfCue();
     }catch(error){
       state.zdf.error=String(error?.message||error);
       state.zdf.loaded=false;
+      renderZdfPanel();
       console.warn("ZDF timed subtitles unavailable",error);
     }finally{
       state.zdf.loading=false;
+      renderZdfPanel();
     }
   }
 
@@ -2158,6 +2214,7 @@
       return;
     }
     if(adapter.id==="zdf"){
+      ensureZdfPanel();
       loadZdfTimedSubtitles();
       if(state.zdf.loaded){ bindZdfVideo(); renderZdfCue(); return; }
     }

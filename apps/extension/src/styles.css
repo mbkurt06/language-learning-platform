@@ -213,3 +213,11 @@
 /* ZDF timed subtitle overlay reuses the proven YouTube typography without hiding ZDF native captions. */
 .gle-zdf-overlay{pointer-events:auto;left:50%;transform:translate(-50%,-100%);top:88%;z-index:2147483645;}
 .gle-zdf-overlay .gle-youtube-german{pointer-events:auto;}
+
+#gle-zdf-panel{position:fixed;right:16px;top:110px;width:320px;max-height:70vh;z-index:2147483647;background:rgba(18,18,22,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.35);font:14px/1.45 system-ui,-apple-system,sans-serif;overflow:hidden}
+.gle-zdf-panel-head{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.14)}
+.gle-zdf-panel-body{padding:12px 14px;display:grid;gap:8px}
+.gle-zdf-status{font-weight:700}
+.gle-zdf-video-id{font-size:12px;opacity:.72;overflow-wrap:anywhere}
+.gle-zdf-error{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:8px;background:rgba(255,255,255,.07);border-radius:7px;font:11px/1.35 ui-monospace,SFMono-Regular,monospace}
+.gle-zdf-current-cue{margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)}
