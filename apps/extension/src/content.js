@@ -1073,6 +1073,8 @@
 
       clearZdfPanelLayout();
       if(panel.parentElement!==host) host.appendChild(panel);
+      const handle=state.youtube.panelHandle;
+      if(handle && handle.parentElement!==host) host.appendChild(handle);
       panel.classList.add("gle-zdf-shared-panel");
       panel.classList.toggle("docked",Boolean(fullscreenRoot));
 
