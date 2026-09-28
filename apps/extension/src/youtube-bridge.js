@@ -2,6 +2,7 @@
   const SOURCE = "gle-youtube-caption-bridge";
   const DEBUG_KEY = "__GLE_YOUTUBE_BRIDGE_DEBUG__";
   const potByVideoId = new Map();
+  const primedVideoIds = new Set();
   let lastTrackKey = "";
   let inflightKey = "";
   let lastMissingPotKey = "";
@@ -197,6 +198,29 @@
     }
   }
 
+  function primeNativeCaptions(videoId, player) {
+    if (!videoId || primedVideoIds.has(videoId)) return false;
+    primedVideoIds.add(videoId);
+
+    const button = document.querySelector(".ytp-subtitles-button");
+    if (button && button.getAttribute("aria-pressed") !== "true") {
+      button.click();
+      setTimeout(inspectPlayer, 120);
+      setTimeout(inspectPlayer, 600);
+      setTimeout(inspectPlayer, 1600);
+      return true;
+    }
+
+    try {
+      player?.setOption?.("captions", "reload", true);
+      setTimeout(inspectPlayer, 250);
+      setTimeout(inspectPlayer, 900);
+      return true;
+    } catch (_error) {}
+
+    return false;
+  }
+
   function inspectPlayer() {
     const player = document.getElementById("movie_player");
     const response = getPlayerResponse(player);
@@ -216,7 +240,14 @@
       kind:track?.kind || "",
     });
 
-    if (enabled && videoId && track?.baseUrl) fetchTrack(videoId, track);
+    if (!videoId || !track?.baseUrl) return;
+
+    if (!enabled) {
+      primeNativeCaptions(videoId, player);
+      return;
+    }
+
+    fetchTrack(videoId, track);
   }
 
   function reset() {
