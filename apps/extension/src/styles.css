@@ -720,3 +720,20 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
 /* ZDF overlay spans the actual video bounds; text stays centered while the drag handle stays at the video edge. */
 .gle-zdf-overlay{align-items:center!important;}
 .gle-zdf-overlay .gle-youtube-drag-handle{left:auto!important;right:8px!important;}
+
+
+/* ZDF subtitle geometry is owned by ensureZdfOverlay() using the live video
+   bounding box. Override older dock/fullscreen rules that recentered it
+   against the page/fullscreen container instead of the video. */
+html.gle-zdf-panel-open .gle-zdf-overlay,
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-overlay,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-overlay{
+  max-width:none!important;
+}
+html.gle-zdf-panel-open .gle-zdf-overlay{
+  left:var(--gle-zdf-overlay-left)!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-overlay,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-overlay{
+  left:var(--gle-zdf-overlay-left)!important;
+}
