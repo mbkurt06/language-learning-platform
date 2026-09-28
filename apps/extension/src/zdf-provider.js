@@ -1,5 +1,7 @@
 (() => {
   const PLAYER_ID = "android_native_6";
+  const TOKEN_URL = "https://zdf-prod-futura.zdf.de/mediathekV2/token";
+  const GRAPHQL_URL = "https://api.zdf.de/graphql";
 
   function normalizeZdfUrl(value) {
     try { return new URL(value, "https://www.zdf.de"); } catch (_error) { return null; }
@@ -70,6 +72,64 @@
     }).filter(Boolean).map((cue, index) => ({...cue, index}));
   }
 
+  function apiAuthorization(tokenPayload) {
+    const type = String(tokenPayload?.type || "").trim();
+    const token = String(tokenPayload?.token || "").trim();
+    return type && token ? `${type} ${token}` : "";
+  }
+
+  function videoMetadataRequest(canonical, authorization) {
+    return {
+      url: GRAPHQL_URL,
+      options: {
+        method: "POST",
+        headers: {
+          "Api-Auth": authorization,
+          "Apollo-Require-Preflight": "true",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          operationName: "VideoByCanonical",
+          query: "query VideoByCanonical($canonical: String!) { videoByCanonical(canonical: $canonical) { canonical title currentMedia { nodes { ptmdTemplate } } } }",
+          variables: {canonical},
+        }),
+      },
+    };
+  }
+
+  function ptmdTemplatesFromMetadata(payload) {
+    const nodes = payload?.data?.videoByCanonical?.currentMedia?.nodes;
+    if (!Array.isArray(nodes)) return [];
+    return [...new Set(nodes.map(node => expandPtmdTemplate(node?.ptmdTemplate)).filter(Boolean))];
+  }
+
+  async function discoverSubtitleTracks(canonical, fetchImpl = fetch) {
+    if (!canonical) throw new Error("missing-zdf-canonical");
+    const tokenResponse = await fetchImpl(TOKEN_URL, {cache:"no-store"});
+    if (!tokenResponse.ok) throw new Error(`zdf-token-http-${tokenResponse.status}`);
+    const authorization = apiAuthorization(await tokenResponse.json());
+    if (!authorization) throw new Error("invalid-zdf-token");
+
+    const metadataRequest = videoMetadataRequest(canonical, authorization);
+    const metadataResponse = await fetchImpl(metadataRequest.url, metadataRequest.options);
+    if (!metadataResponse.ok) throw new Error(`zdf-metadata-http-${metadataResponse.status}`);
+    const ptmdUrls = ptmdTemplatesFromMetadata(await metadataResponse.json());
+    if (!ptmdUrls.length) throw new Error("missing-zdf-ptmd");
+
+    const tracks = [];
+    const seen = new Set();
+    for (const ptmdUrl of ptmdUrls) {
+      const response = await fetchImpl(ptmdUrl, {headers:{"Api-Auth":authorization}, cache:"no-store"});
+      if (!response.ok) continue;
+      for (const track of subtitleTracksFromPtmd(await response.json())) {
+        if (seen.has(track.url)) continue;
+        seen.add(track.url);
+        tracks.push(track);
+      }
+    }
+    return tracks;
+  }
+
   const api = {
     zdfVideoId,
     isZdfVideoPage,
@@ -77,6 +137,10 @@
     subtitleTracksFromPtmd,
     parseClock,
     parseTtmlCues,
+    apiAuthorization,
+    videoMetadataRequest,
+    ptmdTemplatesFromMetadata,
+    discoverSubtitleTracks,
   };
   globalThis.GLEZdfProvider = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
