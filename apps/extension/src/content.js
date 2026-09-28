@@ -884,6 +884,17 @@
     panel.classList.toggle("docked",shouldDock);
     player.classList.toggle("gle-panel-docked",shouldDock && !state.youtube.panelCollapsed);
     player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.youtube.panelCollapsed);
+
+    if(shouldDock && !state.youtube.panelCollapsed){
+      const width=player.getBoundingClientRect().width || 1;
+      const panelWidth=Math.min(420,width*0.35);
+      const scale=Math.max(0.55,(width-panelWidth)/width);
+      player.style.setProperty("--gle-video-scale",String(scale));
+      player.style.setProperty("--gle-panel-width",panelWidth+"px");
+    }else{
+      player.style.removeProperty("--gle-video-scale");
+      player.style.removeProperty("--gle-panel-width");
+    }
   }
 
   function ensureYouTubeSidePanel(){
