@@ -285,10 +285,10 @@ def test_parseme_vpc_semi_slots_are_particles(tmp_path: Path):
 def test_parseme_vid_particle_override_emits_particle_slot(tmp_path: Path):
     cupt = tmp_path / "vid_particle.cupt"
     cupt.write_text(
-        "1\\tsteht\\tstehen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:VID\\n"
-        "2\\tfest\\tfest\\tADV\\t_\\t_\\t1\\tadvmod\\t_\\t_\\t1\\n\\n"
-        "1\\tsteht\\tstehen\\tVERB\\t_\\t_\\t0\\troot\\t_\\t_\\t1:VID\\n"
-        "2\\tfest\\tfest\\tADV\\t_\\t_\\t1\\tadvmod\\t_\\t_\\t1\\n\\n",
+        "1\tsteht\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tfest\tfest\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n"
+        "1\tsteht\tstehen\tVERB\t_\t_\t0\troot\t_\t_\t1:VID\n"
+        "2\tfest\tfest\tADV\t_\t_\t1\tadvmod\t_\t_\t1\n\n",
         encoding="utf-8",
     )
 
