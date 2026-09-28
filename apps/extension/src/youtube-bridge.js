@@ -166,7 +166,7 @@
       });
 
       if (!response.ok && !url.searchParams.get("pot")) {
-        const pot = await waitForPot(videoId, 1200);
+        const pot = await waitForPot(videoId, 3500);
         if (pot) {
           url.searchParams.set("pot", pot);
           response = await fetch(url.href, {
@@ -177,7 +177,14 @@
         }
       }
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const pot = potByVideoId.get(videoId);
+        if (!pot) {
+          setTimeout(inspectPlayer, 700);
+          setTimeout(inspectPlayer, 1800);
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const raw = (await response.text()).replace(/^\)\]\}'\s*/, "");
       if (!raw.trim()) throw new Error("empty-caption-response");
