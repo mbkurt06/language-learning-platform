@@ -55,7 +55,7 @@
 .gle-panel-tabs button{padding:17px 8px 15px;border-bottom:3px solid transparent}
 .gle-panel-tabs button.active{color:#fff;border-bottom-color:#a855f7;background:#1d1d22}
 .gle-panel-toggle{width:46px;height:46px;font-size:28px;color:#ddd;flex:0 0 46px}
-.gle-panel-body{flex:1;overflow:auto;background:#0b0b0d;scrollbar-color:#666 #17171a;overscroll-behavior:contain}
+.gle-panel-body{flex:1;min-height:0;overflow:auto;background:#0b0b0d;scrollbar-color:#666 #17171a;overscroll-behavior:contain}
 .gle-panel-empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:28px;text-align:center;color:#a1a1aa}
 .gle-panel-empty b{color:#e4e4e7}
 .gle-transcript-row{
@@ -369,7 +369,7 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 }
 .gle-translation-switch{display:flex;align-items:center;gap:6px;cursor:pointer;color:#a1a1aa;font:600 10px/1 system-ui}
 .gle-translation-switch input{position:absolute;opacity:0;pointer-events:none}
-.gle-transcript-list{height:100%;overflow:auto}
+.gle-transcript-list{height:auto;min-height:0;overflow:visible}
 .gle-row-text{display:flex!important;flex-direction:column;gap:3px;align-items:flex-start}
 .gle-row-source{display:block}
 .gle-row-translation{display:block;color:#c4b5fd;font-size:10px;line-height:1.35;font-weight:500}
