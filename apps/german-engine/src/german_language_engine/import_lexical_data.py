@@ -50,14 +50,6 @@ def _fallback_sense_id(db,word,pos,idx):
         return base
 
     existing=str(row[0])
-
-    # Product rule: sentence-initial "Er" and sentence-internal "er" are the
-    # same subject pronoun and must share one lexical sense / learning unit.
-    if pos=="PRON" and word.casefold()=="er" and existing.casefold()=="er":
-        if existing=="er" and word=="Er":
-            return None
-        return base
-
     preferred=min((existing,word),key=lambda value:(value!=value.casefold(),value))
     if preferred==existing:
         return _case_disambiguated_sense_id(base,word)
@@ -78,6 +70,15 @@ def import_wiktextract(path,db):
         word=str(item.get("word") or "").strip()
         pos=POS_MAP.get(str(item.get("pos") or "").lower(),str(item.get("pos") or "").upper())
         if not word: continue
+
+        # Product rule: sentence-initial "Er" is the same subject pronoun as
+        # sentence-internal "er". Ignore Wiktionary's separate uppercase PRON
+        # entry and remove any legacy rows created by older imports.
+        if pos=="PRON" and word=="Er":
+            db.execute("delete from senses where lemma=? collate binary and pos=?",("Er","PRON"))
+            db.execute("delete from forms where lemma=? collate binary and pos=?",("Er","PRON"))
+            continue
+
         forms=item.get("forms") or []
         for form in forms:
           value=str(form.get("form") or "").strip()
@@ -100,10 +101,7 @@ def import_wiktextract(path,db):
           glosses=sense.get("glosses") or sense.get("raw_glosses") or []
           gloss=str(glosses[0] if glosses else "").strip()
           sid=str(sense.get("id") or sense.get("senseid") or "").strip()
-          if not sid:
-            sid=_fallback_sense_id(db,word,pos,idx)
-            if sid is None:
-              continue
+          if not sid: sid=_fallback_sense_id(db,word,pos,idx)
           meanings=_translations_for(gloss,turkish)
           db.execute("""insert or replace into senses(sense_id,lemma,pos,ordinal,gloss,meanings_tr,tags,article,plural)
              values(?,?,?,?,?,?,?,?,?)""",(sid,word,pos,idx,gloss,json.dumps(meanings,ensure_ascii=False),json.dumps(list(tags),ensure_ascii=False),article,plural))
