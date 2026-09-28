@@ -130,8 +130,8 @@ VID_CANONICAL_RULES = {
     ("es", "kommen"): ("es kommt zu etwas", "FIXED_CONSTRUCTION"),
     ("gelten", "es"): ("es gilt, etwas zu tun", "FIXED_CONSTRUCTION"),
     ("es", "gelten"): ("es gilt, etwas zu tun", "FIXED_CONSTRUCTION"),
-    ("handeln", "es", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
-    ("es", "handeln", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
+    ("handeln", "es", "sich"): ("es handelt sich um etwas", "FIXED_CONSTRUCTION"),
+    ("es", "handeln", "sich"): ("es handelt sich um etwas", "FIXED_CONSTRUCTION"),
     ("gehen", "davon", "aus"): ("davon ausgehen", "FIXED_CONSTRUCTION"),
     ("stehen", "fest"): ("feststehen", "PARTICLE_VERB"),
     ("stehen", "bereit"): ("bereitstehen", "PARTICLE_VERB"),
@@ -139,6 +139,16 @@ VID_CANONICAL_RULES = {
     ("haben", "zu", "tun"): ("mit etwas zu tun haben", "IDIOM"),
     ("stehen", "zur", "verfügung"): ("zur Verfügung stehen", "FUNCTION_VERB"),
     ("verlieren", "gehen"): ("verloren gehen", "FIXED_CONSTRUCTION"),
+}
+
+
+FIXED_CANONICAL_EXTRA_SLOTS: dict[str, list[dict[str, Any]]] = {
+    "es kommt zu etwas": [
+        {"id": "zu", "type": "PREPOSITION", "prep": "zu", "case": ["Dat"]},
+    ],
+    "es handelt sich um etwas": [
+        {"id": "um", "type": "PREPOSITION", "prep": "um", "case": ["Acc"]},
+    ],
 }
 
 
@@ -316,6 +326,22 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
             else:
                 # For IRV, the reflexive pronoun is structural rather than a lexical lemma.
                 slots.append({"id": f"lemma_{slot_seq}", "type": "LEMMA", "lemma": clean_lemma(item)})
+
+        # Some learner-facing canonical forms contain a governed preposition that
+        # PARSEME's VID annotation does not include in the MWE token set. Add those
+        # structural slots explicitly so runtime matching does not overgeneralize.
+        existing_slot_keys = {
+            (str(slot.get("type", "")), str(slot.get("lemma") or slot.get("prep") or "").lower())
+            for slot in slots
+        }
+        for extra_slot in FIXED_CANONICAL_EXTRA_SLOTS.get(canonical, []):
+            extra_key = (
+                str(extra_slot.get("type", "")),
+                str(extra_slot.get("lemma") or extra_slot.get("prep") or "").lower(),
+            )
+            if extra_key not in existing_slot_keys:
+                slots.append(extra_slot)
+                existing_slot_keys.add(extra_key)
 
         mapped_type = type_override or PARSEME_TYPE_MAP.get(category, "FIXED_CONSTRUCTION")
         candidates.append(Candidate(
