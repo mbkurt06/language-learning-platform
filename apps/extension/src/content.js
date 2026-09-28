@@ -216,6 +216,9 @@
     const payload=await response.json();
     state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
     refreshLearningHighlights();
+    if(adapter.id==="youtube" && state.youtube.panel && !state.youtube.panel.hidden){
+      renderYouTubeSidePanel();
+    }
   }
 
   async function saveLearningItem(item, encounterSnapshot=null){
@@ -753,7 +756,13 @@
     state.youtube.domStable="";
     state.youtube.domLastChange=0;
     state.youtube.domFirstSeen=0;
+    state.youtube.transcriptAnalysis=null;
+    state.youtube.transcriptAnalysisVideoId="";
+    state.youtube.transcriptAnalysisRun+=1;
+    state.youtube.panelSelectedLemma="";
+    stopYouTubePreview();
     hideYouTubeOverlay();
+    if(state.youtube.panel && !state.youtube.panel.hidden) renderYouTubeSidePanel();
   }
 
   function currentYouTubeTitle(){
@@ -1149,6 +1158,7 @@
       const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,cue.index);
       const hoverContextText=globalThis.GLEYoutubeCues.hoverTextForCue(cues,cue.index);
       showYouTubeText(cue.text,translationText,hoverContextText);
+      updatePanelActiveCue();
     }else if(state.youtube.overlay){
       state.youtube.overlay.hidden=false;
     }
@@ -1213,6 +1223,9 @@
       state.youtube.cueIndex=-1;
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
+      ensureYouTubeSidePanel();
+      renderYouTubeSidePanel();
+      analyzeWholeYouTubeTranscript();
       bindYouTubeVideo();
       const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
       const currentCue=video ? globalThis.GLEYoutubeCues.cueAtTime(cues,video.currentTime*1000) : cues[0];
