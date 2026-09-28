@@ -51,6 +51,9 @@
       panelSelectedGroupKey:"",
       wordsView:"overview",
       wordsSearch:"",
+      senseRows:null,
+      senseRowsVideoId:"",
+      senseRowsPromise:null,
     },
     zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null,panel:null}
   };
@@ -214,6 +217,7 @@
       key:item.canonical_key,
       label:item.canonical_form,
       meaning_tr:translation?.meaning||"",
+      status:item.status||"learning",
       encounters:item.encounters||[],
     };
   }
@@ -1621,6 +1625,7 @@
       ["alphabetical","A-Z"],
       ["frequency","Sıklık"],
       ["groups","Kelime grupları"],
+      ["senses","Anlamlar"],
     ];
     return '<div class="gle-words-tools">'+
       '<div class="gle-words-subtabs">'+views.map(([id,label])=>
@@ -1748,6 +1753,107 @@
     renderYouTubeSidePanel();
   }
 
+  function senseLearningKey(lemma,meaning){
+    return "sense:"+String(lemma||"").toLocaleLowerCase("de-DE")+"|"+String(meaning||"").trim().toLocaleLowerCase("tr-TR");
+  }
+
+  function learningItemForSense(row){
+    const key=senseLearningKey(row.lemma,row.meaningTr);
+    return state.learningItems.find(item=>item.kind==="word-sense" && item.key===key);
+  }
+
+  async function analyzePanelWordSenses(){
+    const videoId=state.youtube.videoId;
+    const cues=state.youtube.cues||[];
+    if(!videoId || !cues.length) return;
+    if(state.youtube.senseRowsVideoId===videoId && state.youtube.senseRows) return;
+    if(state.youtube.senseRowsVideoId===videoId && state.youtube.senseRowsPromise) return state.youtube.senseRowsPromise;
+    state.youtube.senseRowsVideoId=videoId;
+    state.youtube.senseRows=null;
+    const task=(async()=>{
+      try{
+        const rows=new Map();
+        for(let cueIndex=0;cueIndex<cues.length;cueIndex++){
+          const cue=cues[cueIndex];
+          const data=await analyze(cue.text);
+          for(const token of data?.tokens||[]){
+            const pos=String(token.pos||"").toUpperCase();
+            if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
+            const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
+            const meaning=cleanTranslationText(token.contextual_word_meaning_tr || (token.dictionary_meanings_tr||[])[0] || "");
+            if(!lemma || !meaning) continue;
+            const key=senseLearningKey(lemma,meaning);
+            if(!rows.has(key)) rows.set(key,{key,lemma,meaningTr:meaning,cueIndex,surface:String(token.text||lemma)});
+          }
+        }
+        state.youtube.senseRows=[...rows.values()].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
+      }catch(error){
+        console.warn("Word sense table analysis failed",error);
+        state.youtube.senseRows=[];
+      }finally{
+        state.youtube.senseRowsPromise=null;
+        if(state.youtube.panelTab==="words" && state.youtube.wordsView==="senses") renderYouTubeSidePanel();
+      }
+    })();
+    state.youtube.senseRowsPromise=task;
+    return task;
+  }
+
+  async function setSenseStatus(row,status){
+    const profileId=state.learningProfileId || await ensureLearningProfile();
+    const apiBase=await platformApiBase();
+    const key=senseLearningKey(row.lemma,row.meaningTr);
+    const response=await fetch(apiBase+"/api/v1/learning-items",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        profile_id:profileId,
+        canonical_form:row.lemma,
+        canonical_key:key,
+        category:"word-sense",
+        status,
+        meaning:row.meaningTr,
+        meaning_language:"tr",
+        metadata:{source:"chrome-extension",cue_index:row.cueIndex},
+      }),
+    });
+    if(!response.ok) throw new Error("word sense status "+response.status);
+    await loadLearningItems();
+  }
+
+  function renderWordSenseTable(body){
+    if(state.youtube.senseRowsVideoId!==state.youtube.videoId || !state.youtube.senseRows){
+      body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
+      bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
+      analyzePanelWordSenses();
+      return;
+    }
+    const q=String(state.youtube.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
+    const rows=state.youtube.senseRows.filter(row=>!q || row.lemma.includes(q) || row.meaningTr.toLocaleLowerCase("tr-TR").includes(q));
+    const table='<div class="gle-sense-table"><div class="gle-sense-head"><span>Kelime</span><span>Bu cümledeki anlamı</span><span>Durum</span></div>'+rows.map(row=>{
+      const item=learningItemForSense(row);
+      const learning=item?.status==="learning";
+      const known=item?.status==="learned" || item?.status==="known";
+      return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.surface||row.lemma)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">★</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
+    }).join("")+'</div>';
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
+    bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
+    body.querySelectorAll("[data-sense-jump]").forEach(button=>button.addEventListener("click",()=>{
+      const row=state.youtube.senseRows.find(item=>item.key===button.dataset.senseJump);
+      if(row) playYouTubeCue(row.cueIndex);
+    }));
+    const bindStatus=(selector,status)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
+      const key=button.dataset.senseLearn||button.dataset.senseKnown;
+      const row=state.youtube.senseRows.find(item=>item.key===key);
+      if(!row) return;
+      button.disabled=true;
+      try{ await setSenseStatus(row,status); renderYouTubeSidePanel(); }
+      catch(error){ console.warn("Word sense status failed",error); button.disabled=false; }
+    }));
+    bindStatus("[data-sense-learn]","learning");
+    bindStatus("[data-sense-known]","learned");
+  }
+
   function bindPanelWordControls(body,analysis){
     body.querySelectorAll("[data-words-view]").forEach(button=>{
       button.addEventListener("click",()=>{
@@ -1839,6 +1945,11 @@
     if(!analysis){
       body.innerHTML='<div class="gle-panel-empty"><b>Video kelimeleri analiz ediliyor…</b><span>Altyazıdaki kelimeler lemma bazında gruplanıyor.</span></div>';
       analyzeWholeYouTubeTranscript();
+      return;
+    }
+
+    if(state.youtube.wordsView==="senses"){
+      renderWordSenseTable(body);
       return;
     }
 
