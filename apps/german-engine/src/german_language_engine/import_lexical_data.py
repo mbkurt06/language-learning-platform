@@ -39,6 +39,8 @@ def _translations_for(gloss,mapped):
             candidates.extend(values)
     return list(dict.fromkeys(candidates))
 
+CASE_SENSITIVE_POS={"NOUN","PROPN","ABBREV"}
+
 def _case_disambiguated_sense_id(base,word):
     suffix=hashlib.sha1(word.encode("utf-8")).hexdigest()[:8]
     return f"{base}:case:{suffix}"
@@ -50,8 +52,16 @@ def _fallback_sense_id(db,word,pos,idx):
         return base
 
     existing=str(row[0])
-    # Keep the all-lowercase lexical entry on the historical base ID when a
-    # case-only collision exists (er/Er, ach/ACh). Disambiguate the other entry.
+
+    # For case-insensitive lexical classes, sentence-initial capitalization is
+    # not a distinct lexical sense. Prefer the lowercase dictionary entry and
+    # keep the historical base ID stable (Er == er, Ach == ach, ...).
+    if pos not in CASE_SENSITIVE_POS and existing.casefold()==word.casefold():
+        if existing==existing.casefold() and word!=word.casefold():
+            return None
+        return base
+
+    # Nouns, proper nouns and abbreviations may genuinely differ by case.
     preferred=min((existing,word),key=lambda value:(value!=value.casefold(),value))
     if preferred==existing:
         return _case_disambiguated_sense_id(base,word)
@@ -94,7 +104,10 @@ def import_wiktextract(path,db):
           glosses=sense.get("glosses") or sense.get("raw_glosses") or []
           gloss=str(glosses[0] if glosses else "").strip()
           sid=str(sense.get("id") or sense.get("senseid") or "").strip()
-          if not sid: sid=_fallback_sense_id(db,word,pos,idx)
+          if not sid:
+            sid=_fallback_sense_id(db,word,pos,idx)
+            if sid is None:
+              continue
           meanings=_translations_for(gloss,turkish)
           db.execute("""insert or replace into senses(sense_id,lemma,pos,ordinal,gloss,meanings_tr,tags,article,plural)
              values(?,?,?,?,?,?,?,?,?)""",(sid,word,pos,idx,gloss,json.dumps(meanings,ensure_ascii=False),json.dumps(list(tags),ensure_ascii=False),article,plural))
