@@ -265,3 +265,192 @@
   slots:
     - {id: reflexive, type: REFLEXIVE}
     - {id: bei, type: PREPOSITION, prep: bei, case: [Dat]}
+
+
+# Expanded high-frequency Nomen-Verb-Verbindungen
+- id: nvv.angebot_machen
+  canonical: "ein Angebot machen"
+  type: NOMEN_VERB
+  head_lemma: machen
+  priority: 88
+  meaning_tr: ["teklif yapmak", "teklifte bulunmak"]
+  slots:
+    - {id: angebot, type: LEMMA, lemma: Angebot}
+
+- id: nvv.beitrag_leisten
+  canonical: "einen Beitrag leisten"
+  type: NOMEN_VERB
+  head_lemma: leisten
+  priority: 90
+  meaning_tr: ["katkıda bulunmak"]
+  slots:
+    - {id: beitrag, type: LEMMA, lemma: Beitrag}
+
+- id: nvv.frage_stellen
+  canonical: "eine Frage stellen"
+  type: NOMEN_VERB
+  head_lemma: stellen
+  priority: 90
+  meaning_tr: ["soru sormak"]
+  slots:
+    - {id: frage, type: LEMMA, lemma: Frage}
+
+- id: nvv.gespraech_fuehren
+  canonical: "ein Gespräch führen"
+  type: NOMEN_VERB
+  head_lemma: führen
+  priority: 90
+  meaning_tr: ["görüşme yapmak", "sohbet etmek"]
+  slots:
+    - {id: gespraech, type: LEMMA, lemma: Gespräch}
+
+- id: nvv.kritik_ueben
+  canonical: "Kritik üben"
+  type: NOMEN_VERB
+  head_lemma: üben
+  priority: 90
+  meaning_tr: ["eleştirmek", "eleştiride bulunmak"]
+  slots:
+    - {id: kritik, type: LEMMA, lemma: Kritik}
+
+- id: nvv.muehe_geben
+  canonical: "sich Mühe geben"
+  type: NOMEN_VERB
+  head_lemma: geben
+  priority: 92
+  meaning_tr: ["çaba göstermek", "gayret etmek"]
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: muehe, type: LEMMA, lemma: Mühe}
+
+- id: nvv.bescheid_geben
+  canonical: "Bescheid geben"
+  type: NOMEN_VERB
+  head_lemma: geben
+  priority: 92
+  meaning_tr: ["haber vermek", "bilgi vermek"]
+  slots:
+    - {id: bescheid, type: LEMMA, lemma: Bescheid}
+
+- id: nvv.kosten_tragen
+  canonical: "die Kosten tragen"
+  type: NOMEN_VERB
+  head_lemma: tragen
+  priority: 90
+  meaning_tr: ["masrafları karşılamak", "maliyeti üstlenmek"]
+  slots:
+    - {id: kosten, type: LEMMA, lemma: Kosten}
+
+- id: nvv.beruf_ausueben
+  canonical: "einen Beruf ausüben"
+  type: NOMEN_VERB
+  head_lemma: ausüben
+  priority: 88
+  meaning_tr: ["bir mesleği icra etmek", "bir meslekte çalışmak"]
+  slots:
+    - {id: beruf, type: LEMMA, lemma: Beruf}
+
+- id: nvv.antrag_stellen
+  canonical: "einen Antrag stellen"
+  type: NOMEN_VERB
+  head_lemma: stellen
+  priority: 92
+  meaning_tr: ["başvuruda bulunmak", "başvuru yapmak"]
+  slots:
+    - {id: antrag, type: LEMMA, lemma: Antrag}
+
+- id: nvv.diagnose_stellen
+  canonical: "eine Diagnose stellen"
+  type: NOMEN_VERB
+  head_lemma: stellen
+  priority: 90
+  meaning_tr: ["teşhis koymak"]
+  slots:
+    - {id: diagnose, type: LEMMA, lemma: Diagnose}
+
+- id: nvv.verantwortung_uebernehmen
+  canonical: "Verantwortung übernehmen"
+  type: NOMEN_VERB
+  head_lemma: übernehmen
+  priority: 92
+  meaning_tr: ["sorumluluk üstlenmek"]
+  slots:
+    - {id: verantwortung, type: LEMMA, lemma: Verantwortung}
+
+- id: nvv.verantwortung_tragen
+  canonical: "Verantwortung tragen"
+  type: NOMEN_VERB
+  head_lemma: tragen
+  priority: 92
+  meaning_tr: ["sorumlu olmak", "sorumluluk taşımak"]
+  slots:
+    - {id: verantwortung, type: LEMMA, lemma: Verantwortung}
+
+- id: nvv.entscheidung_faellen
+  canonical: "eine Entscheidung fällen"
+  type: NOMEN_VERB
+  head_lemma: fällen
+  priority: 91
+  meaning_tr: ["karar vermek"]
+  slots:
+    - {id: entscheidung, type: LEMMA, lemma: Entscheidung}
+
+- id: nvv.kenntnis_nehmen_von
+  canonical: "von etwas Kenntnis nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 92
+  meaning_tr: ["bir şeyden haberdar olmak", "bir şeyi bilgisine almak"]
+  slots:
+    - {id: kenntnis, type: LEMMA, lemma: Kenntnis}
+    - {id: von, type: PREPOSITION, prep: von, case: [Dat]}
+
+- id: nvv.stellung_nehmen_zu
+  canonical: "zu etwas Stellung nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 94
+  meaning_tr: ["bir konuda görüş bildirmek", "bir konuda tavır almak"]
+  slots:
+    - {id: stellung, type: LEMMA, lemma: Stellung}
+    - {id: zu, type: PREPOSITION, prep: zu, case: [Dat]}
+
+- id: nvv.anspruch_nehmen
+  canonical: "etwas in Anspruch nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 95
+  meaning_tr: ["bir şeyden yararlanmak", "bir şeyi kullanmak"]
+  slots:
+    - {id: anspruch, type: LEMMA, lemma: Anspruch}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: nvv.angriff_nehmen
+  canonical: "etwas in Angriff nehmen"
+  type: FUNCTION_VERB
+  head_lemma: nehmen
+  priority: 95
+  meaning_tr: ["bir işe girişmek", "bir şeyi ele alıp başlamak"]
+  slots:
+    - {id: angriff, type: LEMMA, lemma: Angriff}
+    - {id: in, type: PREPOSITION, prep: in}
+
+- id: nvv.druck_stehen
+  canonical: "unter Druck stehen"
+  type: FUNCTION_VERB
+  head_lemma: stehen
+  priority: 94
+  meaning_tr: ["baskı altında olmak"]
+  slots:
+    - {id: druck, type: LEMMA, lemma: Druck}
+    - {id: unter, type: PREPOSITION, prep: unter, case: [Dat]}
+
+- id: nvv.gedanken_machen
+  canonical: "sich Gedanken über etwas machen"
+  type: NOMEN_VERB
+  head_lemma: machen
+  priority: 92
+  meaning_tr: ["bir şey hakkında düşünmek", "kafa yormak"]
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: gedanken, type: LEMMA, lemma: Gedanke, alternatives: [Gedanken]}
