@@ -89,3 +89,40 @@ def test_deduplicate_combines_evidence():
     assert len(result) == 1
     assert result[0].evidence_count == 4
     assert set(result[0].source) == {"parseme", "verbframes"}
+
+
+def test_parseme_normalizes_reflexive_canonical_form(tmp_path: Path):
+    cupt = tmp_path / "irv.cupt"
+    cupt.write_text(
+        "1\tEr\ter\tPRON\t_\tCase=Nom\t3\tnsubj\t_\t_\t*\n"
+        "2\tsich\ter|es|sie\tPRON\t_\tCase=Acc\t3\texpl:pv\t_\t_\t1:IRV\n"
+        "3\tbefindet\tbefinden\tVERB\t_\tMood=Ind\t0\troot\t_\t_\t1\n\n"
+        "1\tSie\tsie\tPRON\t_\tCase=Nom\t3\tnsubj\t_\t_\t*\n"
+        "2\tsich\ter|es|sie\tPRON\t_\tCase=Acc\t3\texpl:pv\t_\t_\t1:IRV\n"
+        "3\tbefinden\tbefinden\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "sich befinden"
+
+
+def test_parseme_normalizes_particle_verb_to_dictionary_form(tmp_path: Path):
+    cupt = tmp_path / "vpc.cupt"
+    cupt.write_text(
+        "1\tDie\tdie\tDET\t_\t_\t2\tdet\t_\t_\t*\n"
+        "2\tSitzung\tSitzung\tNOUN\t_\t_\t3\tnsubj\t_\t_\t*\n"
+        "3\tfindet\tfinden\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "4\tstatt\tstatt\tADV\t_\t_\t3\tcompound:prt\t_\t_\t1\n\n"
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t*\n"
+        "2\tfindet\tfinden\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "3\tstatt\tstatt\tADV\t_\t_\t2\tcompound:prt\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "stattfinden"
