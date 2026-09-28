@@ -76,7 +76,7 @@
     el.id="gle-tooltip";
     el.hidden=true;
     el.addEventListener("mouseenter",cancelTooltipHide);
-    el.addEventListener("mouseleave",()=>scheduleTooltipHide(220));
+    el.addEventListener("mouseleave",()=>scheduleTooltipHide(350));
     document.documentElement.appendChild(el);
     return el;
   }
@@ -1382,9 +1382,11 @@
       button.addEventListener("mouseenter",()=>{
         hoverTimer=setTimeout(()=>showPanelWordTooltip(button,entry),180);
       });
-      button.addEventListener("mouseleave",()=>{
+      button.addEventListener("mouseleave",event=>{
         clearTimeout(hoverTimer);
-        scheduleTooltipHide(220);
+        const next=event.relatedTarget;
+        if(next && state.tooltip?.contains(next)) return;
+        scheduleTooltipHide(850);
       });
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedLemma=button.dataset.lemma;
@@ -1451,6 +1453,7 @@
       content=expressionGroupsSection(groups);
     }else{
       content=
+        expressionGroupsSection(groups)+
         wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
         wordGroup("Bu videoda sık geçenler",frequent)+
         wordGroup("Diğer kelimeler",others);
