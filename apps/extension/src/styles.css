@@ -665,3 +665,45 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
   pointer-events:auto!important;
   z-index:10!important
 }
+
+
+/* External persistent panel handle: lives outside the panel so no player/panel
+   overflow rule can clip it. */
+#gle-panel-edge-handle.gle-panel-edge-handle{
+  display:flex!important;
+  position:fixed!important;
+  top:28%!important;
+  right:var(--gle-zdf-current-panel-width,420px)!important;
+  width:30px!important;
+  height:76px!important;
+  transform:translateY(-50%)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  border:2px solid #7c3aed!important;
+  border-right:0!important;
+  border-radius:14px 0 0 14px!important;
+  background:#d8b4fe!important;
+  color:#4c1d95!important;
+  box-shadow:-4px 0 14px rgba(0,0,0,.38)!important;
+  font:900 27px/1 system-ui!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  z-index:2147483647!important;
+  opacity:1!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  right:0!important;
+  background:#e9d5ff!important;
+  color:#4c1d95!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle:hover{
+  background:#f3e8ff!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle{
+  position:fixed!important;
+  right:var(--gle-zdf-fullscreen-panel-width,420px)!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  right:0!important
+}
