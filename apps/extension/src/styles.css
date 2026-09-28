@@ -161,3 +161,20 @@
 .gle-expression-chip:hover{border-color:#a855f7;background:#25172f}
 .gle-expression-chip b{color:#c4b5fd;font-size:11px}
 .gle-groups-loading,.gle-groups-empty{padding:9px 0;color:#8f8f9b;font-size:12px}
+
+
+.gle-words-tools{position:sticky;top:0;z-index:3;background:#111114;border-bottom:1px solid #27272d;padding:10px}
+.gle-words-subtabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}
+.gle-words-subtabs button{
+  appearance:none;border:1px solid #34343b;border-radius:8px;background:#18181c;color:#b7b7c0;
+  padding:8px 6px;font:700 11px/1 system-ui,-apple-system,sans-serif;cursor:pointer
+}
+.gle-words-subtabs button:hover{border-color:#6d4b8d;color:#fff}
+.gle-words-subtabs button.active{background:#2a1738;border-color:#a855f7;color:#fff}
+.gle-word-search{display:flex;align-items:center;gap:8px;border:1px solid #34343b;border-radius:9px;background:#0d0d10;padding:0 10px}
+.gle-word-search span{color:#8f8f9b;font-size:16px}
+.gle-word-search input{
+  width:100%;min-width:0;border:0;outline:0;background:transparent;color:#f4f4f5;padding:9px 0;
+  font:13px/1.2 system-ui,-apple-system,sans-serif
+}
+.gle-word-search input::placeholder{color:#777782}
