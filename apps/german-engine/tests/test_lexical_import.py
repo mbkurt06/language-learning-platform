@@ -47,12 +47,30 @@ def test_subject_pronoun_er_and_sentence_initial_Er_share_one_sense(tmp_path):
     ]
     source.write_text("\n".join(json.dumps(row,ensure_ascii=False) for row in rows)+"\n",encoding="utf-8")
     db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
-    import_wiktextract(source,db)
+    assert import_wiktextract(source,db)==1
     senses=db.execute(
         "select sense_id,lemma,meanings_tr from senses where lemma=? collate nocase and pos='PRON'",
         ("er",),
     ).fetchall()
     assert senses==[("wiktextract:er:PRON:0","er",'["o"]')]
+    db.close()
+
+
+def test_uppercase_Er_pronoun_import_removes_legacy_rows(tmp_path):
+    source=tmp_path/"de.jsonl"
+    source.write_text(json.dumps({
+      "lang_code":"de","word":"Er","pos":"pron",
+      "senses":[{"glosses":["historical form of address"]}],
+    },ensure_ascii=False)+"\n",encoding="utf-8")
+    db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
+    db.execute(
+        "insert into senses values(?,?,?,?,?,?,?,?,?)",
+        ("wiktextract:er:PRON:0:case:legacy","Er","PRON",0,"legacy","[]","[]",None,None),
+    )
+    db.execute("insert into forms values(?,?,?)",("Er","Er","PRON"))
+    assert import_wiktextract(source,db)==0
+    assert db.execute("select count(*) from senses where lemma='Er' collate binary and pos='PRON'").fetchone()[0]==0
+    assert db.execute("select count(*) from forms where lemma='Er' collate binary and pos='PRON'").fetchone()[0]==0
     db.close()
 
 
