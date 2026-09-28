@@ -1231,6 +1231,14 @@
       IDIOM:"Deyimler",
       NOUN_PREPOSITION:"İsim + edat",
       ADJECTIVE_PREPOSITION:"Sıfat + edat",
+      NOMEN_VERB:"İsim + fiil birliktelikleri",
+      FUNCTION_VERB:"Funktionsverbgefüge",
+      PARTICLE_VERB:"Ayrılabilen fiiller",
+      COPULAR_CONSTRUCTION:"Kopula kalıpları",
+      COLLOCATION:"Kollokasyonlar",
+      CONNECTOR:"Bağlaç / bağlantı kalıpları",
+      FIXED_CONSTRUCTION:"Sabit kalıplar",
+      GRAMMAR_CONSTRUCTION:"Gramer kalıpları",
     })[type] || type;
   }
 
@@ -1238,7 +1246,22 @@
     if(entries===null) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-loading">Kelime grupları analiz ediliyor…</div></section>';
     if(!entries?.length) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-empty">Bu videoda desteklenen kelime grubu bulunamadı.</div></section>';
 
-    const order=["VERB_PREPOSITION","REFLEXIVE_VERB_PREPOSITION","REFLEXIVE_VERB","IDIOM","NOUN_PREPOSITION","ADJECTIVE_PREPOSITION"];
+    const order=[
+      "IDIOM",
+      "NOMEN_VERB",
+      "FUNCTION_VERB",
+      "FIXED_CONSTRUCTION",
+      "COLLOCATION",
+      "VERB_PREPOSITION",
+      "REFLEXIVE_VERB_PREPOSITION",
+      "REFLEXIVE_VERB",
+      "NOUN_PREPOSITION",
+      "ADJECTIVE_PREPOSITION",
+      "PARTICLE_VERB",
+      "COPULAR_CONSTRUCTION",
+      "CONNECTOR",
+      "GRAMMAR_CONSTRUCTION",
+    ];
     const sections=order.map(type=>{
       const items=entries.filter(entry=>entry.type===type);
       if(!items.length) return "";
