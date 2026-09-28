@@ -38,10 +38,15 @@ class StructuralMatcher:
     """
     def match(self, tokens: list[Token], pattern: ExpressionPattern) -> list[ExpressionMatch]:
         particle_slots=[slot for slot in pattern.slots if slot.type == SlotType.PARTICLE and slot.lemma]
+        # Any expression pattern may contain a separable particle, not only
+        # PARTICLE_VERB patterns. For example, fixed constructions such as
+        # "davon ausgehen" use a lexical particle while also requiring other
+        # fixed slots. Support both separated ("davon ... aus gehen") and
+        # joined lemma ("davon ausgehen") realizations generically.
         joined_particle_forms={
             f"{slot.lemma}{pattern.head_lemma}".lower()
             for slot in particle_slots
-        } if pattern.type.value == "PARTICLE_VERB" else set()
+        }
 
         heads=[
             t for t in tokens
