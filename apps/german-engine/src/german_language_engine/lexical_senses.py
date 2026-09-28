@@ -17,12 +17,12 @@ class LexicalSense:
 
 class LexicalSenseProvider(Protocol):
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]: ...
-    def canonical_lemma(self,surface:str,lemma:str)->str: ...
+    def canonical_lemma(self,surface:str,lemma:str,pos:str="")->str: ...
     def select(self,lemma:str,pos:str,surface:str,tokens:list,token_index:int)->LexicalSense|None: ...
 
 class NullLexicalSenseProvider:
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]: return []
-    def canonical_lemma(self,surface:str,lemma:str)->str: return lemma
+    def canonical_lemma(self,surface:str,lemma:str,pos:str="")->str: return lemma
     def select(self,lemma:str,pos:str,surface:str,tokens:list,token_index:int)->LexicalSense|None: return None
     def close(self)->None: pass
 
@@ -30,23 +30,37 @@ class SQLiteLexicalSenseProvider:
     def __init__(self,path:str|Path):
         self.path=str(path); self.db=sqlite3.connect(self.path,check_same_thread=False)
         self.db.row_factory=sqlite3.Row
-    def canonical_lemma(self,surface:str,lemma:str)->str:
-        # Trust the NLP lemma when it is itself a real dictionary headword. This avoids
-        # ambiguous form rows such as ausgeschlafen -> ausschlafen / ausgeschlafen.
+    def canonical_lemma(self,surface:str,lemma:str,pos:str="")->str:
+        pos=pos.upper()
+        def normalize(value:str)->str:
+            return value if pos in {"NOUN","PROPN","ABBREV"} else value.casefold()
+
+        # Prefer a dictionary headword with the same POS. Case-insensitive lookup
+        # must not cross lexical categories (for example ER/ABBREV vs Er/PRON).
+        params=[lemma]
+        sql="select lemma from senses where lemma=? collate nocase"
+        if pos:
+            sql+=" and (pos=? or pos='')"; params.append(pos)
         row=self.db.execute(
-            "select lemma from senses where lemma=? collate nocase limit 1",(lemma,)
+            sql+" order by case when lemma=? then 0 else 1 end, lemma limit 1",
+            params+[lemma],
         ).fetchone()
-        if row: return str(row["lemma"])
+        if row: return normalize(str(row["lemma"]))
+
+        # Resolve inflected forms within the same POS before trusting a surface form.
         for value in (surface,lemma):
+            params=[value]
+            sql="select lemma from forms where form=? collate nocase"
+            if pos:
+                sql+=" and (pos=? or pos='')"; params.append(pos)
             row=self.db.execute(
-                "select lemma from forms where form=? collate nocase "
-                "order by case when lemma=? collate nocase then 1 else 0 end, lemma limit 1",
-                (value,value),
+                sql+" order by case when lemma=? collate nocase then 1 else 0 end, lemma limit 1",
+                params+[value],
             ).fetchone()
-            if row: return str(row["lemma"])
-        return lemma
+            if row: return normalize(str(row["lemma"]))
+        return normalize(lemma)
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]:
-        canonical=self.canonical_lemma(surface,lemma)
+        canonical=self.canonical_lemma(surface,lemma,pos)
         params=[canonical]; sql="select * from senses where lemma=? collate nocase"
         if pos:
             sql+=" and (pos=? or pos='')"; params.append(pos.upper())
