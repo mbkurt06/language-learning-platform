@@ -502,3 +502,61 @@ html.gle-zdf-panel-open body{
 .gle-zdf-fullscreen-panel-collapsed:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel.collapsed{
   position:absolute!important;right:0!important;top:42%!important;
 }
+
+
+/* ZDF docking v3: preserve video height. Reserve panel width horizontally
+   instead of uniformly scaling the video (which created top/bottom black bands). */
+.gle-zdf-media-host-panel-open{
+  width:calc(100% - var(--gle-zdf-panel-width,408px))!important;
+  max-width:calc(100% - var(--gle-zdf-panel-width,408px))!important;
+  height:100%!important;
+  padding-right:0!important;
+  margin-right:var(--gle-zdf-panel-width,408px)!important;
+  transform:none!important;
+  transform-origin:left center!important;
+  overflow:hidden!important;
+}
+.gle-zdf-media-host-panel-open>.gle-zdf-video-panel-open,
+.gle-zdf-video-panel-open{
+  width:100%!important;
+  max-width:100%!important;
+  height:100%!important;
+  transform:none!important;
+  object-fit:contain!important;
+  object-position:center center!important;
+}
+
+/* Make the header collapse control unmistakable. */
+#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-toggle{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  width:34px!important;height:34px!important;min-width:34px!important;
+  border-radius:9px!important;border:1px solid #52525b!important;
+  background:#292930!important;color:#fff!important;
+  font:800 24px/1 system-ui!important;cursor:pointer!important
+}
+
+/* Second collapse handle on the panel's left edge, vertically centered. */
+#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-edge-toggle{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  position:absolute!important;left:-18px!important;top:50%!important;
+  width:18px!important;height:64px!important;transform:translateY(-50%)!important;
+  border:1px solid #4c1d95!important;border-right:0!important;
+  border-radius:10px 0 0 10px!important;background:#6d28d9!important;color:#fff!important;
+  box-shadow:-3px 0 10px rgba(0,0,0,.3)!important;
+  font:800 20px/1 system-ui!important;cursor:pointer!important;z-index:4!important
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-edge-toggle{display:none!important}
+
+/* Fullscreen: keep full height and reserve only horizontal width. */
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-media-host-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-media-host-panel-open{
+  width:calc(100% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
+  max-width:calc(100% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
+  height:100%!important;
+  margin-right:var(--gle-zdf-fullscreen-panel-width,420px)!important;
+  transform:none!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-video-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-video-panel-open{
+  width:100%!important;height:100%!important;transform:none!important;object-fit:contain!important
+}
