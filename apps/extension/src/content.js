@@ -1773,19 +1773,25 @@
     const task=(async()=>{
       try{
         const rows=new Map();
-        for(let cueIndex=0;cueIndex<cues.length;cueIndex++){
-          const cue=cues[cueIndex];
-          const data=await analyze(cue.text);
-          for(const token of data?.tokens||[]){
-            const pos=String(token.pos||"").toUpperCase();
-            if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
-            const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
-            const meaning=cleanTranslationText(token.contextual_word_meaning_tr || (token.dictionary_meanings_tr||[])[0] || "");
-            if(!lemma || !meaning) continue;
-            const key=senseLearningKey(lemma,meaning);
-            if(!rows.has(key)) rows.set(key,{key,lemma,meaningTr:meaning,cueIndex,surface:String(token.text||lemma)});
+        let cursor=0;
+        const worker=async()=>{
+          while(cursor<cues.length){
+            const cueIndex=cursor++;
+            const cue=cues[cueIndex];
+            const data=await analyze(cue.text);
+            for(const token of data?.tokens||[]){
+              const pos=String(token.pos||"").toUpperCase();
+              if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
+              const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
+              const hover=data?.hover?.[String(token.i)] || data?.hover?.[token.i] || {};
+              const meaning=cleanTranslationText(hover.contextual_word_meaning_tr || (hover.dictionary_meanings_tr||[])[0] || "");
+              if(!lemma || !meaning) continue;
+              const key=senseLearningKey(lemma,meaning);
+              if(!rows.has(key)) rows.set(key,{key,lemma,meaningTr:meaning,cueIndex,surface:String(token.text||lemma)});
+            }
           }
-        }
+        };
+        await Promise.all(Array.from({length:Math.min(8,cues.length)},()=>worker()));
         state.youtube.senseRows=[...rows.values()].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
       }catch(error){
         console.warn("Word sense table analysis failed",error);
