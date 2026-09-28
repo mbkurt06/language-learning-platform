@@ -1333,6 +1333,7 @@
 
   function scanYouTube(){
     ensureYouTubeOverlay();
+    if(state.youtube.panel) syncYouTubePanelHost();
 
     if(state.youtube.timedAvailable){
       bindYouTubeVideo();
