@@ -84,10 +84,11 @@ class LearningUnitResolver:
    meaning=_meaning(item.contextual_meaning_tr,item.dictionary_meanings_tr)
    if not meaning:
     continue
-   canonical=_noun_canonical(token.lemma,item.lexical_form) if token.pos=="NOUN" else token.lemma
-   identity=f"word|{token.lemma.lower()}|{meaning.lower()}"
+   lemma=item.canonical_lemma or token.lemma
+   canonical=_noun_canonical(lemma,item.lexical_form) if token.pos=="NOUN" else lemma
+   identity=f"word|{item.sense_id}" if item.sense_id else f"word|{lemma.lower()}|{meaning.lower()}"
    units.append(LearningUnit(
-    id="lu:"+_slug(identity),canonical=canonical,lemma=token.lemma,
+    id="lu:"+_slug(identity),canonical=canonical,lemma=lemma,sense_id=item.sense_id,
     meaning_tr=meaning,unit_type=POS_LABELS.get(token.pos,token.pos or "Kelime"),
     token_indices=[token.i],surface=token.text,lexical_form=item.lexical_form,
    ))
