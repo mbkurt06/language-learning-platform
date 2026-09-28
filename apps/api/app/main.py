@@ -33,7 +33,7 @@ from .schemas import (
     LearningProfileEnsure,
     UserCreate,
 )
-from .services import UnsupportedLanguageError, analyze_text, analyze_tokens_batch, match_learning_items
+from .services import UnsupportedLanguageError, analyze_text, analyze_tokens_batch, analyze_expression_groups_batch, match_learning_items
 
 
 def get_db():
@@ -407,6 +407,17 @@ def analyze(payload: AnalyzeRequest):
 def tokens_batch(payload: TokenBatchRequest):
     try:
         items = analyze_tokens_batch(payload.source_language, payload.texts)
+    except UnsupportedLanguageError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"language engine failed: {exc}") from exc
+    return {"items": items}
+
+
+@app.post("/api/v1/expression-groups-batch")
+def expression_groups_batch(payload: TokenBatchRequest):
+    try:
+        items = analyze_expression_groups_batch(payload.source_language, payload.texts)
     except UnsupportedLanguageError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
