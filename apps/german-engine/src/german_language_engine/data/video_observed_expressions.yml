@@ -1,0 +1,150 @@
+# Expressions observed in the Easy German citizenship episode used for end-to-end validation.
+# These are reusable lexical/grammatical units, not arbitrary adjacent words.
+
+- id: verbprep.denken_an
+  canonical: "an jemanden/etwas denken"
+  type: VERB_PREPOSITION
+  head_lemma: denken
+  priority: 90
+  meaning_tr: ["birini/bir şeyi düşünmek", "aklına getirmek"]
+  cefr: A2
+  grammar_hint: "an + Akk."
+  slots:
+    - {id: an, type: PREPOSITION, prep: an, case: [Acc]}
+
+- id: reflexiv.freuen_auf
+  canonical: "sich auf jemanden/etwas freuen"
+  type: REFLEXIVE_VERB_PREPOSITION
+  head_lemma: freuen
+  priority: 92
+  meaning_tr: ["birini/bir şeyi dört gözle beklemek", "bir şey olacak diye sevinmek"]
+  cefr: A2
+  grammar_hint: "sich freuen auf + Akk."
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: verbprep.hinarbeiten_auf
+  canonical: "auf etwas hinarbeiten"
+  type: VERB_PREPOSITION
+  head_lemma: hinarbeiten
+  priority: 90
+  meaning_tr: ["bir hedef doğrultusunda çalışmak", "bir şeye ulaşmak için çalışmak"]
+  cefr: B2
+  grammar_hint: "auf + Akk."
+  slots:
+    - {id: auf, type: PREPOSITION, prep: auf, case: [Acc]}
+
+- id: idiom.mit_gedanken_spielen
+  canonical: "mit dem Gedanken spielen"
+  type: IDIOM
+  head_lemma: spielen
+  priority: 96
+  meaning_tr: ["bir şeyi yapmayı düşünmek", "bir fikri ciddi olarak değerlendirmek"]
+  cefr: B2
+  grammar_hint: "mit + Dat."
+  slots:
+    - {id: gedanke, type: LEMMA, lemma: Gedanke}
+    - {id: mit, type: PREPOSITION, prep: mit, case: [Dat]}
+
+- id: idiom.im_hinterkopf_haben
+  canonical: "etwas im Hinterkopf haben"
+  type: IDIOM
+  head_lemma: haben
+  priority: 95
+  meaning_tr: ["bir şeyi aklının bir köşesinde tutmak", "aklında bulundurmak"]
+  cefr: B2
+  slots:
+    - {id: hinterkopf, type: LEMMA, lemma: Hinterkopf}
+    - {id: in, type: PREPOSITION, prep: in, case: [Dat]}
+
+- id: nvv.schritte_machen
+  canonical: "Schritte machen"
+  type: NOMEN_VERB
+  head_lemma: machen
+  priority: 88
+  meaning_tr: ["adım atmak", "ilerleme kaydetmek"]
+  cefr: B1
+  slots:
+    - {id: schritt, type: LEMMA, lemma: Schritt, alternatives: [Schritte]}
+
+- id: nvv.sorgen_machen
+  canonical: "sich Sorgen machen"
+  type: NOMEN_VERB
+  head_lemma: machen
+  priority: 94
+  meaning_tr: ["endişelenmek", "kaygılanmak"]
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: sorge, type: LEMMA, lemma: Sorge, alternatives: [Sorgen]}
+
+- id: collocation.fehler_machen
+  canonical: "Fehler machen"
+  type: COLLOCATION
+  head_lemma: machen
+  priority: 85
+  meaning_tr: ["hata yapmak"]
+  cefr: A1
+  slots:
+    - {id: fehler, type: LEMMA, lemma: Fehler}
+
+- id: collocation.kontakt_aufbauen
+  canonical: "Kontakt aufbauen"
+  type: COLLOCATION
+  head_lemma: aufbauen
+  priority: 87
+  meaning_tr: ["iletişim kurmak", "bağlantı kurmak"]
+  cefr: B1
+  slots:
+    - {id: kontakt, type: LEMMA, lemma: Kontakt}
+
+- id: collocation.feedback_bekommen
+  canonical: "Feedback bekommen"
+  type: COLLOCATION
+  head_lemma: bekommen
+  priority: 84
+  meaning_tr: ["geri bildirim almak"]
+  cefr: B1
+  slots:
+    - {id: feedback, type: LEMMA, lemma: Feedback}
+
+- id: collocation.rueckmeldung_bekommen
+  canonical: "eine Rückmeldung bekommen"
+  type: COLLOCATION
+  head_lemma: bekommen
+  priority: 88
+  meaning_tr: ["geri dönüş almak", "yanıt almak"]
+  cefr: B1
+  slots:
+    - {id: rueckmeldung, type: LEMMA, lemma: Rückmeldung}
+
+- id: nvv.moeglichkeit_haben
+  canonical: "die Möglichkeit haben"
+  type: NOMEN_VERB
+  head_lemma: haben
+  priority: 84
+  meaning_tr: ["imkânı olmak", "olanağa sahip olmak"]
+  cefr: A2
+  slots:
+    - {id: moeglichkeit, type: LEMMA, lemma: Möglichkeit}
+
+- id: copular.vorbild_sein
+  canonical: "ein Vorbild sein"
+  type: COPULAR_CONSTRUCTION
+  head_lemma: sein
+  priority: 84
+  meaning_tr: ["örnek olmak", "rol model olmak"]
+  cefr: B1
+  slots:
+    - {id: vorbild, type: LEMMA, lemma: Vorbild}
+
+- id: reflexiv.sich_melden
+  canonical: "sich melden"
+  type: REFLEXIVE_VERB
+  head_lemma: melden
+  priority: 86
+  meaning_tr: ["haber vermek", "iletişime geçmek", "kendini bildirmek"]
+  cefr: A2
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
