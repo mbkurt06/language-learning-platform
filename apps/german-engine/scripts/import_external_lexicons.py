@@ -303,7 +303,7 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
             # PARSEME VPC.full / VPC.semi represents separable verb prefixes.
             # Those tokens are lexical particles, not argument prepositions,
             # even when the corpus tags them as ADP or gives them case features.
-            if category in {"VPC.full", "VPC.semi"}:
+            if category in {"VPC.full", "VPC.semi"} or type_override == "PARTICLE_VERB":
                 slots.append({"id": f"particle_{slot_seq}", "type": "PARTICLE", "lemma": lemma})
             elif lemma in REFLEXIVE_LEMMAS:
                 slots.append({"id": f"reflexive_{slot_seq}", "type": "REFLEXIVE"})
