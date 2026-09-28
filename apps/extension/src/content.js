@@ -10,7 +10,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82},
+    settings:{extensionEnabled:true,showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -55,6 +55,74 @@
 
   const adapter=ADAPTERS.find(a=>a.host.test(location.hostname));
   if(!adapter) return;
+
+
+  function applySharedAppearance(){
+    document.documentElement.style.setProperty("--gle-german-font-scale",(Number(state.settings.germanFontSize||100)/100).toFixed(2));
+    document.documentElement.style.setProperty("--gle-translation-font-scale",(Number(state.settings.translationFontSize||100)/100).toFixed(2));
+    document.documentElement.classList.toggle("gle-extension-disabled",state.settings.extensionEnabled===false);
+    applySharedAppearance();
+  }
+
+  function ensurePlayerControls(){
+    if(!["youtube","zdf"].includes(adapter.id)) return;
+    let controls=document.getElementById("gle-player-controls");
+    if(controls) return controls;
+    controls=document.createElement("div");
+    controls.id="gle-player-controls";
+    controls.innerHTML='<button type="button" class="gle-main-toggle" aria-label="Language Learning aç/kapat" title="Language Learning aç/kapat">G</button><button type="button" class="gle-settings-button" aria-label="Language Learning ayarları" title="Ayarlar">⚙</button>';
+    document.documentElement.appendChild(controls);
+    controls.querySelector(".gle-main-toggle").addEventListener("click",async()=>{
+      state.settings.extensionEnabled=state.settings.extensionEnabled===false;
+      await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
+      renderPlayerControls();
+    });
+    controls.querySelector(".gle-settings-button").addEventListener("click",ensureSettingsDialog);
+    renderPlayerControls();
+    return controls;
+  }
+
+  function renderPlayerControls(){
+    const controls=document.getElementById("gle-player-controls");
+    if(!controls) return;
+    const active=state.settings.extensionEnabled!==false;
+    controls.querySelector(".gle-main-toggle")?.classList.toggle("is-active",active);
+    controls.querySelector(".gle-main-toggle")?.setAttribute("aria-pressed",String(active));
+    applySharedAppearance();
+  }
+
+  function ensureSettingsDialog(){
+    let dialog=document.getElementById("gle-settings-dialog");
+    if(dialog){ dialog.hidden=false; return dialog; }
+    dialog=document.createElement("div");
+    dialog.id="gle-settings-dialog";
+    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · Ayarlar</strong><button type="button" class="gle-settings-close" aria-label="Kapat">×</button></header><div class="gle-settings-body"><label>Almanca yazı boyutu <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>Türkçe yazı boyutu <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label><label class="gle-settings-switch"><input name="showSentenceTranslation" type="checkbox"> Türkçe çeviriyi göster</label></div></div>';
+    document.documentElement.appendChild(dialog);
+    const sync=()=>{
+      for(const name of ["germanFontSize","translationFontSize"]){
+        const input=dialog.querySelector('[name="'+name+'"]');
+        input.value=state.settings[name];
+        dialog.querySelector('[data-for="'+name+'"]').textContent=state.settings[name]+"%";
+      }
+      dialog.querySelector('[name="showSentenceTranslation"]').checked=state.settings.showSentenceTranslation!==false;
+    };
+    sync();
+    dialog.querySelector(".gle-settings-close").addEventListener("click",()=>{dialog.hidden=true;});
+    dialog.addEventListener("click",event=>{if(event.target===dialog) dialog.hidden=true;});
+    for(const name of ["germanFontSize","translationFontSize"]){
+      dialog.querySelector('[name="'+name+'"]').addEventListener("input",async event=>{
+        state.settings[name]=Number(event.target.value);
+        dialog.querySelector('[data-for="'+name+'"]').textContent=state.settings[name]+"%";
+        applySharedAppearance();
+        await chrome.storage.sync.set({[name]:state.settings[name]});
+      });
+    }
+    dialog.querySelector('[name="showSentenceTranslation"]').addEventListener("change",async event=>{
+      state.settings.showSentenceTranslation=event.target.checked;
+      await chrome.storage.sync.set({showSentenceTranslation:event.target.checked});
+    });
+    return dialog;
+  }
 
   function tokenize(text){
     return text.match(/[\p{L}\p{M}ßÄÖÜäöü]+(?:['’-][\p{L}\p{M}]+)?|[^\s]/gu)||[];
@@ -2245,12 +2313,15 @@
   state.tooltip=createTooltip();
 
   chrome.storage.sync.get({
+    extensionEnabled:true,
     showSentenceTranslation:true,
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82
   },settings=>{
     state.settings=settings;
+    ensurePlayerControls();
+    applySharedAppearance();
     scan();
     ensureLearningProfile()
       .then(()=>loadLearningItems())
@@ -2259,6 +2330,7 @@
 
   chrome.storage.onChanged.addListener((changes,area)=>{
     if(area!=="sync") return;
+    if(changes.extensionEnabled) state.settings.extensionEnabled=changes.extensionEnabled.newValue;
     if(changes.showSentenceTranslation) state.settings.showSentenceTranslation=changes.showSentenceTranslation.newValue;
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
