@@ -44,4 +44,19 @@ class SQLiteLexicalSenseProvider:
             meanings_tr=tuple(json.loads(r["meanings_tr"] or "[]")),
             tags=tuple(json.loads(r["tags"] or "[]")),article=r["article"],plural=r["plural"],
         ) for r in rows]
+    def select(self,lemma:str,pos:str,surface:str,tokens:list,token_index:int)->LexicalSense|None:
+        senses=self.lookup(lemma,pos,surface)
+        if not senses: return None
+        token=next((t for t in tokens if t.i==token_index),None)
+        reflexive_words={"sich","mich","dich","uns","euch"}
+        reflexive=any(t.text.casefold() in reflexive_words and (t.head==token_index or (token and t.head==token.head)) for t in tokens)
+        has_object=any(t.head==token_index and (t.dep in {"oa","obj","oc"} or "Acc" in t.morph.get("Case",[])) for t in tokens)
+        def score(sense):
+            tags=set(sense.tags); value=0
+            if reflexive: value+=8 if "reflexive" in tags else -3
+            elif "reflexive" in tags: value-=6
+            if has_object and ("transitive" in tags): value+=4
+            if not has_object and "intransitive" in tags: value+=2
+            return value
+        return max(senses,key=lambda x:(score(x),-senses.index(x)))
     def close(self)->None: self.db.close()
