@@ -54,9 +54,11 @@ def make_handler(engine):
 
 def build_engine():
  url=os.getenv("GLE_TRANSLATION_URL","").strip()
- if not url: return GermanLanguageEngine()
+ db_path=os.getenv("GLE_LEXICAL_DB","").strip()
+ sense_provider=SQLiteLexicalSenseProvider(db_path) if db_path and os.path.exists(db_path) else None
+ if not url: return GermanLanguageEngine(lexical_sense_provider=sense_provider)
  provider=LibreTranslateProvider(url,api_key=os.getenv("GLE_TRANSLATION_API_KEY"))
- return GermanLanguageEngine(sentence_meaning_provider=provider,lexical_meaning_provider=provider)
+ return GermanLanguageEngine(sentence_meaning_provider=provider,lexical_meaning_provider=provider,lexical_sense_provider=sense_provider)
 
 def serve(host="127.0.0.1",port=8765):
  server=ThreadingHTTPServer((host,port),make_handler(build_engine()))
