@@ -12,7 +12,9 @@
     "https://*.ardmediathek.de/*",
     "https://www.youtube.com/*",
     "http://127.0.0.1/*",
-    "http://localhost/*"
+    "http://localhost/*",
+    "https://api.zdf.de/*",
+    "https://zdf-prod-futura.zdf.de/*"
   ],
   "content_scripts": [
     {
