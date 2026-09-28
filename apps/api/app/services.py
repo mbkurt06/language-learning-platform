@@ -62,3 +62,14 @@ def match_learning_items(db: Session, profile_id, analysis: dict[str, Any]) -> l
             "category": item.category,
         })
     return matches
+
+
+def analyze_tokens_batch(source_language: str, texts: list[str]) -> list[dict[str, Any]]:
+    engine_url = get_settings().engine_urls().get(source_language)
+    if not engine_url:
+        raise UnsupportedLanguageError(f"No language engine configured for {source_language!r}")
+    with httpx.Client(timeout=20.0) as client:
+        response = client.post(f"{engine_url}/tokens-batch", json={"texts": texts})
+        response.raise_for_status()
+        payload = response.json()
+        return payload.get("items", [])
