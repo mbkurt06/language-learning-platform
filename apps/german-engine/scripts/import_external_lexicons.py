@@ -299,7 +299,13 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
             if item["id"] == head_token["id"]:
                 continue
             slot_seq += 1
-            if lemma in REFLEXIVE_LEMMAS:
+
+            # PARSEME VPC.full / VPC.semi represents separable verb prefixes.
+            # Those tokens are lexical particles, not argument prepositions,
+            # even when the corpus tags them as ADP or gives them case features.
+            if category in {"VPC.full", "VPC.semi"}:
+                slots.append({"id": f"particle_{slot_seq}", "type": "PARTICLE", "lemma": lemma})
+            elif lemma in REFLEXIVE_LEMMAS:
                 slots.append({"id": f"reflexive_{slot_seq}", "type": "REFLEXIVE"})
             elif item["upos"] in PREPOSITION_UPOS:
                 case = item["feats"].get("Case")

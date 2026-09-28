@@ -242,3 +242,41 @@ def test_parseme_vid_bereitstehen_normalization(tmp_path: Path):
     assert len(items) == 1
     assert items[0].canonical == "bereitstehen"
     assert items[0].type == "PARTICLE_VERB"
+
+
+def test_parseme_vpc_slots_are_particles_not_prepositions(tmp_path: Path):
+    cupt = tmp_path / "vpc_particle.cupt"
+    cupt.write_text(
+        "1\tfindet\tfinden\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "2\tstatt\tstatt\tADP\t_\tCase=Acc\t1\tcompound:prt\t_\t_\t1\n\n"
+        "1\tfindet\tfinden\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "2\tstatt\tstatt\tADP\t_\tCase=Acc\t1\tcompound:prt\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "stattfinden"
+    assert items[0].slots == [
+        {"id": "particle_1", "type": "PARTICLE", "lemma": "statt"}
+    ]
+
+
+def test_parseme_vpc_semi_slots_are_particles(tmp_path: Path):
+    cupt = tmp_path / "vpc_semi_particle.cupt"
+    cupt.write_text(
+        "1\tbietet\tbieten\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.semi\n"
+        "2\tan\tan\tADP\t_\tCase=Acc\t1\tcompound:prt\t_\t_\t1\n\n"
+        "1\tbietet\tbieten\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.semi\n"
+        "2\tan\tan\tADP\t_\tCase=Acc\t1\tcompound:prt\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "anbieten"
+    assert items[0].slots == [
+        {"id": "particle_1", "type": "PARTICLE", "lemma": "an"}
+    ]
