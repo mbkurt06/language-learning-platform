@@ -62,7 +62,8 @@ class SQLiteLexicalSenseProvider:
         token=next((t for t in tokens if t.i==token_index),None)
         # A personal pronoun is reflexive only when it refers back to the clause subject.
         # "Er versucht, mich aufzuhalten" has an accusative object, not reflexive "mich".
-        subject=next((t for t in tokens if token and t.dep in {"sb","nsubj"} and t.head==token.head),None)
+        clause_head=(token.head if token and token.head is not None else token_index)
+        subject=next((t for t in tokens if token and t.dep in {"sb","nsubj"} and t.head==clause_head),None)
         subject_person=(subject.morph.get("Person") or [None])[0] if subject else None
         subject_number=(subject.morph.get("Number") or [None])[0] if subject else None
         reflexive_forms={
