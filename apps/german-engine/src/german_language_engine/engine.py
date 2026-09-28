@@ -6,16 +6,16 @@ from .hover import HoverBuilder
 from .lexicon import ExpressionLexicon
 from .matcher import StructuralMatcher
 from .meaning import MeaningResolver
-from .learning_units import LearningUnitResolver
+from .learning_units import LearningUnitResolver\nfrom .lexical_senses import LexicalSenseProvider
 from .models import Analysis, ExpressionType
 from .nlp import NLPAdapter, SpacyGermanAdapter
 from .resolver import MatchResolver
 
 
 class GermanLanguageEngine:
- def __init__(self,nlp:NLPAdapter|None=None,lexicon:ExpressionLexicon|None=None,sentence_meaning_provider:SentenceMeaningProvider|None=None,lexical_meaning_provider:TranslationProvider|None=None):
+ def __init__(self,nlp:NLPAdapter|None=None,lexicon:ExpressionLexicon|None=None,sentence_meaning_provider:SentenceMeaningProvider|None=None,lexical_meaning_provider:TranslationProvider|None=None,lexical_sense_provider:LexicalSenseProvider|None=None):
   self.nlp=nlp or SpacyGermanAdapter(); self.lexicon=lexicon or ExpressionLexicon.bundled()
-  self.matcher=StructuralMatcher(); self.resolver=MatchResolver(); self.meaning_resolver=MeaningResolver(lexical_meaning_provider)
+  self.matcher=StructuralMatcher(); self.resolver=MatchResolver(); self.meaning_resolver=MeaningResolver(lexical_meaning_provider,lexical_sense_provider)
   self.dynamic_detector=DynamicExpressionDetector(); self.learning_unit_resolver=LearningUnitResolver()
   self.hover_builder=HoverBuilder(self.resolver); self.sentence_meaning_provider=sentence_meaning_provider or NullSentenceMeaningProvider()
 
