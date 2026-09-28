@@ -118,20 +118,36 @@ def clean_lemma(token: dict[str, Any]) -> str:
     return lemma
 
 
-def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[str, str]:
-    """Create a learner-facing canonical candidate and head lemma.
+VID_CANONICAL_RULES = {
+    ("geben", "es"): ("es gibt", "FIXED_CONSTRUCTION"),
+    ("es", "geben"): ("es gibt", "FIXED_CONSTRUCTION"),
+    ("heißen", "es"): ("es heißt", "FIXED_CONSTRUCTION"),
+    ("es", "heißen"): ("es heißt", "FIXED_CONSTRUCTION"),
+    ("handeln", "es", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
+    ("es", "handeln", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
+    ("gehen", "davon", "aus"): ("davon ausgehen", "FIXED_CONSTRUCTION"),
+    ("stehen", "fest"): ("feststehen", "PARTICLE_VERB"),
+    ("stellen", "fest"): ("feststellen", "PARTICLE_VERB"),
+    ("haben", "zu", "tun"): ("mit etwas zu tun haben", "IDIOM"),
+    ("stehen", "zur", "verfügung"): ("zur Verfügung stehen", "FUNCTION_VERB"),
+    ("verlieren", "gehen"): ("verloren gehen", "FIXED_CONSTRUCTION"),
+}
+
+
+def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[str, str, str | None]:
+    """Create a learner-facing canonical candidate and optional type override.
 
     PARSEME annotation is corpus-oriented. Its token lemmas are not automatically
-    a dictionary entry, especially for reflexives and separable verbs.
+    a dictionary entry, especially for reflexives, separable verbs and VID entries.
     """
     verb_tokens = [item for item in members if item["upos"] in VERB_UPOS]
     if not verb_tokens:
-        return "", ""
+        return "", "", None
     head = verb_tokens[0]
     head_lemma = clean_lemma(head).lower()
 
     if category == "IRV":
-        return f"sich {head_lemma}", head_lemma
+        return f"sich {head_lemma}", head_lemma, None
 
     if category in {"VPC.full", "VPC.semi"}:
         non_verbs = [item for item in members if item["id"] != head["id"]]
@@ -143,7 +159,7 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
         if particles:
             # German separable verbs are written as one infinitive in dictionary form:
             # statt + finden -> stattfinden, mit + teilen -> mitteilen.
-            return "".join(particles) + head_lemma, head_lemma
+            return "".join(particles) + head_lemma, head_lemma, None
 
     parts: list[str] = []
     for item in members:
@@ -152,7 +168,15 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
         if low in REFLEXIVE_LEMMAS:
             lemma = "sich"
         parts.append(lemma)
-    return " ".join(parts), head_lemma
+
+    if category == "VID":
+        normalized_key = tuple(part.casefold() for part in parts)
+        rule = VID_CANONICAL_RULES.get(normalized_key)
+        if rule:
+            canonical, type_override = rule
+            return canonical, head_lemma, type_override
+
+    return " ".join(parts), head_lemma, None
 
 
 def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
@@ -230,7 +254,7 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
         if len(items) < min_count:
             continue
         representative = items[0]["tokens"]
-        canonical, head_lemma = canonicalize_parseme(category, representative)
+        canonical, head_lemma, type_override = canonicalize_parseme(category, representative)
         if not canonical or not head_lemma:
             continue
         verb_tokens = [item for item in representative if item["upos"] in VERB_UPOS]
@@ -255,7 +279,7 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
                 # For IRV, the reflexive pronoun is structural rather than a lexical lemma.
                 slots.append({"id": f"lemma_{slot_seq}", "type": "LEMMA", "lemma": clean_lemma(item)})
 
-        mapped_type = PARSEME_TYPE_MAP.get(category, "FIXED_CONSTRUCTION")
+        mapped_type = type_override or PARSEME_TYPE_MAP.get(category, "FIXED_CONSTRUCTION")
         candidates.append(Candidate(
             id=stable_id("parseme", canonical, category),
             canonical=canonical,
