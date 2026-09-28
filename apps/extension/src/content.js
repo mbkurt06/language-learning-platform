@@ -1367,10 +1367,8 @@
       resetYouTube(message.videoId);
     }
 
-    if(message.type==="track-status" && message.hasTrack===false){
-      state.youtube.timedAvailable=false;
-      state.youtube.cues=null;
-      if(state.youtube.panel) renderYouTubeSidePanel();
+    if(message.type==="track-status" && message.enabled===false){
+      resetYouTube(message.videoId || state.youtube.videoId);
       return;
     }
 
