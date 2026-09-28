@@ -65,29 +65,20 @@
   }
 
   function ensurePlayerControls(){
-    if(!["youtube","zdf"].includes(adapter.id)) return;
-    let controls=document.getElementById("gle-player-controls");
-    if(controls) return controls;
-    controls=document.createElement("div");
-    controls.id="gle-player-controls";
-    controls.innerHTML='<button type="button" class="gle-main-toggle" aria-label="Language Learning aç/kapat" title="Language Learning aç/kapat">G</button><button type="button" class="gle-settings-button" aria-label="Language Learning ayarları" title="Ayarlar">⚙</button>';
-    document.documentElement.appendChild(controls);
-    controls.querySelector(".gle-main-toggle").addEventListener("click",async()=>{
-      state.settings.extensionEnabled=state.settings.extensionEnabled===false;
-      await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
-      renderPlayerControls();
-    });
-    controls.querySelector(".gle-settings-button").addEventListener("click",ensureSettingsDialog);
-    renderPlayerControls();
-    return controls;
+    // Player controls are integrated into the shared side-panel header.
+    return ensureYouTubeSidePanel();
   }
 
   function renderPlayerControls(){
-    const controls=document.getElementById("gle-player-controls");
-    if(!controls) return;
-    const active=state.settings.extensionEnabled!==false;
-    controls.querySelector(".gle-main-toggle")?.classList.toggle("is-active",active);
-    controls.querySelector(".gle-main-toggle")?.setAttribute("aria-pressed",String(active));
+    const panel=state.youtube.panel;
+    if(!panel) return;
+    const toggle=panel.querySelector(".gle-header-main-toggle");
+    if(toggle){
+      const active=state.settings.extensionEnabled!==false;
+      toggle.classList.toggle("is-active",active);
+      toggle.setAttribute("aria-pressed",String(active));
+      toggle.title=active?"Language Learning aktif":"Language Learning pasif";
+    }
     applySharedAppearance();
   }
 
@@ -1018,8 +1009,8 @@
     panel.classList.toggle("collapsed",state.youtube.panelCollapsed);
     const toggle=panel.querySelector(".gle-panel-toggle");
     if(toggle){
-      toggle.textContent=state.youtube.panelCollapsed?"‹":"›";
-      toggle.title=state.youtube.panelCollapsed?"Paneli aç":"Paneli küçült";
+      toggle.textContent=state.youtube.panelCollapsed?"G":"›";
+      toggle.title=state.youtube.panelCollapsed?"Language Learning panelini aç":"Paneli küçült";
       toggle.setAttribute("aria-label",toggle.title);
     }
     syncYouTubePanelHost();
@@ -1031,7 +1022,9 @@
       if(!panel) return;
       if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
       panel.classList.add("gle-zdf-shared-panel");
-      document.documentElement.classList.toggle("gle-zdf-panel-open",!state.youtube.panelCollapsed);
+      const open=!state.youtube.panelCollapsed;
+      document.documentElement.classList.toggle("gle-zdf-panel-open",open);
+      document.documentElement.style.setProperty("--gle-zdf-panel-space",open?"432px":"0px");
       state.youtube.panelDocked=true;
       return;
     }
@@ -1075,11 +1068,21 @@
 
     const panel=document.createElement("aside");
     panel.id="gle-youtube-panel";
-    panel.innerHTML='<div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div><div class="gle-panel-actions"><button type="button" class="gle-header-main-toggle" aria-label="Language Learning aç/kapat" title="Language Learning aktif">G</button><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙</button><button type="button" class="gle-panel-toggle" aria-label="Paneli küçült" title="Paneli küçült">›</button></div></div><div class="gle-panel-body"></div>';
 
     panel.querySelector(".gle-panel-toggle").addEventListener("click",()=>{
       setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
     });
+    panel.querySelector(".gle-header-main-toggle").addEventListener("click",async()=>{
+      if(state.youtube.panelCollapsed){
+        setYouTubePanelCollapsed(false);
+        return;
+      }
+      state.settings.extensionEnabled=state.settings.extensionEnabled===false;
+      await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
+      renderPlayerControls();
+    });
+    panel.querySelector(".gle-header-settings").addEventListener("click",()=>ensureSettingsDialog());
 
     panel.querySelectorAll("[data-tab]").forEach(button=>{
       button.addEventListener("click",()=>{
