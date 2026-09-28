@@ -394,3 +394,111 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .gle-zdf-fullscreen-panel-open:fullscreen>video{
   width:100%!important;max-width:100%!important
 }
+
+
+/* ZDF panel docking v2: mirror the proven YouTube strategy. The media itself
+   shrinks from the left edge, leaving a real black/right-side lane for the panel.
+   These rules intentionally override the earlier body/padding experiment. */
+html.gle-zdf-panel-open body{
+  width:100vw!important;
+  max-width:none!important;
+  margin-right:0!important;
+  padding-right:0!important;
+}
+.gle-zdf-media-host-panel-open{
+  padding-right:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+.gle-zdf-video-panel-open{
+  width:100%!important;
+  max-width:none!important;
+  transform:scale(var(--gle-zdf-video-scale,1))!important;
+  transform-origin:left center!important;
+  object-position:left center!important;
+}
+#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed){
+  position:fixed!important;
+  right:12px!important;
+  top:12px!important;
+  bottom:12px!important;
+  width:var(--gle-zdf-current-panel-width,408px)!important;
+  height:auto!important;
+  max-height:none!important;
+  z-index:2147483647!important;
+}
+
+/* Collapsed means one persistent launcher. Remove the obsolete empty tab row
+   so it cannot sit above the actual toggle and intercept clicks. */
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+  position:fixed!important;
+  right:0!important;
+  top:42%!important;
+  bottom:auto!important;
+  width:48px!important;
+  min-width:48px!important;
+  height:58px!important;
+  min-height:58px!important;
+  transform:translateY(-50%)!important;
+  overflow:visible!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  z-index:2147483647!important;
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar{
+  display:flex!important;
+  width:48px!important;
+  height:58px!important;
+  min-height:58px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:12px 0 0 12px!important;
+  overflow:hidden!important;
+  pointer-events:auto!important;
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar>strong,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-master-switch,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-header-settings,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-head,
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-body{
+  display:none!important;
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-actions{
+  display:flex!important;width:48px!important;height:58px!important;pointer-events:auto!important
+}
+#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-toggle{
+  display:block!important;width:48px!important;height:58px!important;
+  flex:0 0 48px!important;pointer-events:auto!important;cursor:pointer!important;
+  border-radius:12px 0 0 12px!important;background:#6d28d9!important;color:#fff!important;
+  font:800 28px/1 system-ui!important
+}
+
+/* Fullscreen uses the fullscreen element as the single layout coordinate system.
+   Do not combine padding + width reductions; only scale the video and dock panel. */
+:fullscreen.gle-zdf-fullscreen-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen{
+  padding-right:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-video-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-video-panel-open{
+  width:100%!important;
+  max-width:none!important;
+  transform:scale(var(--gle-zdf-video-scale,1))!important;
+  transform-origin:left center!important;
+  object-position:left center!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open > #gle-youtube-panel.gle-zdf-shared-panel,
+.gle-zdf-fullscreen-panel-open:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel{
+  position:absolute!important;
+  top:0!important;right:0!important;bottom:0!important;
+  width:var(--gle-zdf-fullscreen-panel-width,420px)!important;
+  height:100%!important;max-height:none!important;
+  transform:none!important;border-radius:0!important;
+  z-index:2147483647!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-collapsed > #gle-youtube-panel.gle-zdf-shared-panel.collapsed,
+.gle-zdf-fullscreen-panel-collapsed:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+  position:absolute!important;right:0!important;top:42%!important;
+}
