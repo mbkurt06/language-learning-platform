@@ -6,6 +6,14 @@ test("extracts canonical id from current ZDF video URLs", () => {
   assert.equal(zdfVideoId("https://www.zdf.de/video/magazine/heute-journal-104/heute-journal-vom-27-september-2026-100"), "heute-journal-vom-27-september-2026-100");
 });
 
+test("extracts canonical id from ZDF play URLs", () => {
+  assert.equal(
+    zdfVideoId("https://www.zdf.de/play/animation/die-biene-maja-110/die-grosse-weite-wiesenwelt-102"),
+    "die-grosse-weite-wiesenwelt-102"
+  );
+  assert.equal(isZdfVideoPage("https://www.zdf.de/play/animation/die-biene-maja-110/die-grosse-weite-wiesenwelt-102"), true);
+});
+
 test("rejects non-video and non-ZDF URLs", () => {
   assert.equal(zdfVideoId("https://www.zdf.de/nachrichten"), "");
   assert.equal(zdfVideoId("https://example.com/video/test-100"), "");
