@@ -307,3 +307,30 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
   left:calc((100vw - var(--gle-zdf-panel-space,432px))/2)!important;
   max-width:calc(92vw - var(--gle-zdf-panel-space,432px))!important;
 }
+
+/* ZDF fullscreen: Chrome only renders descendants of the fullscreen element.
+   The content script reparents the panel there and reserves the right side. */
+:fullscreen.gle-zdf-fullscreen-panel-open,
+.gle-zdf-fullscreen-panel-open:fullscreen{
+  overflow:hidden!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open video,
+.gle-zdf-fullscreen-panel-open:fullscreen video{
+  width:calc(100% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
+  max-width:calc(100% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+}
+:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel,
+.gle-zdf-fullscreen-panel-open > #gle-youtube-panel.gle-zdf-shared-panel{
+  position:absolute!important;
+  top:0!important;right:0!important;bottom:0!important;
+  width:var(--gle-zdf-fullscreen-panel-width,420px)!important;
+  height:100%!important;max-height:none!important;border-radius:0!important;
+  z-index:2147483647!important;
+}
+:fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-overlay,
+.gle-zdf-fullscreen-panel-open:fullscreen .gle-zdf-overlay{
+  left:calc((100% - var(--gle-zdf-fullscreen-panel-width,420px))/2)!important;
+  max-width:calc(92% - var(--gle-zdf-fullscreen-panel-width,420px))!important;
+}
