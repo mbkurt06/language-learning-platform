@@ -2307,7 +2307,9 @@
     state.zdf.germanLine=overlay.querySelector(".gle-youtube-german");
     const videoRect=video.getBoundingClientRect();
     const hostRect=host.getBoundingClientRect();
-    overlay.style.left=(videoRect.left-hostRect.left+videoRect.width/2)+"px";
+    const overlayLeft=(videoRect.left-hostRect.left+videoRect.width/2)+"px";
+    overlay.style.setProperty("--gle-zdf-overlay-left",overlayLeft);
+    overlay.style.left=overlayLeft;
     overlay.style.width=videoRect.width+"px";
     overlay.style.maxWidth="none";
     overlay.style.top=clamp(Number(state.settings.zdfSubtitlePositionY)||88,8,92)+"%";
