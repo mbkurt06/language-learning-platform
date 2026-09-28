@@ -29,3 +29,43 @@ def test_freedict_only_fills_empty_sense_translations(tmp_path):
     attach_freedict_fallbacks(db)
     assert json.loads(db.execute("select meanings_tr from senses where sense_id='s1'").fetchone()[0])==["arı"]
     assert json.loads(db.execute("select meanings_tr from senses where sense_id='s2'").fetchone()[0])==["arı"]
+
+
+def test_case_distinct_wiktionary_entries_keep_distinct_fallback_ids(tmp_path):
+    source=tmp_path/"de.jsonl"
+    rows=[
+      {
+        "lang_code":"de","word":"er","pos":"pron",
+        "translations":[{"lang_code":"tr","word":"o","sense":"personal pronoun"}],
+        "senses":[{"glosses":["personal pronoun"]}],
+      },
+      {
+        "lang_code":"de","word":"Er","pos":"pron",
+        "translations":[],
+        "senses":[{"glosses":["male form of address"]}],
+      },
+    ]
+    source.write_text("\n".join(json.dumps(row,ensure_ascii=False) for row in rows)+"\n",encoding="utf-8")
+    db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
+    assert import_wiktextract(source,db)==2
+    senses=db.execute("select sense_id,lemma,meanings_tr from senses where lemma=? collate nocase and pos='PRON' order by lemma collate binary",("er",)).fetchall()
+    assert len(senses)==2
+    by_lemma={lemma:(sense_id,json.loads(meanings)) for sense_id,lemma,meanings in senses}
+    assert by_lemma["er"][0]=="wiktextract:er:PRON:0"
+    assert by_lemma["er"][1]==["o"]
+    assert by_lemma["Er"][0]!="wiktextract:er:PRON:0"
+    assert by_lemma["Er"][1]==[]
+    db.close()
+
+
+def test_freedict_fallback_does_not_cross_case_distinct_lemmas(tmp_path):
+    db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("lower-er","er","PRON",0,"personal pronoun","[]","[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("upper-er","Er","PRON",0,"form of address","[]","[]",None,None))
+    db.execute("insert into translations values(?,?)",("er","o"))
+    attach_freedict_fallbacks(db)
+    lower=json.loads(db.execute("select meanings_tr from senses where sense_id='lower-er'").fetchone()[0])
+    upper=json.loads(db.execute("select meanings_tr from senses where sense_id='upper-er'").fetchone()[0])
+    assert lower==["o"]
+    assert upper==[]
+    db.close()
