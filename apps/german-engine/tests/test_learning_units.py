@@ -20,3 +20,14 @@ def test_same_lemma_different_senses_have_different_ids():
     a=resolver.resolve([token],[],[TokenMeaning(token_index=0,lemma="abnehmen",contextual_meaning_tr="kilo vermek")])[0]
     b=resolver.resolve([token],[],[TokenMeaning(token_index=0,lemma="abnehmen",contextual_meaning_tr="azalmak")])[0]
     assert a.id!=b.id
+
+
+def test_stable_sense_id_controls_learning_unit_identity():
+    resolver=LearningUnitResolver()
+    token=Token(i=0,text="aufgehalten",lemma="aufhalten",pos="VERB")
+    first=TokenMeaning(token_index=0,lemma="aufhalten",canonical_lemma="aufhalten",sense_id="de-aufhalten-stop",contextual_meaning_tr="durdurmak")
+    renamed=TokenMeaning(token_index=0,lemma="aufhalten",canonical_lemma="aufhalten",sense_id="de-aufhalten-stop",contextual_meaning_tr="alıkoymak")
+    a=resolver.resolve([token],[],[first])[0]
+    b=resolver.resolve([token],[],[renamed])[0]
+    assert a.id==b.id
+    assert a.sense_id=="de-aufhalten-stop"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from .models import ExpressionMatch, LexicalForm, Token, TokenMeaning, UsageNote
 from .translation import NullTranslationProvider, TranslationProvider
+from .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
 
 SEED_WORDS={
  "gefallen":{"meanings":["iyilik","jest"],"noun":("der","Gefallen","Gefallen")},
@@ -215,12 +216,16 @@ PRONOUN_CASE_MEANINGS={
 }
 
 class MeaningResolver:
- def __init__(self,lexical_provider:TranslationProvider|None=None):
+ def __init__(self,lexical_provider:TranslationProvider|None=None,lexical_sense_provider:LexicalSenseProvider|None=None):
   self.lexical_provider=lexical_provider or NullTranslationProvider()
+  self.lexical_sense_provider=lexical_sense_provider or NullLexicalSenseProvider()
 
  def lexical_meanings(self,lemma:str,pos:str="VERB")->list[str]:
   entry=SEED_WORDS.get(lemma.lower(),{})
   dictionary=list(entry.get("meanings",[]))
+  if not dictionary:
+   senses=self.lexical_sense_provider.lookup(lemma,pos,lemma)
+   dictionary=list(dict.fromkeys(value for sense in senses for value in sense.meanings_tr if value))
   if not dictionary and pos in LEXICAL_PROVIDER_POS:
    lexical_translate=getattr(self.lexical_provider,"translate_lexeme",None)
    fallback=lexical_translate(lemma,pos) if callable(lexical_translate) else self.lexical_provider.translate(lemma)
@@ -318,13 +323,18 @@ class MeaningResolver:
    for index in expression.token_indices: by_token.setdefault(index,[]).append(expression)
   output=[]
   for token in tokens:
-   entry=SEED_WORDS.get(token.lemma.lower(),{}); dictionary=self.lexical_meanings(token.lemma,token.pos)
+   canonical_lemma=self.lexical_sense_provider.canonical_lemma(token.text,token.lemma)
+   entry=SEED_WORDS.get(canonical_lemma.lower(),{})
+   selected_sense=self.lexical_sense_provider.select(canonical_lemma,token.pos,token.text,tokens,token.i)
+   dictionary=list(dict.fromkeys(selected_sense.meanings_tr)) if selected_sense and selected_sense.meanings_tr else self.lexical_meanings(canonical_lemma,token.pos)
    related=sorted(by_token.get(token.i,[]),key=lambda item:item.rank,reverse=True)
    function_context=self._contextual_function_meaning(token)
    contextual=(related[0].contextual_meaning_tr or (related[0].meaning_tr[0] if related[0].meaning_tr else None)) if related else (function_context or (dictionary[0] if dictionary else None))
    lexical=None
    noun_forms=entry.get("noun")
-   if noun_forms:
+   if selected_sense and token.pos=="NOUN" and (selected_sense.article or selected_sense.plural):
+    lexical=LexicalForm(article=selected_sense.article,singular=canonical_lemma,plural=selected_sense.plural)
+   elif noun_forms:
     article,singular,plural=noun_forms
     lexical=LexicalForm(article=article,singular=singular,plural=plural)
    if not related and contextual and token.pos in {"NOUN","PROPN"}:
@@ -347,5 +357,5 @@ class MeaningResolver:
    role=POS_ROLE_TR.get(token.pos)
    if role:
     notes.append(UsageNote(kind="GRAMMAR_ROLE",label="Görevi",explanation_tr=role,source=token.pos))
-   output.append(TokenMeaning(token_index=token.i,lemma=token.lemma,contextual_meaning_tr=contextual,dictionary_meanings_tr=dictionary,lexical_form=lexical,usage_notes=notes))
+   output.append(TokenMeaning(token_index=token.i,lemma=canonical_lemma,contextual_meaning_tr=contextual,dictionary_meanings_tr=dictionary,lexical_form=lexical,usage_notes=notes,sense_id=selected_sense.sense_id if selected_sense else None,canonical_lemma=canonical_lemma))
   return output

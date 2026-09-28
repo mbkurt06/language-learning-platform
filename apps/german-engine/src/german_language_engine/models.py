@@ -52,6 +52,7 @@ class TokenMeaning(BaseModel):
     token_index:int; lemma:str; contextual_meaning_tr:str|None=None
     dictionary_meanings_tr:list[str]=Field(default_factory=list)
     lexical_form:LexicalForm|None=None; usage_notes:list[UsageNote]=Field(default_factory=list)
+    sense_id:str|None=None; canonical_lemma:str|None=None
 
 class HoverAnalysis(BaseModel):
     token_index:int; token:str; primary_expressions:list[ExpressionMatch]=Field(default_factory=list)
@@ -70,6 +71,7 @@ class LearningUnit(BaseModel):
     pattern_id:str|None=None
     lexical_form:LexicalForm|None=None
     grammar_hint:str|None=None
+    sense_id:str|None=None
 
 class Analysis(BaseModel):
     text:str; sentence_meaning_tr:str|None=None; tokens:list[Token]; expressions:list[ExpressionMatch]

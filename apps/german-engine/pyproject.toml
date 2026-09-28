@@ -21,6 +21,8 @@ dev = ["pytest>=8,<9", "ruff>=0.6,<1"]
 [project.scripts]
 gle = "german_language_engine.cli:main"
 gle-serve = "german_language_engine.api:main"
+gle-bootstrap-lexicon = "german_language_engine.bootstrap_lexical_data:main"
+gle-import-lexicon = "german_language_engine.import_lexical_data:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/german_language_engine"]
 

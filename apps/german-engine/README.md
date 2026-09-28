@@ -53,3 +53,25 @@ gle analyze "Darauf müssen wir Rücksicht nehmen."
 v0.1 establishes the reusable engine contract, spaCy adapter, structural matcher, resolver, seed lexicon and regression tests. Real-text evaluation will drive subsequent lexicon/rule expansion.
 
 See `docs/architecture.md` and `docs/expression-schema.md`.
+
+
+## Offline lexical senses (German -> Turkish)
+
+The engine can use an offline SQLite lexical index built from:
+- Wiktextract/Kaikki German entries for canonical forms, morphology and stable sense IDs.
+- FreeDict deu-tur for Turkish dictionary equivalents.
+
+Build it once from the repository root:
+
+```bash
+cd apps/german-engine
+python -m german_language_engine.bootstrap_lexical_data --data-dir ../../data/lexical
+```
+
+The bootstrap downloads source data and writes `data/lexical/german-lexical.sqlite3`.
+Source dumps and the generated database are intentionally gitignored. Docker Compose mounts
+that directory read-only and sets `GLE_LEXICAL_DB` automatically.
+
+At runtime the priority is: expression lexicon -> offline lexical sense -> seed lexicon ->
+translation fallback. Learning-unit identity uses the stable Wiktextract sense ID when present,
+not the Turkish display gloss.
