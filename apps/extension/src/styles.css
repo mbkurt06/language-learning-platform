@@ -24,7 +24,7 @@
 #gle-youtube-panel{
   position:fixed;right:12px;top:72px;bottom:12px;z-index:2147482400;width:min(420px,calc(100vw - 24px));
   display:flex;flex-direction:column;background:#0b0b0d;color:#f4f4f5;border:1px solid #2b2b31;border-radius:14px;
-  box-shadow:0 16px 50px rgba(0,0,0,.48);overflow:hidden;font:14px/1.4 system-ui,-apple-system,sans-serif
+  box-shadow:0 16px 50px rgba(0,0,0,.48);overflow:hidden;overscroll-behavior:contain;font:14px/1.4 system-ui,-apple-system,sans-serif
 }
 .gle-panel-head{display:flex;align-items:center;border-bottom:1px solid #2b2b31;background:#151519;min-height:50px}
 .gle-panel-tabs{display:grid;grid-template-columns:repeat(3,1fr);flex:1;min-width:0}
@@ -34,7 +34,7 @@
 .gle-panel-tabs button{padding:17px 8px 15px;border-bottom:3px solid transparent}
 .gle-panel-tabs button.active{color:#fff;border-bottom-color:#a855f7;background:#1d1d22}
 .gle-panel-toggle{width:46px;height:46px;font-size:28px;color:#ddd;flex:0 0 46px}
-.gle-panel-body{flex:1;overflow:auto;background:#0b0b0d;scrollbar-color:#666 #17171a}
+.gle-panel-body{flex:1;overflow:auto;background:#0b0b0d;scrollbar-color:#666 #17171a;overscroll-behavior:contain}
 .gle-panel-empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:28px;text-align:center;color:#a1a1aa}
 .gle-panel-empty b{color:#e4e4e7}
 .gle-transcript-row{
