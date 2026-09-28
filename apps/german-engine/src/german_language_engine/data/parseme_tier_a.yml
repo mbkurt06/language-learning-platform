@@ -1,0 +1,151 @@
+# Curated PARSEME Tier A promotion batch.
+# Candidates are corpus-attested at least 10 times and manually supplied with
+# learner-facing Turkish meanings. Equivalent runtime entries are not duplicated.
+
+- id: parseme.a.es_gibt
+  canonical: "es gibt"
+  type: FIXED_CONSTRUCTION
+  head_lemma: geben
+  priority: 92
+  meaning_tr: ["var", "bulunuyor"]
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+
+- id: parseme.a.es_heisst
+  canonical: "es heißt"
+  type: FIXED_CONSTRUCTION
+  head_lemma: heißen
+  priority: 92
+  meaning_tr: ["bu demektir", "adı ...dır"]
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+
+- id: parseme.a.stattfinden
+  canonical: "stattfinden"
+  type: PARTICLE_VERB
+  head_lemma: finden
+  priority: 92
+  meaning_tr: ["gerçekleşmek", "yapılmak"]
+  grammar_hint: "trennbar · findet ... statt"
+  slots:
+    - {id: statt, type: PARTICLE, lemma: statt}
+
+- id: parseme.a.sich_befinden
+  canonical: "sich befinden"
+  type: REFLEXIVE_VERB
+  head_lemma: befinden
+  priority: 92
+  meaning_tr: ["bulunmak", "yer almak"]
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+
+- id: parseme.a.es_kommt_zu
+  canonical: "es kommt zu etwas"
+  type: FIXED_CONSTRUCTION
+  head_lemma: kommen
+  priority: 92
+  meaning_tr: ["bir şey meydana gelmek", "bir şey yaşanmak"]
+  grammar_hint: "zu + Dat."
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+    - {id: zu, type: PREPOSITION, prep: zu, case: [Dat]}
+
+- id: parseme.a.ausgehen
+  canonical: "ausgehen"
+  type: PARTICLE_VERB
+  head_lemma: gehen
+  priority: 90
+  meaning_tr: ["dışarı çıkmak", "sona ermek", "bir şeyden hareket etmek"]
+  grammar_hint: "trennbar · geht ... aus"
+  slots:
+    - {id: aus, type: PARTICLE, lemma: aus}
+
+- id: parseme.a.mitteilen
+  canonical: "mitteilen"
+  type: PARTICLE_VERB
+  head_lemma: teilen
+  priority: 92
+  meaning_tr: ["bildirmek", "haber vermek", "iletmek"]
+  grammar_hint: "trennbar · teilt ... mit"
+  slots:
+    - {id: mit, type: PARTICLE, lemma: mit}
+
+- id: parseme.a.ankuendigen
+  canonical: "ankündigen"
+  type: PARTICLE_VERB
+  head_lemma: kündigen
+  priority: 92
+  meaning_tr: ["duyurmak", "ilan etmek", "haber vermek"]
+  grammar_hint: "trennbar · kündigt ... an"
+  slots:
+    - {id: an, type: PARTICLE, lemma: an}
+
+- id: parseme.a.davon_ausgehen
+  canonical: "davon ausgehen"
+  type: FIXED_CONSTRUCTION
+  head_lemma: gehen
+  priority: 93
+  meaning_tr: ["bunu varsaymak", "bundan hareket etmek", "bunu temel almak"]
+  slots:
+    - {id: davon, type: LEMMA, lemma: davon}
+    - {id: aus, type: PARTICLE, lemma: aus}
+
+- id: parseme.a.anbieten
+  canonical: "anbieten"
+  type: PARTICLE_VERB
+  head_lemma: bieten
+  priority: 92
+  meaning_tr: ["sunmak", "teklif etmek"]
+  grammar_hint: "trennbar · bietet ... an"
+  slots:
+    - {id: an, type: PARTICLE, lemma: an}
+
+- id: parseme.a.feststehen
+  canonical: "feststehen"
+  type: PARTICLE_VERB
+  head_lemma: stehen
+  priority: 92
+  meaning_tr: ["kesinleşmiş olmak", "belli olmak"]
+  grammar_hint: "trennbar · steht ... fest"
+  slots:
+    - {id: fest, type: PARTICLE, lemma: fest}
+
+- id: parseme.a.einraeumen
+  canonical: "einräumen"
+  type: PARTICLE_VERB
+  head_lemma: räumen
+  priority: 90
+  meaning_tr: ["kabul etmek", "itiraf etmek", "birine bir hak veya imkân tanımak"]
+  grammar_hint: "trennbar · räumt ... ein"
+  slots:
+    - {id: ein, type: PARTICLE, lemma: ein}
+
+- id: parseme.a.feststellen
+  canonical: "feststellen"
+  type: PARTICLE_VERB
+  head_lemma: stellen
+  priority: 92
+  meaning_tr: ["tespit etmek", "belirlemek", "fark etmek"]
+  grammar_hint: "trennbar · stellt ... fest"
+  slots:
+    - {id: fest, type: PARTICLE, lemma: fest}
+
+- id: parseme.a.teilnehmen
+  canonical: "teilnehmen"
+  type: PARTICLE_VERB
+  head_lemma: nehmen
+  priority: 92
+  meaning_tr: ["katılmak", "iştirak etmek"]
+  grammar_hint: "trennbar · nimmt ... teil"
+  slots:
+    - {id: teil, type: PARTICLE, lemma: teil}
+
+- id: parseme.a.vorstellen
+  canonical: "vorstellen"
+  type: PARTICLE_VERB
+  head_lemma: stellen
+  priority: 90
+  meaning_tr: ["tanıtmak", "takdim etmek", "sunmak"]
+  grammar_hint: "trennbar · stellt ... vor"
+  slots:
+    - {id: vor, type: PARTICLE, lemma: vor}
