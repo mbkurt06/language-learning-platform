@@ -53,10 +53,24 @@ class DynamicExpressionDetector:
 
         return matches, patterns
 
+    def detect_groups(
+        self,
+        tokens: list[Token],
+    ) -> tuple[list[ExpressionMatch], dict[str, ExpressionPattern]]:
+        particle_matches, particle_patterns = self._particle_verbs(
+            tokens, lambda _lemma, _pos: [], require_meanings=False
+        )
+        relative_matches, relative_patterns = self._preposition_relative_pronouns(tokens)
+        return (
+            [*particle_matches, *relative_matches],
+            {**particle_patterns, **relative_patterns},
+        )
+
     def _particle_verbs(
         self,
         tokens: list[Token],
         lexical_meanings: Callable[[str, str], list[str]],
+        require_meanings: bool = True,
     ) -> tuple[list[ExpressionMatch], dict[str, ExpressionPattern]]:
         by_i = {token.i: token for token in tokens}
         matches: list[ExpressionMatch] = []
@@ -76,7 +90,7 @@ class DynamicExpressionDetector:
             base = head.lemma.lower()
             infinitive = base if base.startswith(prefix) else prefix + base
             meanings = lexical_meanings(infinitive, "VERB")
-            if not meanings:
+            if not meanings and require_meanings:
                 continue
 
             pattern_id = f"dynamic.particle.{infinitive}"
