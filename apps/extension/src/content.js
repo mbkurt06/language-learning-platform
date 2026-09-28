@@ -922,13 +922,6 @@
       setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
     });
 
-    panel.addEventListener("wheel",event=>{
-      if(state.youtube.panelCollapsed) return;
-      const body=panel.querySelector(".gle-panel-body");
-      if(!body || Math.abs(event.deltaX)>Math.abs(event.deltaY)) return;
-      event.preventDefault();
-      body.scrollTop+=event.deltaY;
-    },{passive:false});
     panel.querySelectorAll("[data-tab]").forEach(button=>{
       button.addEventListener("click",()=>{
         state.youtube.panelTab=button.dataset.tab;
@@ -1424,6 +1417,23 @@
       scanYouTube();
     });
   });
+
+  window.addEventListener("wheel",event=>{
+    const panel=state.youtube.panel;
+    if(!panel || state.youtube.panelCollapsed || !panel.contains(event.target)) return;
+    if(Math.abs(event.deltaX)>Math.abs(event.deltaY)) return;
+
+    const body=panel.querySelector(".gle-panel-body");
+    if(!body) return;
+
+    // Capture before YouTube's own page-level wheel handlers. In theater mode
+    // YouTube can otherwise scroll the document even though the panel itself
+    // is scrollable, pulling recommended videos up behind the player.
+    event.preventDefault();
+    event.stopPropagation();
+    if(typeof event.stopImmediatePropagation==="function") event.stopImmediatePropagation();
+    body.scrollTop+=event.deltaY;
+  },{capture:true,passive:false});
 
   document.addEventListener("fullscreenchange",()=>requestAnimationFrame(syncYouTubePanelHost));
   window.addEventListener("resize",()=>requestAnimationFrame(syncYouTubePanelHost));
