@@ -72,11 +72,19 @@ def quality_reasons(item: dict[str, Any]) -> list[str]:
         reasons.append(CONTEXT_SENSITIVE_CANONICALS[canonical])
 
     if expression_type == "PARTICLE_VERB":
-        if "PARTICLE" not in slot_types:
+        particle_slots = [slot for slot in slots if slot.get("type") == "PARTICLE"]
+        if not particle_slots:
             reasons.append("particle_verb_without_particle_slot")
         bad = [slot for slot in slots if slot.get("type") in {"PREPOSITION", "LEMMA"}]
         if bad:
             reasons.append("particle_verb_has_non_particle_prefix_slot")
+        if particle_slots and head:
+            expected = "".join(
+                str(slot.get("lemma", "")).strip()
+                for slot in particle_slots
+            ) + head
+            if canonical.casefold() != expected.casefold():
+                reasons.append("particle_verb_canonical_mismatch")
 
     if expression_type == "REFLEXIVE_VERB" and "REFLEXIVE" not in slot_types:
         reasons.append("reflexive_verb_without_reflexive_slot")
@@ -129,10 +137,19 @@ def build_batch(
     if max_items is not None:
         selected = selected[:max_items]
 
+    canonical_counts = Counter(
+        str(item.get("canonical", "")).strip().casefold()
+        for item in selected
+        if str(item.get("canonical", "")).strip()
+    )
+
     ready: list[dict[str, Any]] = []
     review: list[dict[str, Any]] = []
     for item in selected:
         reasons = quality_reasons(item)
+        canonical_key = str(item.get("canonical", "")).strip().casefold()
+        if canonical_key and canonical_counts[canonical_key] > 1:
+            reasons.append("duplicate_canonical_in_tier")
         target = review if reasons else ready
         target.append(batch_item(item, tier, reasons))
     return ready, review
