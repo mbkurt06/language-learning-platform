@@ -921,6 +921,14 @@
     panel.querySelector(".gle-panel-toggle").addEventListener("click",()=>{
       setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
     });
+
+    panel.addEventListener("wheel",event=>{
+      if(state.youtube.panelCollapsed) return;
+      const body=panel.querySelector(".gle-panel-body");
+      if(!body || Math.abs(event.deltaX)>Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      body.scrollTop+=event.deltaY;
+    },{passive:false});
     panel.querySelectorAll("[data-tab]").forEach(button=>{
       button.addEventListener("click",()=>{
         state.youtube.panelTab=button.dataset.tab;
