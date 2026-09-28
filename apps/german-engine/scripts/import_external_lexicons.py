@@ -103,6 +103,58 @@ def parse_feats(raw: str) -> dict[str, str]:
     return result
 
 
+def clean_lemma(token: dict[str, Any]) -> str:
+    """Return a stable learner-facing lemma from noisy corpus annotations."""
+    lemma = str(token.get("lemma") or token.get("form") or "").strip()
+    form = str(token.get("form") or "").strip()
+    if not lemma or lemma == "_":
+        return form
+
+    # Some German corpora expose morphological alternatives like "er|es|sie".
+    # Those are not usable canonical lexicon forms. Prefer the actual surface
+    # token unless the construction itself tells us the normalized form.
+    if "|" in lemma:
+        return form
+    return lemma
+
+
+def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[str, str]:
+    """Create a learner-facing canonical candidate and head lemma.
+
+    PARSEME annotation is corpus-oriented. Its token lemmas are not automatically
+    a dictionary entry, especially for reflexives and separable verbs.
+    """
+    verb_tokens = [item for item in members if item["upos"] in VERB_UPOS]
+    if not verb_tokens:
+        return "", ""
+    head = verb_tokens[0]
+    head_lemma = clean_lemma(head).lower()
+
+    if category == "IRV":
+        return f"sich {head_lemma}", head_lemma
+
+    if category in {"VPC.full", "VPC.semi"}:
+        non_verbs = [item for item in members if item["id"] != head["id"]]
+        particles = [
+            clean_lemma(item).lower()
+            for item in non_verbs
+            if item["upos"] in {"ADP", "ADV", "PART"} or item.get("deprel") in {"compound:prt", "svp"}
+        ]
+        if particles:
+            # German separable verbs are written as one infinitive in dictionary form:
+            # statt + finden -> stattfinden, mit + teilen -> mitteilen.
+            return "".join(particles) + head_lemma, head_lemma
+
+    parts: list[str] = []
+    for item in members:
+        lemma = clean_lemma(item)
+        low = lemma.lower()
+        if low in REFLEXIVE_LEMMAS:
+            lemma = "sich"
+        parts.append(lemma)
+    return " ".join(parts), head_lemma
+
+
 def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
     observations: dict[tuple[str, tuple[str, ...], str], list[dict[str, Any]]] = defaultdict(list)
 
@@ -134,7 +186,7 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
             for entry in mwes.values():
                 members = sorted(entry["tokens"], key=lambda item: item["id"])
                 category = entry["category"]
-                lemmas = tuple((item["lemma"] or item["form"]).lower() for item in members)
+                lemmas = tuple(clean_lemma(item).lower() for item in members)
                 if len(lemmas) < 2:
                     continue
                 key = (category, lemmas, str(path))
@@ -178,16 +230,16 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
         if len(items) < min_count:
             continue
         representative = items[0]["tokens"]
-        verb_tokens = [item for item in representative if item["upos"] in VERB_UPOS]
-        if not verb_tokens:
+        canonical, head_lemma = canonicalize_parseme(category, representative)
+        if not canonical or not head_lemma:
             continue
+        verb_tokens = [item for item in representative if item["upos"] in VERB_UPOS]
         head_token = verb_tokens[0]
-        head_lemma = (head_token["lemma"] or head_token["form"]).lower()
 
         slots: list[dict[str, Any]] = []
         slot_seq = 0
         for item in representative:
-            lemma = (item["lemma"] or item["form"]).lower()
+            lemma = clean_lemma(item).lower()
             if item["id"] == head_token["id"]:
                 continue
             slot_seq += 1
@@ -200,9 +252,9 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
                     slot["case"] = [case]
                 slots.append(slot)
             else:
-                slots.append({"id": f"lemma_{slot_seq}", "type": "LEMMA", "lemma": item["lemma"] or item["form"]})
+                # For IRV, the reflexive pronoun is structural rather than a lexical lemma.
+                slots.append({"id": f"lemma_{slot_seq}", "type": "LEMMA", "lemma": clean_lemma(item)})
 
-        canonical = " ".join(item["lemma"] or item["form"] for item in representative)
         mapped_type = PARSEME_TYPE_MAP.get(category, "FIXED_CONSTRUCTION")
         candidates.append(Candidate(
             id=stable_id("parseme", canonical, category),
