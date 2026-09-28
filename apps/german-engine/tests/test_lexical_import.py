@@ -69,3 +69,17 @@ def test_freedict_fallback_does_not_cross_case_distinct_lemmas(tmp_path):
     assert lower==["o"]
     assert upper==[]
     db.close()
+
+
+def test_freedict_fallback_preserves_exact_case_groups(tmp_path):
+    db=sqlite3.connect(tmp_path/"lex.db"); schema(db)
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("lower-er","er","PRON",0,"personal pronoun","[]","[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("upper-er","Er","PRON",0,"form of address","[]","[]",None,None))
+    db.execute("insert into translations values(?,?)",("er","o"))
+    db.execute("insert into translations values(?,?)",("Er","Bay"))
+    attach_freedict_fallbacks(db)
+    lower=json.loads(db.execute("select meanings_tr from senses where sense_id='lower-er'").fetchone()[0])
+    upper=json.loads(db.execute("select meanings_tr from senses where sense_id='upper-er'").fetchone()[0])
+    assert lower==["o"]
+    assert upper==["Bay"]
+    db.close()
