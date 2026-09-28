@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 
-from .models import Analysis, ExpressionMatch, LearningUnit, Token, TokenMeaning
+from .models import ExpressionMatch, LearningUnit, Token, TokenMeaning
 
 # These token classes are grammatical glue by default. They can still be learned
 # when the expression resolver promotes them as part of a meaningful construction.
