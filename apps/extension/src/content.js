@@ -46,6 +46,8 @@
       expressionGroupsVideoId:"",
       expressionGroupsPromise:null,
       panelSelectedGroupKey:"",
+      wordsView:"overview",
+      wordsSearch:"",
     }
   };
 
@@ -790,6 +792,8 @@
     state.youtube.expressionGroupsPromise=null;
     state.youtube.panelSelectedLemma="";
     state.youtube.panelSelectedGroupKey="";
+    state.youtube.wordsView="overview";
+    state.youtube.wordsSearch="";
     state.youtube.videoUnknownLemmas=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
@@ -1199,7 +1203,7 @@
       const unknown=state.youtube.videoUnknownLemmas.has(entry.lemma);
       return '<div class="gle-word-chip-wrap'+(unknown?" unknown":"")+'">'+
         '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
-        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Bu video için işareti kaldır":"Bu videoda anlamını göster")+'">'+(unknown?"✓":"+")+'</button>'+
+        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Altyazıda anlam gösterimini kapat":"Bu kelimenin anlamını altyazıda göster")+'">'+(unknown?"✓":"+")+'</button>'+
       '</div>';
     }).join("");
     return '<section class="gle-word-group"><h3>'+esc(title)+'</h3><div class="gle-word-grid">'+chips+'</div></section>';
@@ -1297,6 +1301,113 @@
     });
   }
 
+  function wordsToolbar(analysis){
+    const q=state.youtube.wordsSearch||"";
+    const views=[
+      ["overview","Genel"],
+      ["alphabetical","A-Z"],
+      ["frequency","Sıklık"],
+      ["groups","Kelime grupları"],
+    ];
+    return '<div class="gle-words-tools">'+
+      '<div class="gle-words-subtabs">'+views.map(([id,label])=>
+        '<button type="button" data-words-view="'+id+'" class="'+(state.youtube.wordsView===id?"active":"")+'">'+label+'</button>'
+      ).join("")+'</div>'+
+      '<label class="gle-word-search"><span>⌕</span><input type="search" placeholder="Bu videoda kelime ara…" value="'+escAttr(q)+'" aria-label="Bu videoda kelime ara"></label>'+
+    '</div>';
+  }
+
+  function filterPanelWords(entries){
+    const q=String(state.youtube.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
+    if(!q) return entries;
+    return entries.filter(entry=>
+      String(entry.lemma||"").toLocaleLowerCase("de-DE").includes(q) ||
+      (entry.forms||[]).some(form=>String(form).toLocaleLowerCase("de-DE").includes(q))
+    );
+  }
+
+  function alphabeticalWordList(entries){
+    const sorted=[...entries].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
+    return wordGroup("A-Z",sorted);
+  }
+
+  function frequencyWordList(entries){
+    const sorted=[...entries].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+    return wordGroup("En çok geçenden aza",sorted);
+  }
+
+  async function showPanelWordTooltip(button,entry){
+    const cueIndex=entry?.occurrences?.[0];
+    const cue=(state.youtube.cues||[])[cueIndex];
+    if(!cue?.text) return;
+    try{
+      const data=await analyze(cue.text);
+      const token=(data.tokens||[]).find(token=>
+        String(token.lemma||"").toLocaleLowerCase("de-DE")===String(entry.lemma||"").toLocaleLowerCase("de-DE")
+      );
+      if(!token) return;
+      renderCard(data,token.i,button);
+    }catch(_error){}
+  }
+
+  function bindPanelWordControls(body,analysis){
+    body.querySelectorAll("[data-words-view]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        state.youtube.wordsView=button.dataset.wordsView||"overview";
+        state.youtube.panelSelectedLemma="";
+        state.youtube.panelSelectedGroupKey="";
+        renderYouTubeSidePanel();
+      });
+    });
+
+    const search=body.querySelector(".gle-word-search input");
+    if(search){
+      search.addEventListener("input",()=>{
+        state.youtube.wordsSearch=search.value;
+        const cursor=search.selectionStart;
+        renderYouTubeSidePanel();
+        requestAnimationFrame(()=>{
+          const next=state.youtube.panel?.querySelector(".gle-word-search input");
+          if(next){
+            next.focus();
+            try{ next.setSelectionRange(cursor,cursor); }catch(_error){}
+          }
+        });
+      });
+    }
+
+    body.querySelectorAll(".gle-word-chip").forEach(button=>{
+      const entry=analysis.find(item=>item.lemma===button.dataset.lemma);
+      let hoverTimer=null;
+      button.addEventListener("mouseenter",()=>{
+        hoverTimer=setTimeout(()=>showPanelWordTooltip(button,entry),180);
+      });
+      button.addEventListener("mouseleave",()=>{
+        clearTimeout(hoverTimer);
+        scheduleTooltipHide(220);
+      });
+      button.addEventListener("click",()=>{
+        state.youtube.panelSelectedLemma=button.dataset.lemma;
+        renderYouTubeSidePanel();
+      });
+    });
+
+    body.querySelectorAll(".gle-expression-chip").forEach(button=>{
+      button.addEventListener("click",()=>{
+        state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
+        state.youtube.panelSelectedLemma="";
+        renderYouTubeSidePanel();
+      });
+    });
+
+    body.querySelectorAll(".gle-word-mark").forEach(button=>{
+      button.addEventListener("click",event=>{
+        event.stopPropagation();
+        toggleVideoUnknownLemma(button.dataset.markLemma);
+      });
+    });
+  }
+
   function renderPanelWords(body){
     const analysis=state.youtube.transcriptAnalysis;
     if(!analysis){
@@ -1323,37 +1434,35 @@
       state.youtube.panelSelectedLemma="";
     }
 
-    const learning=analysis.filter(entry=>learningItemForLemma(entry.lemma));
+    const visible=filterPanelWords(analysis);
+    const learning=visible.filter(entry=>learningItemForLemma(entry.lemma));
     const learningSet=new Set(learning.map(entry=>entry.lemma));
-    const frequent=analysis.filter(entry=>!learningSet.has(entry.lemma) && entry.count>=3);
+    const frequent=visible.filter(entry=>!learningSet.has(entry.lemma) && entry.count>=3);
     const frequentSet=new Set(frequent.map(entry=>entry.lemma));
-    const others=analysis.filter(entry=>!learningSet.has(entry.lemma) && !frequentSet.has(entry.lemma));
+    const others=visible.filter(entry=>!learningSet.has(entry.lemma) && !frequentSet.has(entry.lemma));
 
     const groups=state.youtube.expressionGroupsAnalysis;
+    let content="";
+    if(state.youtube.wordsView==="alphabetical"){
+      content=alphabeticalWordList(visible);
+    }else if(state.youtube.wordsView==="frequency"){
+      content=frequencyWordList(visible);
+    }else if(state.youtube.wordsView==="groups"){
+      content=expressionGroupsSection(groups);
+    }else{
+      content=
+        wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
+        wordGroup("Bu videoda sık geçenler",frequent)+
+        wordGroup("Diğer kelimeler",others);
+    }
+
+    if(!content){
+      content='<div class="gle-panel-empty"><b>Sonuç bulunamadı.</b><span>Arama kelimesini değiştir.</span></div>';
+    }
+
     body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+
-      expressionGroupsSection(groups)+
-      wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
-      wordGroup("Bu videoda sık geçenler",frequent)+
-      wordGroup("Diğer kelimeler",others);
-    body.querySelectorAll(".gle-expression-chip").forEach(button=>{
-      button.addEventListener("click",()=>{
-        state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
-        state.youtube.panelSelectedLemma="";
-        renderYouTubeSidePanel();
-      });
-    });
-    body.querySelectorAll(".gle-word-chip").forEach(button=>{
-      button.addEventListener("click",()=>{
-        state.youtube.panelSelectedLemma=button.dataset.lemma;
-        renderYouTubeSidePanel();
-      });
-    });
-    body.querySelectorAll(".gle-word-mark").forEach(button=>{
-      button.addEventListener("click",event=>{
-        event.stopPropagation();
-        toggleVideoUnknownLemma(button.dataset.markLemma);
-      });
-    });
+      wordsToolbar(analysis)+content;
+    bindPanelWordControls(body,analysis);
   }
 
   function renderPanelSaved(body){
