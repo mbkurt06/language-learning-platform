@@ -236,3 +236,26 @@
 .gle-settings-switch{display:flex;gap:10px;align-items:center}
 .gle-extension-disabled .gle-youtube-overlay,.gle-extension-disabled .gle-zdf-overlay,.gle-extension-disabled #gle-zdf-panel{display:none!important}
 .gle-youtube-overlay,.gle-zdf-overlay{--gle-german-font-scale:var(--gle-german-font-scale,1);--gle-translation-font-scale:var(--gle-translation-font-scale,1)}
+
+/* ZDF uses the same transcript/words/saved panel as YouTube. Reserve layout
+   space instead of covering the video. */
+html.gle-zdf-panel-open body{
+  width:calc(100vw - 432px)!important;
+  max-width:calc(100vw - 432px)!important;
+  transition:width .18s ease,max-width .18s ease;
+}
+#gle-youtube-panel.gle-zdf-shared-panel{
+  right:12px;top:12px;bottom:12px;width:408px;
+}
+#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed){
+  position:fixed;
+}
+html.gle-zdf-panel-open #gle-player-controls{
+  right:448px;
+}
+.gle-zdf-overlay .gle-youtube-german{
+  font-size:clamp(18px,calc(2.1vw * var(--gle-german-font-scale,1)),52px);
+}
+.gle-zdf-overlay .gle-subtitle-translation{
+  font-size:clamp(18px,calc(2.1vw * var(--gle-translation-font-scale,1)),52px);
+}
