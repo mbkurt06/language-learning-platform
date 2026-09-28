@@ -1,17 +1,24 @@
-const ALLOWED_ZDF_HOSTS = [
-  /(^|\\.)zdf\\.de$/i,
-  /(^|\\.)akamaized\\.net$/i,
-];
+const EXACT_ZDF_HOSTS = new Set([
+  "api.zdf.de",
+  "zdf-prod-futura.zdf.de",
+  "utstreaming.zdf.de",
+]);
 
 function allowedUrl(value){
-  try { return ALLOWED_ZDF_HOSTS.some(pattern=>pattern.test(new URL(value).hostname)); }
-  catch (_error) { return false; }
+  try {
+    const hostname=new URL(value).hostname.toLowerCase();
+    return EXACT_ZDF_HOSTS.has(hostname) || hostname.endsWith(".akamaized.net");
+  } catch (_error) {
+    return false;
+  }
 }
 
 chrome.runtime.onMessage.addListener((message,_sender,sendResponse)=>{
   if(message?.type!=="gle-zdf-fetch") return;
   if(!allowedUrl(message.url)){
-    sendResponse({ok:false,error:"blocked-zdf-fetch-host"});
+    let hostname="invalid-url";
+    try { hostname=new URL(message.url).hostname; } catch (_error) {}
+    sendResponse({ok:false,error:"blocked-zdf-fetch-host: "+hostname});
     return;
   }
   (async()=>{
