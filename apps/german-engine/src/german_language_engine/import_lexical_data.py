@@ -116,7 +116,7 @@ def import_freedict(path,db):
     return count
 
 def attach_freedict_fallbacks(db):
-    rows=db.execute("select lemma,group_concat(meaning_tr,char(31)) meanings from translations group by lemma").fetchall()
+    rows=db.execute("select lemma,group_concat(meaning_tr,char(31)) meanings from translations group by lemma collate binary").fetchall()
     for lemma,joined in rows:
       values=list(dict.fromkeys(x.strip() for x in (joined or "").split(chr(31)) if x.strip()))
       payload=json.dumps(values,ensure_ascii=False)
