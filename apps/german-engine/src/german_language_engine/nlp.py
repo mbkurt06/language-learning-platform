@@ -5,6 +5,7 @@ from .models import Token
 class NLPAdapter(Protocol):
     def parse(self, text: str) -> list[Token]: ...
     def parse_many(self, texts: list[str]) -> list[list[Token]]: ...
+    def parse_many_with_dependencies(self, texts: list[str]) -> list[list[Token]]: ...
 
 class SpacyGermanAdapter:
     def __init__(self, model: str = "de_core_news_md"):
@@ -38,7 +39,13 @@ class SpacyGermanAdapter:
 
     def parse_many(self, texts: list[str]) -> list[list[Token]]:
         # Vocabulary indexing only needs tokenization, lemma, POS, tag and morphology.
-        # Running parser/NER separately for every subtitle cue is unnecessarily costly.
         disabled = [name for name in ("parser", "ner") if name in self.nlp.pipe_names]
         docs = self.nlp.pipe(texts, batch_size=64, disable=disabled)
         return [self._tokens_from_doc(doc, include_dependencies=False) for doc in docs]
+
+    def parse_many_with_dependencies(self, texts: list[str]) -> list[list[Token]]:
+        # Structural word groups (verb+preposition, reflexive forms, idioms, etc.)
+        # need dependency information, but still benefit from spaCy's batched pipe.
+        disabled = [name for name in ("ner",) if name in self.nlp.pipe_names]
+        docs = self.nlp.pipe(texts, batch_size=64, disable=disabled)
+        return [self._tokens_from_doc(doc, include_dependencies=True) for doc in docs]
