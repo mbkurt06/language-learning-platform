@@ -67,6 +67,8 @@ SEED_WORDS={
  "mitmachen":{"meanings":["katılmak","birlikte yapmak"]},
  "weitergehen":{"meanings":["devam etmek","ilerlemeye devam etmek"]},
  "gehen":{"meanings":["gitmek"]},
+ "verfassung":{"meanings":["anayasa","durum"],"noun":("die","Verfassung","Verfassungen")},
+ "grundgesetz":{"meanings":["Temel Yasa","anayasa"],"noun":("das","Grundgesetz","Grundgesetze")},
 }
 PRONOMINAL_USAGE={
  "damit":("bununla / bunu yaparak","mit","Önceden söylenen bir nesneye, olaya veya duruma tekrar ad vermeden gönderme yapar."),
