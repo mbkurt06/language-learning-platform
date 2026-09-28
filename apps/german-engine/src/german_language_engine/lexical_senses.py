@@ -60,8 +60,18 @@ class SQLiteLexicalSenseProvider:
         senses=self.lookup(lemma,pos,surface)
         if not senses: return None
         token=next((t for t in tokens if t.i==token_index),None)
-        reflexive_words={"sich","mich","dich","uns","euch"}
-        reflexive=any(t.text.casefold() in reflexive_words and (t.head==token_index or (token and t.head==token.head)) for t in tokens)
+        # A personal pronoun is reflexive only when it refers back to the clause subject.
+        # "Er versucht, mich aufzuhalten" has an accusative object, not reflexive "mich".
+        clause_head=(token.head if token and token.head is not None else token_index)
+        subject=next((t for t in tokens if token and t.dep in {"sb","nsubj"} and t.head==clause_head),None)
+        subject_person=(subject.morph.get("Person") or [None])[0] if subject else None
+        subject_number=(subject.morph.get("Number") or [None])[0] if subject else None
+        reflexive_forms={
+            ("1","Sing"):{"mich","mir"}, ("2","Sing"):{"dich","dir"},
+            ("1","Plur"):{"uns"}, ("2","Plur"):{"euch"},
+        }
+        expected=reflexive_forms.get((subject_person,subject_number),{"sich"} if subject else set())
+        reflexive=any(t.text.casefold() in expected and t.head==token_index for t in tokens)
         has_object=any(t.head==token_index and (t.dep in {"oa","obj","oc"} or "Acc" in t.morph.get("Case",[])) for t in tokens)
         def score(sense):
             tags=set(sense.tags); value=0
