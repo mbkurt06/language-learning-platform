@@ -14,7 +14,9 @@
     "http://127.0.0.1/*",
     "http://localhost/*",
     "https://api.zdf.de/*",
-    "https://zdf-prod-futura.zdf.de/*"
+    "https://zdf-prod-futura.zdf.de/*",
+    "https://utstreaming.zdf.de/*",
+    "https://*.akamaized.net/*"
   ],
   "content_scripts": [
     {

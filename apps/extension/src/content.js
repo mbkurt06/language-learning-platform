@@ -49,7 +49,8 @@
       panelSelectedGroupKey:"",
       wordsView:"overview",
       wordsSearch:"",
-    }
+    },
+    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null}
   };
 
   const adapter=ADAPTERS.find(a=>a.host.test(location.hostname));
@@ -2046,10 +2047,119 @@
     }
   }
 
+
+  function cueAtTime(cues,timeMs){
+    if(!Array.isArray(cues)) return null;
+    return cues.find(cue=>timeMs>=cue.startMs && timeMs<cue.endMs) || null;
+  }
+
+  function ensureZdfOverlay(){
+    const video=document.querySelector("video");
+    if(!video) return null;
+    const host=video.parentElement || document.documentElement;
+    let overlay=host.querySelector?.(".gle-zdf-overlay");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.className="gle-youtube-overlay gle-zdf-overlay";
+      overlay.hidden=true;
+      const germanLine=document.createElement("div");
+      germanLine.className="gle-youtube-german";
+      overlay.appendChild(germanLine);
+      host.appendChild(overlay);
+    }
+    state.zdf.overlay=overlay;
+    state.zdf.germanLine=overlay.querySelector(".gle-youtube-german");
+    return {video,overlay,germanLine:state.zdf.germanLine};
+  }
+
+  function renderZdfCue(mediaTime){
+    const cues=state.zdf.cues;
+    const ui=ensureZdfOverlay();
+    if(!cues?.length || !ui) return false;
+    const seconds=Number.isFinite(mediaTime)?mediaTime:ui.video.currentTime;
+    const cue=cueAtTime(cues,seconds*1000);
+    if(!cue){
+      ui.overlay.hidden=true;
+      state.zdf.cueIndex=-1;
+      return true;
+    }
+    ui.overlay.hidden=false;
+    if(state.zdf.cueIndex!==cue.index){
+      state.zdf.cueIndex=cue.index;
+      decorate(ui.germanLine,cue.text);
+    }
+    return true;
+  }
+
+  function bindZdfVideo(){
+    const video=document.querySelector("video");
+    if(!video || video===state.zdf.video) return video;
+    if(state.zdf.video && state.zdf.videoListeners){
+      ["timeupdate","seeking","seeked","play","pause","ratechange"].forEach(type=>
+        state.zdf.video.removeEventListener(type,state.zdf.videoListeners)
+      );
+      if(state.zdf.frameId!==null && state.zdf.video.cancelVideoFrameCallback){
+        state.zdf.video.cancelVideoFrameCallback(state.zdf.frameId);
+      }
+    }
+    state.zdf.video=video;
+    state.zdf.videoListeners=()=>renderZdfCue();
+    ["timeupdate","seeking","seeked","play","pause","ratechange"].forEach(type=>
+      video.addEventListener(type,state.zdf.videoListeners)
+    );
+    if(video.requestVideoFrameCallback){
+      const onFrame=(_now,metadata)=>{
+        if(state.zdf.video!==video) return;
+        renderZdfCue(metadata.mediaTime);
+        state.zdf.frameId=video.requestVideoFrameCallback(onFrame);
+      };
+      state.zdf.frameId=video.requestVideoFrameCallback(onFrame);
+    }
+    return video;
+  }
+
+  async function loadZdfTimedSubtitles(){
+    if(adapter.id!=="zdf" || state.zdf.loading) return;
+    const videoId=globalThis.GLEZdfProvider?.zdfVideoId(location.href);
+    if(!videoId) return;
+    if(state.zdf.loaded && state.zdf.videoId===videoId) {
+      bindZdfVideo();
+      renderZdfCue();
+      return;
+    }
+    state.zdf.loading=true;
+    state.zdf.videoId=videoId;
+    state.zdf.error="";
+    try{
+      const tracks=await globalThis.GLEZdfProvider.discoverSubtitleTracks(videoId);
+      const german=tracks.find(track=>/^(de|deu|ger)(-|$)/i.test(track.language||"")) || tracks[0];
+      if(!german) throw new Error("missing-zdf-subtitle-track");
+      const response=await fetch(german.url,{cache:"no-store"});
+      if(!response.ok) throw new Error("zdf-subtitle-http-"+response.status);
+      const cues=globalThis.GLEZdfProvider.parseTtmlCues(await response.text());
+      if(!cues.length) throw new Error("empty-zdf-subtitles");
+      state.zdf.cues=cues;
+      state.zdf.cueIndex=-1;
+      state.zdf.loaded=true;
+      bindZdfVideo();
+      renderZdfCue();
+    }catch(error){
+      state.zdf.error=String(error?.message||error);
+      state.zdf.loaded=false;
+      console.warn("ZDF timed subtitles unavailable",error);
+    }finally{
+      state.zdf.loading=false;
+    }
+  }
+
   function scan(){
     if(adapter.id==="youtube"){
       scanYouTube();
       return;
+    }
+    if(adapter.id==="zdf"){
+      loadZdfTimedSubtitles();
+      if(state.zdf.loaded){ bindZdfVideo(); renderZdfCue(); return; }
     }
 
     for(const selector of adapter.selectors){

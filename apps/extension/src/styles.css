@@ -209,3 +209,7 @@
 }
 .gle-expression-learn:hover{background:#25172f;color:#fff}
 .gle-expression-learn.active{background:#3a2a13;color:#fbbf24;border-color:#8b6a1f}
+
+/* ZDF timed subtitle overlay reuses the proven YouTube typography without hiding ZDF native captions. */
+.gle-zdf-overlay{pointer-events:auto;left:50%;transform:translate(-50%,-100%);top:88%;z-index:2147483645;}
+.gle-zdf-overlay .gle-youtube-german{pointer-events:auto;}
