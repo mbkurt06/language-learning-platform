@@ -222,7 +222,7 @@ def parse_parseme_files(paths: list[Path], min_count: int) -> list[Candidate]:
 def _fixed_verbframe_slots(frame: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
     slots: list[dict[str, Any]] = []
     canonical_parts: list[str] = []
-    ignored = {"vfin", "optional", "mandatory", "forbidden", "synsets"}
+    ignored = {"vfin", "optional", "mandatory", "forbidden", "synsets", "synsetIds"}
     seq = 0
 
     for key, value in frame.items():
@@ -235,8 +235,14 @@ def _fixed_verbframe_slots(frame: dict[str, Any]) -> tuple[list[dict[str, Any]],
             continue
 
         if "+" in key:
-            prep, raw_case = key.rsplit("+", 1)
-            case_map = {"A": "Acc", "D": "Dat", "G": "Gen"}
+            # VerbframesDE can encode alternatives such as
+            # "von+D/bei+D" or "mit+D/per+D/mittels+G". For the review queue
+            # preserve the first governed preposition as the structural slot and
+            # record the remaining alternatives in notes during review rather than
+            # creating an invalid compound preposition.
+            first_variant = key.split("/", 1)[0]
+            prep, raw_case = first_variant.rsplit("+", 1)
+            case_map = {"A": "Acc", "D": "Dat", "G": "Gen", "N": "Nom"}
             slot: dict[str, Any] = {"id": f"prep_{seq}", "type": "PREPOSITION", "prep": prep}
             if raw_case in case_map:
                 slot["case"] = [case_map[raw_case]]
