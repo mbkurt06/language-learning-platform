@@ -147,3 +147,17 @@
   top:42%!important;bottom:auto!important;height:54px!important;transform:translateY(-50%)!important;
   width:46px!important;min-width:46px!important
 }
+
+
+.gle-expression-groups{padding:14px;border-bottom:1px solid #2a2a31;background:#0f0f12}
+.gle-expression-groups>h3{margin:0 0 12px;color:#e4e4e7;font-size:13px;letter-spacing:.03em}
+.gle-expression-subgroup{margin:0 0 12px}.gle-expression-subgroup:last-child{margin-bottom:0}
+.gle-expression-subgroup h4{margin:0 0 7px;color:#a78bfa;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.gle-expression-grid{display:flex;flex-wrap:wrap;gap:7px}
+.gle-expression-chip{
+  appearance:none;display:flex;align-items:center;gap:7px;border:1px solid #4b3a61;border-radius:9px;background:#1b1422;color:#f4f4f5;
+  padding:7px 9px;font:650 13px/1 system-ui,-apple-system,sans-serif;cursor:pointer
+}
+.gle-expression-chip:hover{border-color:#a855f7;background:#25172f}
+.gle-expression-chip b{color:#c4b5fd;font-size:11px}
+.gle-groups-loading,.gle-groups-empty{padding:9px 0;color:#8f8f9b;font-size:12px}

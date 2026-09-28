@@ -42,6 +42,10 @@
       panelDocked:false,
       videoUnknownLemmas:new Set(),
       transcriptAnalysisPromise:null,
+      expressionGroupsAnalysis:null,
+      expressionGroupsVideoId:"",
+      expressionGroupsPromise:null,
+      panelSelectedGroupKey:"",
     }
   };
 
@@ -781,7 +785,11 @@
     state.youtube.transcriptAnalysisVideoId="";
     state.youtube.transcriptAnalysisRun+=1;
     state.youtube.transcriptAnalysisPromise=null;
+    state.youtube.expressionGroupsAnalysis=null;
+    state.youtube.expressionGroupsVideoId="";
+    state.youtube.expressionGroupsPromise=null;
     state.youtube.panelSelectedLemma="";
+    state.youtube.panelSelectedGroupKey="";
     state.youtube.videoUnknownLemmas=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
@@ -926,6 +934,7 @@
       button.addEventListener("click",()=>{
         state.youtube.panelTab=button.dataset.tab;
         state.youtube.panelSelectedLemma="";
+        state.youtube.panelSelectedGroupKey="";
         renderYouTubeSidePanel();
       });
     });
@@ -979,6 +988,90 @@
     renderYouTubeSidePanel();
   }
 
+  function expressionGroupsCacheKey(){
+    const cues=state.youtube.cues||[];
+    const first=cues[0];
+    const last=cues[cues.length-1];
+    return "gleExpressionGroups:v1:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
+  }
+
+  async function analyzeWholeYouTubeExpressionGroups(){
+    const videoId=state.youtube.videoId;
+    const cues=state.youtube.cues||[];
+    if(!videoId || !cues.length) return;
+    if(state.youtube.expressionGroupsVideoId===videoId && state.youtube.expressionGroupsAnalysis) return;
+    if(state.youtube.expressionGroupsVideoId===videoId && state.youtube.expressionGroupsPromise) return state.youtube.expressionGroupsPromise;
+
+    state.youtube.expressionGroupsVideoId=videoId;
+    const task=(async()=>{
+      const cacheKey=expressionGroupsCacheKey();
+      try{
+        const cached=await chrome.storage.local.get(cacheKey);
+        if(Array.isArray(cached[cacheKey])){
+          state.youtube.expressionGroupsAnalysis=cached[cacheKey];
+          if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+          return;
+        }
+      }catch(_error){}
+
+      try{
+        const apiBase=await platformApiBase();
+        const items=[];
+        const batchSize=120;
+        for(let offset=0;offset<cues.length;offset+=batchSize){
+          const chunk=cues.slice(offset,offset+batchSize);
+          const response=await fetch(apiBase+"/api/v1/expression-groups-batch",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({source_language:"de",texts:chunk.map(cue=>cue.text)}),
+          });
+          if(!response.ok) throw new Error("expression group analysis "+response.status);
+          const payload=await response.json();
+          (payload.items||[]).forEach((item,index)=>items.push({item,cueIndex:offset+index}));
+        }
+
+        const grouped=new Map();
+        for(const {item,cueIndex} of items){
+          for(const expression of item.expressions||[]){
+            const key=String(expression.type||"")+"|"+String(expression.pattern_id||expression.canonical||"");
+            let entry=grouped.get(key);
+            if(!entry){
+              entry={
+                key,
+                type:String(expression.type||""),
+                patternId:String(expression.pattern_id||""),
+                canonical:String(expression.canonical||expression.surface||""),
+                count:0,
+                forms:new Set(),
+                occurrences:[],
+              };
+              grouped.set(key,entry);
+            }
+            entry.count+=1;
+            if(expression.surface) entry.forms.add(String(expression.surface));
+            if(!entry.occurrences.includes(cueIndex)) entry.occurrences.push(cueIndex);
+          }
+        }
+
+        const analysis=[...grouped.values()]
+          .map(entry=>({...entry,forms:[...entry.forms]}))
+          .sort((a,b)=>b.count-a.count || a.canonical.localeCompare(b.canonical,"de"));
+        state.youtube.expressionGroupsAnalysis=analysis;
+        chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
+        if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+      }catch(error){
+        console.warn("Video expression group analysis failed",error);
+        state.youtube.expressionGroupsAnalysis=[];
+        if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+      }finally{
+        state.youtube.expressionGroupsPromise=null;
+      }
+    })();
+
+    state.youtube.expressionGroupsPromise=task;
+    return task;
+  }
+
   function transcriptAnalysisCacheKey(){
     const cues=state.youtube.cues||[];
     const first=cues[0];
@@ -1006,6 +1099,7 @@
         if(run!==state.youtube.transcriptAnalysisRun) return;
         if(Array.isArray(cached[cacheKey])){
           state.youtube.transcriptAnalysis=cached[cacheKey];
+          analyzeWholeYouTubeExpressionGroups();
           if(state.youtube.panel) renderYouTubeSidePanel();
           return;
         }
@@ -1061,6 +1155,7 @@
 
         state.youtube.transcriptAnalysis=analysis;
         chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
+        analyzeWholeYouTubeExpressionGroups();
         if(state.youtube.panel) renderYouTubeSidePanel();
       }catch(error){
         console.warn("Video word analysis failed",error);
@@ -1128,12 +1223,72 @@
     });
   }
 
+  function expressionGroupLabel(type){
+    return ({
+      VERB_PREPOSITION:"Fiil + edat",
+      REFLEXIVE_VERB:"Refleksif fiiller",
+      REFLEXIVE_VERB_PREPOSITION:"Refleksif fiil + edat",
+      IDIOM:"Deyimler",
+      NOUN_PREPOSITION:"İsim + edat",
+      ADJECTIVE_PREPOSITION:"Sıfat + edat",
+    })[type] || type;
+  }
+
+  function expressionGroupsSection(entries){
+    if(entries===null) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-loading">Kelime grupları analiz ediliyor…</div></section>';
+    if(!entries?.length) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-empty">Bu videoda desteklenen kelime grubu bulunamadı.</div></section>';
+
+    const order=["VERB_PREPOSITION","REFLEXIVE_VERB_PREPOSITION","REFLEXIVE_VERB","IDIOM","NOUN_PREPOSITION","ADJECTIVE_PREPOSITION"];
+    const sections=order.map(type=>{
+      const items=entries.filter(entry=>entry.type===type);
+      if(!items.length) return "";
+      const chips=items.map(entry=>
+        '<button type="button" class="gle-expression-chip" data-group-key="'+escAttr(entry.key)+'">'+
+          '<span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
+        '</button>'
+      ).join("");
+      return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
+    }).join("");
+
+    return '<section class="gle-expression-groups"><h3>Kelime grupları</h3>'+sections+'</section>';
+  }
+
+  function renderExpressionGroupDetail(body,entry){
+    const cues=state.youtube.cues||[];
+    const rows=entry.occurrences.map(index=>{
+      const cue=cues[index];
+      if(!cue) return "";
+      return '<button type="button" class="gle-word-occurrence" data-cue-index="'+index+'"><span>▶</span><b>'+panelClock(cue.startMs)+'</b><em>'+esc(cue.text)+'</em></button>';
+    }).join("");
+
+    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.canonical)+'</strong><span>'+esc(expressionGroupLabel(entry.type))+' · '+entry.count+' kez</span></div></div>'+
+      '<div class="gle-word-forms">Videodaki biçimler: '+esc(entry.forms.join(", "))+'</div>'+
+      '<div class="gle-word-occurrences">'+rows+'</div>';
+
+    body.querySelector(".gle-word-back").addEventListener("click",()=>{
+      state.youtube.panelSelectedGroupKey="";
+      renderYouTubeSidePanel();
+    });
+    body.querySelectorAll(".gle-word-occurrence").forEach(button=>{
+      button.addEventListener("click",()=>playYouTubeCue(Number(button.dataset.cueIndex)));
+    });
+  }
+
   function renderPanelWords(body){
     const analysis=state.youtube.transcriptAnalysis;
     if(!analysis){
       body.innerHTML='<div class="gle-panel-empty"><b>Video kelimeleri analiz ediliyor…</b><span>Altyazıdaki kelimeler lemma bazında gruplanıyor.</span></div>';
       analyzeWholeYouTubeTranscript();
       return;
+    }
+
+    if(state.youtube.panelSelectedGroupKey){
+      const group=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===state.youtube.panelSelectedGroupKey);
+      if(group){
+        renderExpressionGroupDetail(body,group);
+        return;
+      }
+      state.youtube.panelSelectedGroupKey="";
     }
 
     if(state.youtube.panelSelectedLemma){
@@ -1151,7 +1306,19 @@
     const frequentSet=new Set(frequent.map(entry=>entry.lemma));
     const others=analysis.filter(entry=>!learningSet.has(entry.lemma) && !frequentSet.has(entry.lemma));
 
-    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+wordGroup("Bu videoda sık geçenler",frequent)+wordGroup("Diğer kelimeler",others);
+    const groups=state.youtube.expressionGroupsAnalysis;
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+
+      expressionGroupsSection(groups)+
+      wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
+      wordGroup("Bu videoda sık geçenler",frequent)+
+      wordGroup("Diğer kelimeler",others);
+    body.querySelectorAll(".gle-expression-chip").forEach(button=>{
+      button.addEventListener("click",()=>{
+        state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
+        state.youtube.panelSelectedLemma="";
+        renderYouTubeSidePanel();
+      });
+    });
     body.querySelectorAll(".gle-word-chip").forEach(button=>{
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedLemma=button.dataset.lemma;
