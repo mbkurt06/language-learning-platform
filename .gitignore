@@ -11,3 +11,7 @@ dist/
 .terraform/
 generated-inventory.ini
 .DS_Store
+
+# Local external corpora and generated lexicon review artifacts
+external/
+apps/german-engine/build/
