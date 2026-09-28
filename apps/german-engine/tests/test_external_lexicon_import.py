@@ -162,3 +162,32 @@ def test_parseme_vid_fixed_particle_expression_is_normalized(tmp_path: Path):
     assert len(items) == 1
     assert items[0].canonical == "davon ausgehen"
     assert items[0].type == "FIXED_CONSTRUCTION"
+
+
+def test_parseme_vid_context_verified_constructions(tmp_path: Path):
+    cupt = tmp_path / "vid3.cupt"
+    cupt.write_text(
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tkam\tkommen\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n"
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tkommt\tkommen\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+    assert len(items) == 1
+    assert items[0].canonical == "es kommt zu etwas"
+    assert items[0].type == "FIXED_CONSTRUCTION"
+
+
+def test_parseme_vpc_known_prefix_fallback(tmp_path: Path):
+    cupt = tmp_path / "vpc2.cupt"
+    cupt.write_text(
+        "1\träumt\träumen\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "2\tein\tein\tX\t_\t_\t1\tdep\t_\t_\t1\n\n"
+        "1\träumt\träumen\tVERB\t_\t_\t0\troot\t_\t_\t1:VPC.full\n"
+        "2\tein\tein\tX\t_\t_\t1\tdep\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+    assert len(items) == 1
+    assert items[0].canonical == "einräumen"

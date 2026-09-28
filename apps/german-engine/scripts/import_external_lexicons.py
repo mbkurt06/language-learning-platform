@@ -123,6 +123,10 @@ VID_CANONICAL_RULES = {
     ("es", "geben"): ("es gibt", "FIXED_CONSTRUCTION"),
     ("heißen", "es"): ("es heißt", "FIXED_CONSTRUCTION"),
     ("es", "heißen"): ("es heißt", "FIXED_CONSTRUCTION"),
+    ("kommen", "es"): ("es kommt zu etwas", "FIXED_CONSTRUCTION"),
+    ("es", "kommen"): ("es kommt zu etwas", "FIXED_CONSTRUCTION"),
+    ("gelten", "es"): ("es gilt, etwas zu tun", "FIXED_CONSTRUCTION"),
+    ("es", "gelten"): ("es gilt, etwas zu tun", "FIXED_CONSTRUCTION"),
     ("handeln", "es", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
     ("es", "handeln", "sich"): ("es handelt sich", "FIXED_CONSTRUCTION"),
     ("gehen", "davon", "aus"): ("davon ausgehen", "FIXED_CONSTRUCTION"),
@@ -160,6 +164,13 @@ def canonicalize_parseme(category: str, members: list[dict[str, Any]]) -> tuple[
             # German separable verbs are written as one infinitive in dictionary form:
             # statt + finden -> stattfinden, mit + teilen -> mitteilen.
             return "".join(particles) + head_lemma, head_lemma, None
+
+        # Some PARSEME/German tag combinations do not mark a separable prefix
+        # with a particle-like UPOS/deprel even though the MWE category is VPC.
+        # Keep a tiny explicit fallback for observed high-confidence cases.
+        raw_non_verbs = tuple(clean_lemma(item).lower() for item in non_verbs)
+        if head_lemma == "räumen" and raw_non_verbs == ("ein",):
+            return "einräumen", head_lemma, None
 
     parts: list[str] = []
     for item in members:
