@@ -1048,6 +1048,8 @@
                 count:0,
                 forms:new Set(),
                 occurrences:[],
+                meaningTr:expression.contextual_meaning_tr || (expression.meaning_tr||[])[0] || "",
+                grammarHint:expression.grammar_hint || "",
               };
               grouped.set(key,entry);
             }
@@ -1269,11 +1271,15 @@
     const sections=order.map(type=>{
       const items=entries.filter(entry=>entry.type===type);
       if(!items.length) return "";
-      const chips=items.map(entry=>
-        '<button type="button" class="gle-expression-chip" data-group-key="'+escAttr(entry.key)+'">'+
-          '<span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
-        '</button>'
-      ).join("");
+      const chips=items.map(entry=>{
+        const learning=isLearning("expression",entry.patternId||entry.canonical);
+        return '<div class="gle-expression-chip-wrap">'+
+          '<button type="button" class="gle-expression-chip'+(learning?" learning":"")+'" data-group-key="'+escAttr(entry.key)+'">'+
+            '<span>'+(learning?"★ ":"")+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
+          '</button>'+
+          '<button type="button" class="gle-expression-learn'+(learning?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle")+'">'+(learning?"✓":"+")+'</button>'+
+        '</div>';
+      }).join("");
       return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
     }).join("");
 
@@ -1350,6 +1356,91 @@
     }catch(_error){}
   }
 
+  async function showPanelExpressionTooltip(button,entry){
+    const cueIndex=entry?.occurrences?.[0];
+    const cue=(state.youtube.cues||[])[cueIndex];
+    if(!cue?.text) return;
+    try{
+      const data=await analyze(cue.text);
+      const expression=(data.expressions||[]).find(expr=>
+        (entry.patternId && expr.pattern_id===entry.patternId) ||
+        String(expr.canonical||"").toLocaleLowerCase("de-DE")===String(entry.canonical||"").toLocaleLowerCase("de-DE")
+      );
+      const tokenIndex=expression?.token_indices?.[0];
+      if(Number.isInteger(tokenIndex)){
+        renderCard(data,tokenIndex,button);
+        return;
+      }
+    }catch(_error){}
+
+    cancelTooltipHide();
+    const learning=isLearning("expression",entry.patternId||entry.canonical);
+    state.tooltip.innerHTML=
+      '<div class="gle-hover-head"><b>'+esc(entry.canonical)+'</b><span>'+esc(expressionGroupLabel(entry.type))+'</span></div>'+
+      (entry.meaningTr?'<div class="gle-context gle-context-primary"><b>Anlam:</b> '+esc(entry.meaningTr)+'</div>':"")+
+      (entry.grammarHint?'<div class="gle-note"><b>Yapı:</b> '+esc(entry.grammarHint)+'</div>':"")+
+      '<div class="gle-learn-actions"><button type="button" class="gle-learn-button gle-expression-tooltip-learn">'+(learning?"★":"☆")+' <span>Öğren</span></button></div>';
+
+    const learnButton=state.tooltip.querySelector(".gle-expression-tooltip-learn");
+    learnButton?.addEventListener("click",async()=>{
+      learnButton.disabled=true;
+      try{
+        const key=entry.patternId||entry.canonical;
+        if(isLearning("expression",key)){
+          await removeLearningItem("expression",key);
+        }else{
+          await saveLearningItem({
+            kind:"expression",
+            key,
+            label:entry.canonical,
+            meaning_tr:entry.meaningTr||"",
+            surface:entry.forms?.[0]||entry.canonical,
+          });
+        }
+        renderYouTubeSidePanel();
+        state.tooltip.hidden=true;
+      }finally{
+        learnButton.disabled=false;
+      }
+    });
+
+    const r=button.getBoundingClientRect();
+    state.tooltip.hidden=false;
+    state.tooltip.style.left=Math.min(window.innerWidth-370,Math.max(8,r.left))+"px";
+    state.tooltip.style.top=Math.max(8,r.top-state.tooltip.offsetHeight-10)+"px";
+  }
+
+  async function toggleExpressionLearning(entry){
+    const key=entry.patternId||entry.canonical;
+    if(!key) return;
+    if(isLearning("expression",key)){
+      await removeLearningItem("expression",key);
+    }else{
+      const cueIndex=entry.occurrences?.[0];
+      const cue=(state.youtube.cues||[])[cueIndex];
+      const encounterSnapshot=cue ? {
+        surface_form:entry.forms?.[0]||entry.canonical,
+        sentence:cue.text,
+        provider:"youtube",
+        source_type:"video",
+        external_id:state.youtube.videoId,
+        url:"https://www.youtube.com/watch?v="+encodeURIComponent(state.youtube.videoId),
+        title:currentYouTubeTitle(),
+        media_timestamp_ms:Math.round(cue.startMs),
+        media_end_timestamp_ms:Math.round(cue.endMs),
+        context:{cue_index:cue.index ?? cueIndex,page_url:location.href},
+      } : null;
+      await saveLearningItem({
+        kind:"expression",
+        key,
+        label:entry.canonical,
+        meaning_tr:entry.meaningTr||"",
+        surface:entry.forms?.[0]||entry.canonical,
+      },encounterSnapshot);
+    }
+    renderYouTubeSidePanel();
+  }
+
   function bindPanelWordControls(body,analysis){
     body.querySelectorAll("[data-words-view]").forEach(button=>{
       button.addEventListener("click",()=>{
@@ -1395,10 +1486,36 @@
     });
 
     body.querySelectorAll(".gle-expression-chip").forEach(button=>{
+      const entry=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===button.dataset.groupKey);
+      let hoverTimer=null;
+      button.addEventListener("mouseenter",()=>{
+        hoverTimer=setTimeout(()=>showPanelExpressionTooltip(button,entry),180);
+      });
+      button.addEventListener("mouseleave",event=>{
+        clearTimeout(hoverTimer);
+        const next=event.relatedTarget;
+        if(next && state.tooltip?.contains(next)) return;
+        scheduleTooltipHide(850);
+      });
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
         state.youtube.panelSelectedLemma="";
         renderYouTubeSidePanel();
+      });
+    });
+
+    body.querySelectorAll(".gle-expression-learn").forEach(button=>{
+      button.addEventListener("click",async event=>{
+        event.stopPropagation();
+        const entry=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===button.dataset.groupLearnKey);
+        if(!entry) return;
+        button.disabled=true;
+        try{
+          await toggleExpressionLearning(entry);
+        }catch(error){
+          console.warn("Expression learning sync failed",error);
+          button.disabled=false;
+        }
       });
     });
 

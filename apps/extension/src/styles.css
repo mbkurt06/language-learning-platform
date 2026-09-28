@@ -178,3 +178,14 @@
   font:13px/1.2 system-ui,-apple-system,sans-serif
 }
 .gle-word-search input::placeholder{color:#777782}
+
+
+.gle-expression-chip-wrap{display:inline-flex;align-items:stretch;border-radius:9px;overflow:hidden}
+.gle-expression-chip-wrap .gle-expression-chip{border-radius:9px 0 0 9px}
+.gle-expression-chip.learning{border-color:#f59e0b;background:#2a2111}
+.gle-expression-learn{
+  appearance:none;border:1px solid #4b3a61;border-left:0;border-radius:0 9px 9px 0;background:#161219;color:#b9a3cf;
+  min-width:30px;padding:0 8px;font:800 14px/1 system-ui,-apple-system,sans-serif;cursor:pointer
+}
+.gle-expression-learn:hover{background:#25172f;color:#fff}
+.gle-expression-learn.active{background:#3a2a13;color:#fbbf24;border-color:#8b6a1f}
