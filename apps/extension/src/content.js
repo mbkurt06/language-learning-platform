@@ -2066,13 +2066,13 @@
     if(!panel) return;
     const body=panel.querySelector(".gle-zdf-panel-body");
     if(!body) return;
-    const status=state.zdf.loading
-      ? "Altyazı yükleniyor…"
-      : state.zdf.loaded
+    const status=state.zdf.error
+      ? "Altyazı hatası"
+      : state.zdf.loading
+        ? "Altyazı yükleniyor…"
+        : state.zdf.loaded
         ? "Altyazı hazır · "+(state.zdf.cues?.length||0)+" cue"
-        : state.zdf.error
-          ? "Altyazı hatası"
-          : "ZDF videosu algılandı";
+        : "ZDF videosu algılandı";
     body.textContent="";
     const statusNode=document.createElement("div");
     statusNode.className="gle-zdf-status";
@@ -2169,6 +2169,19 @@
     return video;
   }
 
+  async function extensionFetch(url,options={}){
+    const result=await chrome.runtime.sendMessage({type:"gle-zdf-fetch",url,options});
+    if(!result) throw new Error("extension-fetch-no-response");
+    if(result.error && !result.status) throw new Error(result.error);
+    return {
+      ok:Boolean(result.ok),
+      status:Number(result.status||0),
+      statusText:result.statusText||"",
+      text:async()=>result.body||"",
+      json:async()=>JSON.parse(result.body||"null"),
+    };
+  }
+
   async function loadZdfTimedSubtitles(){
     if(adapter.id!=="zdf" || state.zdf.loading) return;
     const videoId=globalThis.GLEZdfProvider?.zdfVideoId(location.href);
@@ -2184,10 +2197,12 @@
     renderZdfPanel();
     state.zdf.error="";
     try{
-      const tracks=await globalThis.GLEZdfProvider.discoverSubtitleTracks(videoId);
+      const tracks=await globalThis.GLEZdfProvider.discoverSubtitleTracks(videoId,extensionFetch);
       const german=tracks.find(track=>/^(de|deu|ger)(-|$)/i.test(track.language||"")) || tracks[0];
       if(!german) throw new Error("missing-zdf-subtitle-track");
-      const response=await fetch(german.url,{cache:"no-store"});
+      let response;
+      try { response=await extensionFetch(german.url,{cache:"no-store"}); }
+      catch(error){ throw new Error("zdf-subtitle-fetch: "+String(error?.message||error)); }
       if(!response.ok) throw new Error("zdf-subtitle-http-"+response.status);
       const cues=globalThis.GLEZdfProvider.parseTtmlCues(await response.text());
       if(!cues.length) throw new Error("empty-zdf-subtitles");

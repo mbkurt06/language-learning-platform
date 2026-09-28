@@ -105,13 +105,17 @@
 
   async function discoverSubtitleTracks(canonical, fetchImpl = fetch) {
     if (!canonical) throw new Error("missing-zdf-canonical");
-    const tokenResponse = await fetchImpl(TOKEN_URL, {cache:"no-store"});
+    let tokenResponse;
+    try { tokenResponse = await fetchImpl(TOKEN_URL, {cache:"no-store"}); }
+    catch (error) { throw new Error("zdf-token-fetch: "+String(error?.message||error)); }
     if (!tokenResponse.ok) throw new Error(`zdf-token-http-${tokenResponse.status}`);
     const authorization = apiAuthorization(await tokenResponse.json());
     if (!authorization) throw new Error("invalid-zdf-token");
 
     const metadataRequest = videoMetadataRequest(canonical, authorization);
-    const metadataResponse = await fetchImpl(metadataRequest.url, metadataRequest.options);
+    let metadataResponse;
+    try { metadataResponse = await fetchImpl(metadataRequest.url, metadataRequest.options); }
+    catch (error) { throw new Error("zdf-metadata-fetch: "+String(error?.message||error)); }
     if (!metadataResponse.ok) throw new Error(`zdf-metadata-http-${metadataResponse.status}`);
     const ptmdUrls = ptmdTemplatesFromMetadata(await metadataResponse.json());
     if (!ptmdUrls.length) throw new Error("missing-zdf-ptmd");
@@ -119,7 +123,9 @@
     const tracks = [];
     const seen = new Set();
     for (const ptmdUrl of ptmdUrls) {
-      const response = await fetchImpl(ptmdUrl, {headers:{"Api-Auth":authorization}, cache:"no-store"});
+      let response;
+      try { response = await fetchImpl(ptmdUrl, {headers:{"Api-Auth":authorization}, cache:"no-store"}); }
+      catch (error) { throw new Error("zdf-ptmd-fetch: "+String(error?.message||error)); }
       if (!response.ok) continue;
       for (const track of subtitleTracksFromPtmd(await response.json())) {
         if (seen.has(track.url)) continue;
