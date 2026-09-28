@@ -61,7 +61,7 @@
     document.documentElement.style.setProperty("--gle-german-font-scale",(Number(state.settings.germanFontSize||100)/100).toFixed(2));
     document.documentElement.style.setProperty("--gle-translation-font-scale",(Number(state.settings.translationFontSize||100)/100).toFixed(2));
     document.documentElement.classList.toggle("gle-extension-disabled",state.settings.extensionEnabled===false);
-    applySharedAppearance();
+    applyYouTubeAppearance();
   }
 
   function ensurePlayerControls(){
@@ -1027,6 +1027,14 @@
 
   function syncYouTubePanelHost(){
     const panel=state.youtube.panel;
+    if(adapter.id==="zdf"){
+      if(!panel) return;
+      if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
+      panel.classList.add("gle-zdf-shared-panel");
+      document.documentElement.classList.toggle("gle-zdf-panel-open",!state.youtube.panelCollapsed);
+      state.youtube.panelDocked=true;
+      return;
+    }
     const player=document.querySelector(".html5-video-player");
     if(!panel || !player) return;
 
@@ -1059,7 +1067,7 @@
   }
 
   function ensureYouTubeSidePanel(){
-    if(adapter.id!=="youtube") return null;
+    if(!["youtube","zdf"].includes(adapter.id)) return null;
     if(state.youtube.panel?.isConnected){
       syncYouTubePanelHost();
       return state.youtube.panel;
@@ -2119,50 +2127,20 @@
 
   function ensureZdfPanel(){
     if(adapter.id!=="zdf") return null;
-    if(state.zdf.panel?.isConnected) return state.zdf.panel;
-    const panel=document.createElement("aside");
-    panel.id="gle-zdf-panel";
-    panel.innerHTML='<div class="gle-zdf-panel-head"><strong>Language Learning · ZDF</strong></div><div class="gle-zdf-panel-body"></div>';
-    document.documentElement.appendChild(panel);
-    state.zdf.panel=panel;
-    renderZdfPanel();
-    return panel;
+    return ensureYouTubeSidePanel();
   }
 
   function renderZdfPanel(){
-    const panel=state.zdf.panel;
-    if(!panel) return;
-    const body=panel.querySelector(".gle-zdf-panel-body");
-    if(!body) return;
-    const status=state.zdf.error
-      ? "Altyazı hatası"
-      : state.zdf.loading
-        ? "Altyazı yükleniyor…"
-        : state.zdf.loaded
-        ? "Altyazı hazır · "+(state.zdf.cues?.length||0)+" cue"
-        : "ZDF videosu algılandı";
-    body.textContent="";
-    const statusNode=document.createElement("div");
-    statusNode.className="gle-zdf-status";
-    statusNode.textContent=status;
-    body.appendChild(statusNode);
-    const idNode=document.createElement("div");
-    idNode.className="gle-zdf-video-id";
-    idNode.textContent="Video: "+(state.zdf.videoId||globalThis.GLEZdfProvider?.zdfVideoId(location.href)||"—");
-    body.appendChild(idNode);
-    if(state.zdf.error){
-      const errorNode=document.createElement("pre");
-      errorNode.className="gle-zdf-error";
-      errorNode.textContent=state.zdf.error;
-      body.appendChild(errorNode);
-    }
-    if(state.zdf.loaded && state.zdf.cues?.length){
-      const cue=state.zdf.cues[state.zdf.cueIndex] || state.zdf.cues[0];
-      const cueNode=document.createElement("div");
-      cueNode.className="gle-zdf-current-cue";
-      cueNode.textContent=cue?.text||"";
-      body.appendChild(cueNode);
-    }
+    if(adapter.id!=="zdf") return;
+    renderYouTubeSidePanel();
+  }
+
+  function adoptZdfMediaForSharedPanel(){
+    state.youtube.videoId=state.zdf.videoId;
+    state.youtube.video=state.zdf.video;
+    state.youtube.cues=state.zdf.cues;
+    state.youtube.cueIndex=state.zdf.cueIndex;
+    state.youtube.timedAvailable=Boolean(state.zdf.loaded);
   }
 
   function cueAtTime(cues,timeMs){
@@ -2198,14 +2176,16 @@
     if(!cue){
       ui.overlay.hidden=true;
       state.zdf.cueIndex=-1;
-      renderZdfPanel();
+      state.youtube.cueIndex=-1;
+      updatePanelActiveCue();
       return true;
     }
     ui.overlay.hidden=false;
     if(state.zdf.cueIndex!==cue.index){
       state.zdf.cueIndex=cue.index;
+      state.youtube.cueIndex=cue.index;
       decorate(ui.germanLine,cue.text);
-      renderZdfPanel();
+      updatePanelActiveCue();
     }
     return true;
   }
@@ -2277,17 +2257,25 @@
       state.zdf.cues=cues;
       state.zdf.cueIndex=-1;
       state.zdf.loaded=true;
-      renderZdfPanel();
       bindZdfVideo();
+      adoptZdfMediaForSharedPanel();
+      ensureYouTubeSidePanel();
+      Promise.all([loadVideoUnknownLemmas(),loadVideoUnknownExpressions()]).then(()=>{
+        renderYouTubeSidePanel();
+        refreshLearningHighlights();
+      });
+      renderYouTubeSidePanel();
+      analyzeWholeYouTubeTranscript();
+      analyzeWholeYouTubeExpressionGroups();
       renderZdfCue();
     }catch(error){
       state.zdf.error=String(error?.message||error);
       state.zdf.loaded=false;
-      renderZdfPanel();
+      renderYouTubeSidePanel();
       console.warn("ZDF timed subtitles unavailable",error);
     }finally{
       state.zdf.loading=false;
-      renderZdfPanel();
+      renderYouTubeSidePanel();
     }
   }
 
@@ -2320,6 +2308,11 @@
     youtubeSubtitlePositionY:82
   },settings=>{
     state.settings=settings;
+    if(adapter.id==="zdf" && Number(state.settings.germanFontSize)===100 && Number(state.settings.translationFontSize)===100){
+      state.settings.germanFontSize=115;
+      state.settings.translationFontSize=115;
+      chrome.storage.sync.set({germanFontSize:115,translationFontSize:115});
+    }
     ensurePlayerControls();
     applySharedAppearance();
     scan();
