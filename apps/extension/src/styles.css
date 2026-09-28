@@ -707,3 +707,12 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
 :fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
   right:0!important
 }
+
+
+/* Transcript translations are first-class subtitle lines, not metadata. */
+.gle-transcript-row .gle-row-translation{
+  font-size:inherit!important;
+  line-height:inherit!important;
+  opacity:.92!important;
+  margin-top:4px!important;
+}
