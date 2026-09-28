@@ -18,9 +18,24 @@ def _db(tmp_path):
 
 def test_form_normalization_uses_dictionary_lemma(tmp_path):
     p=SQLiteLexicalSenseProvider(_db(tmp_path))
-    assert p.canonical_lemma("ausgeschlafen","ausschlafen")=="ausschlafen"
-    assert p.canonical_lemma("ausgeschlafen","ausgeschlafen")=="ausschlafen"
-    assert p.canonical_lemma("aufzuhalten","aufhalten")=="aufhalten"
+    assert p.canonical_lemma("ausgeschlafen","ausschlafen","VERB")=="ausschlafen"
+    assert p.canonical_lemma("ausgeschlafen","ausgeschlafen","VERB")=="ausschlafen"
+    assert p.canonical_lemma("aufzuhalten","aufhalten","VERB")=="aufhalten"
+
+def test_canonical_lemma_prefers_matching_pos_and_normalizes_case(tmp_path):
+    path=_db(tmp_path); db=sqlite3.connect(path)
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("abbr-er","ER","ABBREV",0,"",json.dumps(["x"]),"[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("noun-er","Er","NOUN",0,"",json.dumps(["x"]),"[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("pron-er","Er","PRON",0,"",json.dumps(["o"]),"[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("abbr-ach","ACh","ABBREV",0,"",json.dumps(["x"]),"[]",None,None))
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("intj-ach","ach","INTJ",0,"",json.dumps(["aman"]),"[]",None,None))
+    db.commit(); db.close()
+
+    p=SQLiteLexicalSenseProvider(path)
+    assert p.canonical_lemma("Er","er","PRON")=="er"
+    assert p.canonical_lemma("ach","ach","INTJ")=="ach"
+    assert p.lookup("er","PRON","Er")[0].sense_id=="pron-er"
+    assert p.lookup("ach","INTJ","ach")[0].sense_id=="intj-ach"
 
 def test_senses_keep_stable_ids_and_turkish_glosses(tmp_path):
     p=SQLiteLexicalSenseProvider(_db(tmp_path)); senses=p.lookup("aufhalten","VERB","aufzuhalten")

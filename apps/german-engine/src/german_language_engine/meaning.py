@@ -323,7 +323,7 @@ class MeaningResolver:
    for index in expression.token_indices: by_token.setdefault(index,[]).append(expression)
   output=[]
   for token in tokens:
-   canonical_lemma=self.lexical_sense_provider.canonical_lemma(token.text,token.lemma)
+   canonical_lemma=self.lexical_sense_provider.canonical_lemma(token.text,token.lemma,token.pos)
    entry=SEED_WORDS.get(canonical_lemma.lower(),{})
    selected_sense=self.lexical_sense_provider.select(canonical_lemma,token.pos,token.text,tokens,token.i)
    dictionary=list(dict.fromkeys(selected_sense.meanings_tr)) if selected_sense and selected_sense.meanings_tr else self.lexical_meanings(canonical_lemma,token.pos)
