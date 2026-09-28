@@ -31,6 +31,12 @@
       domTimer:null,
       hideTimer:null,
       corpusIndexing:new Set(),
+      panel:null,
+      panelTab:"subtitles",
+      transcriptAnalysis:null,
+      transcriptAnalysisVideoId:"",
+      transcriptAnalysisRun:0,
+      previewTimer:null,
     }
   };
 
