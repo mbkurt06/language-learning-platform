@@ -84,3 +84,14 @@ def analyze_expression_groups_batch(source_language: str, texts: list[str]) -> l
         response.raise_for_status()
         payload = response.json()
         return payload.get("items", [])
+
+
+def analyze_learning_units_batch(source_language: str, texts: list[str]) -> list[dict[str, Any]]:
+    engine_url = get_settings().engine_urls().get(source_language)
+    if not engine_url:
+        raise UnsupportedLanguageError(f"No language engine configured for {source_language!r}")
+    with httpx.Client(timeout=60.0) as client:
+        response = client.post(f"{engine_url}/learning-units-batch", json={"texts": texts})
+        response.raise_for_status()
+        payload = response.json()
+        return payload.get("items", [])

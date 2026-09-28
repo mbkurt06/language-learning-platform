@@ -59,8 +59,20 @@ class HoverAnalysis(BaseModel):
     usage_notes:list[UsageNote]=Field(default_factory=list)
     dictionary_meanings_tr:list[str]=Field(default_factory=list)
 
+class LearningUnit(BaseModel):
+    id:str
+    canonical:str
+    meaning_tr:str
+    unit_type:str
+    token_indices:list[int]=Field(default_factory=list)
+    surface:str=""
+    lemma:str|None=None
+    pattern_id:str|None=None
+    lexical_form:LexicalForm|None=None
+    grammar_hint:str|None=None
+
 class Analysis(BaseModel):
     text:str; sentence_meaning_tr:str|None=None; tokens:list[Token]; expressions:list[ExpressionMatch]
     token_meanings:list[TokenMeaning]=Field(default_factory=list)
     hover:dict[int,HoverAnalysis]=Field(default_factory=dict)
-    unmatched_token_indices:list[int]; metadata:dict[str,Any]=Field(default_factory=dict)
+    unmatched_token_indices:list[int]; learning_units:list[LearningUnit]=Field(default_factory=list); metadata:dict[str,Any]=Field(default_factory=dict)

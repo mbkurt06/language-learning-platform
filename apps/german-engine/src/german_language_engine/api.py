@@ -15,11 +15,17 @@ def make_handler(engine):
    self.headers_out(200 if self.path=="/health" else 404)
    self.wfile.write(b'{"status":"ok"}' if self.path=="/health" else b'{"error":"not_found"}')
   def do_POST(self):
-   if self.path not in {"/analyze","/tokens-batch","/expression-groups-batch"}:
+   if self.path not in {"/analyze","/tokens-batch","/expression-groups-batch","/learning-units-batch"}:
     self.headers_out(404); self.wfile.write(b'{"error":"not_found"}'); return
    try:
     payload=json.loads(self.rfile.read(int(self.headers.get("Content-Length","0"))) or b"{}")
-    if self.path=="/expression-groups-batch":
+    if self.path=="/learning-units-batch":
+     texts=payload.get("texts") or []
+     if not isinstance(texts,list) or not texts: raise ValueError("texts is required")
+     if len(texts)>500: raise ValueError("max 500 texts")
+     sources=[str(text or "").strip() for text in texts]
+     body=json.dumps({"items":[{"text":source,"learning_units":[unit.model_dump(mode="json") for unit in engine.analyze(source).learning_units]} for source in sources]},ensure_ascii=False).encode()
+    elif self.path=="/expression-groups-batch":
      texts=payload.get("texts") or []
      if not isinstance(texts,list) or not texts: raise ValueError("texts is required")
      if len(texts)>500: raise ValueError("max 500 texts")
