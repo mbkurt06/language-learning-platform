@@ -300,3 +300,39 @@ def test_parseme_vid_particle_override_emits_particle_slot(tmp_path: Path):
     assert items[0].slots == [
         {"id": "particle_1", "type": "PARTICLE", "lemma": "fest"}
     ]
+
+
+def test_parseme_fixed_construction_adds_governed_preposition_slot(tmp_path: Path):
+    cupt = tmp_path / "vid_kommen.cupt"
+    cupt.write_text(
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tkam\tkommen\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n"
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\tkam\tkommen\tVERB\t_\t_\t0\troot\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "es kommt zu etwas"
+    assert {"id": "zu", "type": "PREPOSITION", "prep": "zu", "case": ["Dat"]} in items[0].slots
+
+
+def test_parseme_es_handelt_sich_gets_um_slot(tmp_path: Path):
+    cupt = tmp_path / "vid_handeln.cupt"
+    cupt.write_text(
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\thandelt\thandeln\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\tsich\tsich\tPRON\t_\t_\t2\texpl:pv\t_\t_\t1\n\n"
+        "1\tEs\tes\tPRON\t_\t_\t2\tnsubj\t_\t_\t1:VID\n"
+        "2\thandelt\thandeln\tVERB\t_\t_\t0\troot\t_\t_\t1\n"
+        "3\tsich\tsich\tPRON\t_\t_\t2\texpl:pv\t_\t_\t1\n\n",
+        encoding="utf-8",
+    )
+
+    items = MODULE.parse_parseme_files([cupt], min_count=2)
+
+    assert len(items) == 1
+    assert items[0].canonical == "es handelt sich um etwas"
+    assert {"id": "um", "type": "PREPOSITION", "prep": "um", "case": ["Acc"]} in items[0].slots
