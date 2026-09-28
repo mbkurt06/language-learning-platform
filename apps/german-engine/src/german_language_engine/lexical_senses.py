@@ -31,8 +31,18 @@ class SQLiteLexicalSenseProvider:
         self.path=str(path); self.db=sqlite3.connect(self.path,check_same_thread=False)
         self.db.row_factory=sqlite3.Row
     def canonical_lemma(self,surface:str,lemma:str)->str:
+        # Trust the NLP lemma when it is itself a real dictionary headword. This avoids
+        # ambiguous form rows such as ausgeschlafen -> ausschlafen / ausgeschlafen.
+        row=self.db.execute(
+            "select lemma from senses where lemma=? collate nocase limit 1",(lemma,)
+        ).fetchone()
+        if row: return str(row["lemma"])
         for value in (surface,lemma):
-            row=self.db.execute("select lemma from forms where form=? collate nocase limit 1",(value,)).fetchone()
+            row=self.db.execute(
+                "select lemma from forms where form=? collate nocase "
+                "order by case when lemma=? collate nocase then 1 else 0 end, lemma limit 1",
+                (value,value),
+            ).fetchone()
             if row: return str(row["lemma"])
         return lemma
     def lookup(self,lemma:str,pos:str="",surface:str="")->list[LexicalSense]:

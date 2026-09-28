@@ -8,6 +8,8 @@ def _db(tmp_path):
     create table forms(form text,lemma text,pos text,primary key(form,lemma,pos));
     """)
     db.execute("insert into forms values('ausgeschlafen','ausschlafen','VERB')")
+    db.execute("insert into forms values('ausgeschlafen','ausgeschlafen','VERB')")
+    db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("sense-ausschlafen","ausschlafen","VERB",0,"sleep until rested",json.dumps(["uykusunu almak"]),"[]",None,None))
     db.execute("insert into forms values('aufzuhalten','aufhalten','VERB')")
     db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("en-aufhalten-stop","aufhalten","VERB",0,"to halt or stop",json.dumps(["durdurmak","alıkoymak"]),"[]",None,None))
     db.execute("insert into senses values(?,?,?,?,?,?,?,?,?)",("en-aufhalten-stay","aufhalten","VERB",1,"to stay in a place",json.dumps(["bulunmak","kalmak"]),"[]",None,None))
@@ -15,6 +17,7 @@ def _db(tmp_path):
 
 def test_form_normalization_uses_dictionary_lemma(tmp_path):
     p=SQLiteLexicalSenseProvider(_db(tmp_path))
+    assert p.canonical_lemma("ausgeschlafen","ausschlafen")=="ausschlafen"
     assert p.canonical_lemma("ausgeschlafen","ausgeschlafen")=="ausschlafen"
     assert p.canonical_lemma("aufzuhalten","aufhalten")=="aufhalten"
 
