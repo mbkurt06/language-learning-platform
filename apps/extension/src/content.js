@@ -41,6 +41,7 @@
       panelCollapsed:false,
       panelDocked:false,
       videoUnknownLemmas:new Set(),
+      videoUnknownExpressions:new Set(),
       transcriptAnalysisPromise:null,
       expressionGroupsAnalysis:null,
       expressionGroupsVideoId:"",
@@ -594,6 +595,28 @@
       }
     }
 
+    for(const match of expressions){
+      const key=String(match.pattern_id||match.canonical||"").toLocaleLowerCase("de-DE");
+      if(!state.youtube.videoUnknownExpressions.has(key)) continue;
+      const visible=[];
+      mappedTokens.forEach((mapped,i)=>{
+        if(mapped && match.token_indices?.includes(mapped.i)){
+          const currentItem={
+            id:null,
+            kind:"video-unknown-expression",
+            key,
+            label:match.canonical||match.surface||key,
+            meaning_tr:match.contextual_meaning_tr||(match.meaning_tr||[])[0]||"",
+          };
+          expressionMembers.set(i,currentItem);
+          visible.push(i);
+        }
+      });
+      if(visible.length){
+        expressionBadges.set(visible[0],expressionMembers.get(visible[0]));
+      }
+    }
+
     for(const {item,surface} of seenLearningItems.values()){
       captureSeenLearningItem(item,surface);
     }
@@ -606,7 +629,7 @@
       const learningItem=expressionMembers.get(i)||learningWordLabels.get(i);
       if(learningItem){
         span.classList.add("gle-learning-item");
-        if(learningItem.kind==="video-unknown") span.classList.add("gle-video-unknown-item");
+        if(learningItem.kind==="video-unknown" || learningItem.kind==="video-unknown-expression") span.classList.add("gle-video-unknown-item");
       }
       const badgeItem=expressionBadges.get(i)||learningWordLabels.get(i);
       if(badgeItem){
@@ -795,6 +818,7 @@
     state.youtube.wordsView="overview";
     state.youtube.wordsSearch="";
     state.youtube.videoUnknownLemmas=new Set();
+    state.youtube.videoUnknownExpressions=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
     if(state.youtube.panel) renderYouTubeSidePanel();
@@ -988,6 +1012,30 @@
     if(state.youtube.videoUnknownLemmas.has(normalized)) state.youtube.videoUnknownLemmas.delete(normalized);
     else state.youtube.videoUnknownLemmas.add(normalized);
     await chrome.storage.local.set({[videoUnknownStorageKey()]:[...state.youtube.videoUnknownLemmas]});
+    refreshLearningHighlights();
+    renderYouTubeSidePanel();
+  }
+
+  function videoUnknownExpressionStorageKey(videoId=state.youtube.videoId){
+    return "gleVideoUnknownExpressions:"+String(videoId||"");
+  }
+
+  async function loadVideoUnknownExpressions(){
+    const key=videoUnknownExpressionStorageKey();
+    if(!state.youtube.videoId){
+      state.youtube.videoUnknownExpressions=new Set();
+      return;
+    }
+    const stored=await chrome.storage.local.get(key);
+    state.youtube.videoUnknownExpressions=new Set(Array.isArray(stored[key])?stored[key]:[]);
+  }
+
+  async function toggleVideoUnknownExpression(entry){
+    const key=String(entry?.patternId||entry?.canonical||"").toLocaleLowerCase("de-DE");
+    if(!key) return;
+    if(state.youtube.videoUnknownExpressions.has(key)) state.youtube.videoUnknownExpressions.delete(key);
+    else state.youtube.videoUnknownExpressions.add(key);
+    await chrome.storage.local.set({[videoUnknownExpressionStorageKey()]:[...state.youtube.videoUnknownExpressions]});
     refreshLearningHighlights();
     renderYouTubeSidePanel();
   }
@@ -1273,11 +1321,14 @@
       if(!items.length) return "";
       const chips=items.map(entry=>{
         const learning=isLearning("expression",entry.patternId||entry.canonical);
-        return '<div class="gle-expression-chip-wrap">'+
+        const videoUnknown=state.youtube.videoUnknownExpressions.has(
+          String(entry.patternId||entry.canonical||"").toLocaleLowerCase("de-DE")
+        );
+        return '<div class="gle-expression-chip-wrap'+(videoUnknown?" unknown":"")+'">'+
           '<button type="button" class="gle-expression-chip'+(learning?" learning":"")+'" data-group-key="'+escAttr(entry.key)+'">'+
             '<span>'+(learning?"★ ":"")+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
           '</button>'+
-          '<button type="button" class="gle-expression-learn'+(learning?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle")+'">'+(learning?"✓":"+")+'</button>'+
+          '<button type="button" class="gle-expression-learn'+(videoUnknown?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(videoUnknown?"Bu video için anlam gösterimini kapat":"Bu video için anlamını altyazıda göster")+'">'+(videoUnknown?"✓":"+")+'</button>'+
         '</div>';
       }).join("");
       return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
@@ -1511,9 +1562,9 @@
         if(!entry) return;
         button.disabled=true;
         try{
-          await toggleExpressionLearning(entry);
+          await toggleVideoUnknownExpression(entry);
         }catch(error){
-          console.warn("Expression learning sync failed",error);
+          console.warn("Expression video-mark sync failed",error);
           button.disabled=false;
         }
       });
@@ -1804,7 +1855,7 @@
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
       ensureYouTubeSidePanel();
-      loadVideoUnknownLemmas().then(()=>{
+      Promise.all([loadVideoUnknownLemmas(),loadVideoUnknownExpressions()]).then(()=>{
         renderYouTubeSidePanel();
         refreshLearningHighlights();
       });
