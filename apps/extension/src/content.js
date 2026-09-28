@@ -594,7 +594,7 @@
         const currentItem={
           ...(expressionMembers.get(visible[0])||item),
           bubbleType:"expression",
-          bubbleSurface:surface||match.surface||item.label,
+          bubbleSurface:match.canonical||item.label||surface||match.surface,
         };
         expressionBadges.set(visible[0],currentItem);
         if(currentItem?.id) {
@@ -625,7 +625,7 @@
         const currentItem={
           ...expressionMembers.get(visible[0]),
           bubbleType:"expression",
-          bubbleSurface:surface||match.surface||match.canonical||key,
+          bubbleSurface:match.canonical||surface||match.surface||key,
         };
         expressionBadges.set(visible[0],currentItem);
       }
@@ -711,21 +711,29 @@
     const translationPromise=state.settings.showSentenceTranslation
       ? analyze(translationText).catch(()=>null)
       : Promise.resolve(null);
+    const localAnalysisPromise=analyze(text);
+    const contextAnalysisPromise=hoverContextText===text
+      ? Promise.resolve(null)
+      : analyze(hoverContextText).catch(()=>null);
 
     translationPromise.then(data=>{
-      if(data) applySentenceTranslation(node,text,data);
+      if(data && node.dataset.gleText===text) applySentenceTranslation(node,text,data);
     });
 
     try{
-      const [data,hoverData]=await Promise.all([
-        analyze(text),
-        hoverContextText===text ? Promise.resolve(null) : analyze(hoverContextText),
-      ]);
+      const data=await localAnalysisPromise;
       if(node.dataset.gleText!==text) return;
-      renderAnalyzedTokens(node,text,data,hoverData||data);
+
+      // Fast path: show learned/marked words and expressions immediately from the
+      // current subtitle cue instead of waiting for the wider context analysis.
+      renderAnalyzedTokens(node,text,data,data);
+
+      const hoverData=await contextAnalysisPromise;
+      if(node.dataset.gleText!==text) return;
+      if(hoverData) renderAnalyzedTokens(node,text,data,hoverData);
 
       const translationData=await translationPromise;
-      if(translationData) applySentenceTranslation(node,text,translationData);
+      if(translationData && node.dataset.gleText===text) applySentenceTranslation(node,text,translationData);
     }catch(_error){}
   }
 
