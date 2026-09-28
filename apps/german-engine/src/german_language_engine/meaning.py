@@ -337,8 +337,19 @@ class MeaningResolver:
    elif noun_forms:
     article,singular,plural=noun_forms
     lexical=LexicalForm(article=article,singular=singular,plural=plural)
-   if not related and contextual and token.pos in {"NOUN","PROPN"} and "Plur" in token.morph.get("Number",[]):
-    contextual=self._pluralize_tr(contextual)
+   if not related and contextual and token.pos in {"NOUN","PROPN"}:
+    should_pluralize=False
+    if noun_forms:
+     _,singular,plural=noun_forms
+     surface=token.text.casefold()
+     if surface==plural.casefold():
+      should_pluralize=True
+     elif surface!=singular.casefold() and "Plur" in token.morph.get("Number",[]):
+      should_pluralize=True
+    elif "Plur" in token.morph.get("Number",[]):
+     should_pluralize=True
+    if should_pluralize:
+     contextual=self._pluralize_tr(contextual)
    notes=[]; low=token.text.lower()
    if low in PRONOMINAL_USAGE:
     contextual,prep,explanation=PRONOMINAL_USAGE[low]
