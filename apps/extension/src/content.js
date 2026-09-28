@@ -1753,13 +1753,8 @@
     renderYouTubeSidePanel();
   }
 
-  function senseLearningKey(lemma,meaning){
-    return "sense:"+String(lemma||"").toLocaleLowerCase("de-DE")+"|"+String(meaning||"").trim().toLocaleLowerCase("tr-TR");
-  }
-
   function learningItemForSense(row){
-    const key=row.key;
-    return state.learningItems.find(item=>item.kind==="word-sense" && item.key===key);
+    return state.learningItems.find(item=>item.kind==="learning-unit" && item.key===row.key);
   }
 
   async function analyzePanelWordSenses(){
@@ -1797,6 +1792,8 @@
                   canonical:String(unit.canonical||unit.lemma||""),
                   meaningTr:String(unit.meaning_tr||""),
                   unitType:String(unit.unit_type||"Kelime"),
+                  senseId:String(unit.sense_id||""),
+                  patternId:String(unit.pattern_id||""),
                   cueIndex,
                   surface:String(unit.surface||unit.canonical||""),
                   occurrences:[],
@@ -1823,19 +1820,23 @@
   async function setSenseStatus(row,status){
     const profileId=state.learningProfileId || await ensureLearningProfile();
     const apiBase=await platformApiBase();
-    const key=senseLearningKey(row.lemma,row.meaningTr);
     const response=await fetch(apiBase+"/api/v1/learning-items",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         profile_id:profileId,
         canonical_form:row.canonical,
-        canonical_key:key,
+        canonical_key:row.key,
         category:"learning-unit",
         status,
         meaning:row.meaningTr,
         meaning_language:"tr",
-        metadata:{source:"chrome-extension",cue_index:row.cueIndex},
+        metadata:{
+          source:"chrome-extension",
+          cue_index:row.cueIndex,
+          sense_id:row.senseId||null,
+          pattern_id:row.patternId||null,
+        },
       }),
     });
     if(!response.ok) throw new Error("word sense status "+response.status);
