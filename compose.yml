@@ -30,6 +30,9 @@ services:
       context: ./apps/german-engine
     environment:
       GLE_TRANSLATION_URL: ${GLE_TRANSLATION_URL:-http://translation:5000}
+      GLE_LEXICAL_DB: ${GLE_LEXICAL_DB:-/data/lexical/german-lexical.sqlite3}
+    volumes:
+      - ./data/lexical:/data/lexical:ro
     ports:
       - "8765:8765"
     depends_on:
