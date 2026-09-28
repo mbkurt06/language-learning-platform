@@ -40,6 +40,7 @@
       panelSelectedLemma:"",
       panelCollapsed:false,
       panelDocked:false,
+      videoUnknownLemmas:new Set(),
     }
   };
 
@@ -533,6 +534,22 @@
       });
     }
 
+    for(const token of tokens){
+      const lemma=String(token.lemma||"").toLocaleLowerCase("de-DE");
+      if(!state.youtube.videoUnknownLemmas.has(lemma)) continue;
+      const i=tokens.indexOf(token);
+      const mapped=mappedTokens[i]||token;
+      const currentHover=hoverData.hover?.[String(mapped.i)]||hoverData.hover?.[mapped.i]||{};
+      const meaning=currentHover.contextual_word_meaning_tr||(currentHover.dictionary_meanings_tr||[])[0]||"";
+      learningWordLabels.set(i,{
+        id:null,
+        kind:"video-unknown",
+        key:lemma,
+        label:lemma,
+        meaning_tr:meaning,
+      });
+    }
+
     const seenLearningItems=new Map();
     for(const [index,item] of learningWordLabels){
       const token=tokens[index];
@@ -582,6 +599,7 @@
       const learningItem=expressionMembers.get(i)||learningWordLabels.get(i);
       if(learningItem){
         span.classList.add("gle-learning-item");
+        if(learningItem.kind==="video-unknown") span.classList.add("gle-video-unknown-item");
       }
       const badgeItem=expressionBadges.get(i)||learningWordLabels.get(i);
       if(badgeItem){
@@ -762,6 +780,7 @@
     state.youtube.transcriptAnalysisVideoId="";
     state.youtube.transcriptAnalysisRun+=1;
     state.youtube.panelSelectedLemma="";
+    state.youtube.videoUnknownLemmas=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
     if(state.youtube.panel) renderYouTubeSidePanel();
@@ -914,6 +933,37 @@
     );
   }
 
+  function videoUnknownStorageKey(videoId=state.youtube.videoId){
+    return "gleVideoUnknown:"+String(videoId||"");
+  }
+
+  async function loadVideoUnknownLemmas(){
+    const key=videoUnknownStorageKey();
+    if(!state.youtube.videoId){
+      state.youtube.videoUnknownLemmas=new Set();
+      return;
+    }
+    const stored=await chrome.storage.local.get(key);
+    state.youtube.videoUnknownLemmas=new Set(Array.isArray(stored[key])?stored[key]:[]);
+  }
+
+  async function toggleVideoUnknownLemma(lemma){
+    const normalized=String(lemma||"").toLocaleLowerCase("de-DE");
+    if(!normalized) return;
+    if(state.youtube.videoUnknownLemmas.has(normalized)) state.youtube.videoUnknownLemmas.delete(normalized);
+    else state.youtube.videoUnknownLemmas.add(normalized);
+    await chrome.storage.local.set({[videoUnknownStorageKey()]:[...state.youtube.videoUnknownLemmas]});
+    refreshLearningHighlights();
+    renderYouTubeSidePanel();
+  }
+
+  function transcriptAnalysisCacheKey(){
+    const cues=state.youtube.cues||[];
+    const first=cues[0];
+    const last=cues[cues.length-1];
+    return "gleTranscriptAnalysis:v2:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
+  }
+
   async function analyzeWholeYouTubeTranscript(){
     const videoId=state.youtube.videoId;
     const cues=state.youtube.cues||[];
@@ -923,15 +973,32 @@
     const run=++state.youtube.transcriptAnalysisRun;
     state.youtube.transcriptAnalysisVideoId=videoId;
     state.youtube.transcriptAnalysis=null;
-    const words=new Map();
-    let cursor=0;
 
-    async function worker(){
-      while(cursor<cues.length && run===state.youtube.transcriptAnalysisRun){
-        const index=cursor++;
-        let data;
-        try{ data=await analyze(cues[index].text); }catch(_error){ continue; }
-        for(const token of data.tokens||[]){
+    const cacheKey=transcriptAnalysisCacheKey();
+    try{
+      const cached=await chrome.storage.local.get(cacheKey);
+      if(run!==state.youtube.transcriptAnalysisRun) return;
+      if(Array.isArray(cached[cacheKey])){
+        state.youtube.transcriptAnalysis=cached[cacheKey];
+        if(state.youtube.panel) renderYouTubeSidePanel();
+        return;
+      }
+    }catch(_error){}
+
+    try{
+      const apiBase=await platformApiBase();
+      const response=await fetch(apiBase+"/api/v1/tokens-batch",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({source_language:"de",texts:cues.map(cue=>cue.text)}),
+      });
+      if(!response.ok) throw new Error("batch token analysis "+response.status);
+      const payload=await response.json();
+      if(run!==state.youtube.transcriptAnalysisRun) return;
+
+      const words=new Map();
+      (payload.items||[]).forEach((item,index)=>{
+        for(const token of item.tokens||[]){
           const pos=String(token.pos||"").toUpperCase();
           if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
           const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
@@ -945,15 +1012,17 @@
           entry.forms.add(String(token.text||lemma));
           if(!entry.occurrences.includes(index)) entry.occurrences.push(index);
         }
-      }
-    }
+      });
 
-    await Promise.all(Array.from({length:Math.min(5,cues.length)},()=>worker()));
-    if(run!==state.youtube.transcriptAnalysisRun) return;
-    state.youtube.transcriptAnalysis=[...words.values()]
-      .map(entry=>({lemma:entry.lemma,pos:entry.pos,count:entry.count,forms:[...entry.forms],occurrences:entry.occurrences}))
-      .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
-    if(state.youtube.panel) renderYouTubeSidePanel();
+      const analysis=[...words.values()]
+        .map(entry=>({lemma:entry.lemma,pos:entry.pos,count:entry.count,forms:[...entry.forms],occurrences:entry.occurrences}))
+        .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+      state.youtube.transcriptAnalysis=analysis;
+      chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
+      if(state.youtube.panel) renderYouTubeSidePanel();
+    }catch(error){
+      console.warn("Video word analysis failed",error);
+    }
   }
 
   function renderPanelSubtitles(body){
@@ -980,7 +1049,11 @@
     if(!entries.length) return "";
     const chips=entries.map(entry=>{
       const learning=Boolean(learningItemForLemma(entry.lemma));
-      return '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>';
+      const unknown=state.youtube.videoUnknownLemmas.has(entry.lemma);
+      return '<div class="gle-word-chip-wrap'+(unknown?" unknown":"")+'">'+
+        '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
+        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Bu video için işareti kaldır":"Bu videoda anlamını göster")+'">'+(unknown?"✓":"+")+'</button>'+
+      '</div>';
     }).join("");
     return '<section class="gle-word-group"><h3>'+esc(title)+'</h3><div class="gle-word-grid">'+chips+'</div></section>';
   }
@@ -1031,6 +1104,12 @@
       button.addEventListener("click",()=>{
         state.youtube.panelSelectedLemma=button.dataset.lemma;
         renderYouTubeSidePanel();
+      });
+    });
+    body.querySelectorAll(".gle-word-mark").forEach(button=>{
+      button.addEventListener("click",event=>{
+        event.stopPropagation();
+        toggleVideoUnknownLemma(button.dataset.markLemma);
       });
     });
   }
@@ -1254,6 +1333,10 @@
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
       ensureYouTubeSidePanel();
+      loadVideoUnknownLemmas().then(()=>{
+        renderYouTubeSidePanel();
+        refreshLearningHighlights();
+      });
       renderYouTubeSidePanel();
       analyzeWholeYouTubeTranscript();
       bindYouTubeVideo();
