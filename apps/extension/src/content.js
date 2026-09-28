@@ -1367,7 +1367,7 @@
       resetYouTube(message.videoId);
     }
 
-    if(message.type==="track-status" && message.enabled===false){
+    if(message.type==="track-status" && message.hasTrack===false){
       resetYouTube(message.videoId || state.youtube.videoId);
       return;
     }
