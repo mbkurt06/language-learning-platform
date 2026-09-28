@@ -716,3 +716,7 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
   opacity:.92!important;
   margin-top:4px!important;
 }
+
+/* ZDF overlay spans the actual video bounds; text stays centered while the drag handle stays at the video edge. */
+.gle-zdf-overlay{align-items:center!important;}
+.gle-zdf-overlay .gle-youtube-drag-handle{left:auto!important;right:8px!important;}
