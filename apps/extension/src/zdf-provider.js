@@ -11,8 +11,8 @@
     const url = normalizeZdfUrl(value);
     if (!url || !/(^|\.)zdf\.de$/i.test(url.hostname)) return "";
     const parts = url.pathname.split("/").filter(Boolean);
-    const videoIndex = parts.indexOf("video");
-    if (videoIndex < 0 || videoIndex === parts.length - 1) return "";
+    const routeIndex = parts.findIndex(part => part === "video" || part === "play");
+    if (routeIndex < 0 || routeIndex === parts.length - 1) return "";
     return decodeURIComponent(parts[parts.length - 1]);
   }
 
