@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .models import ExpressionMatch, LexicalForm, Token, TokenMeaning, UsageNote
-from .translation import NullTranslationProvider, TranslationProvider
+from .translation import NullTranslationProvider, TranslationProvider\nfrom .lexical_senses import LexicalSenseProvider, NullLexicalSenseProvider
 
 SEED_WORDS={
  "gefallen":{"meanings":["iyilik","jest"],"noun":("der","Gefallen","Gefallen")},
@@ -347,5 +347,5 @@ class MeaningResolver:
    role=POS_ROLE_TR.get(token.pos)
    if role:
     notes.append(UsageNote(kind="GRAMMAR_ROLE",label="Görevi",explanation_tr=role,source=token.pos))
-   output.append(TokenMeaning(token_index=token.i,lemma=token.lemma,contextual_meaning_tr=contextual,dictionary_meanings_tr=dictionary,lexical_form=lexical,usage_notes=notes))
+   output.append(TokenMeaning(token_index=token.i,lemma=canonical_lemma,contextual_meaning_tr=contextual,dictionary_meanings_tr=dictionary,lexical_form=lexical,usage_notes=notes,sense_id=selected_sense.sense_id if selected_sense else None,canonical_lemma=canonical_lemma))
   return output
