@@ -1187,3 +1187,22 @@ html[data-gle-theme="light"] .gle-settings-track{
   color:#4c1d95!important;
   box-shadow:-4px 0 16px rgba(124,58,237,.34)!important
 }
+
+
+/* Final handle offset: keep the shared handle visibly outside the panel edge
+   on every provider, including ZDF layouts with their own panel inset. */
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  left:calc(var(--gle-panel-handle-left,40px) - 40px)!important;
+  right:auto!important
+}
+
+/* Stronger hover affordance while keeping the resting state translucent. */
+#gle-panel-edge-handle.gle-panel-edge-handle:hover{
+  background:rgba(250,245,255,.98)!important;
+  border-color:rgba(168,85,247,1)!important;
+  color:#3b0764!important;
+  box-shadow:
+    -4px 0 20px rgba(168,85,247,.62),
+    0 0 14px rgba(216,180,254,.58)!important;
+  filter:brightness(1.16) saturate(1.18)!important
+}
