@@ -431,12 +431,14 @@
     state.playlistUrls = [...new Set([...(data.subtitlePlaylistUrls || []), ...state.playlistUrls].filter(Boolean))];
 
     if (state.playlistUrls.length) {
-      window.clearTimeout(state.candidateRefreshTimer);
-      state.candidateRefreshTimer = window.setTimeout(() => {
-        refreshLivePlaylist(false).catch(error => {
-          registerRefreshFailure(error);
-        });
-      }, CANDIDATE_REFRESH_DEBOUNCE_MS);
+      if (!state.candidateRefreshTimer) {
+        state.candidateRefreshTimer = window.setTimeout(() => {
+          state.candidateRefreshTimer = null;
+          refreshLivePlaylist(false).catch(error => {
+            registerRefreshFailure(error);
+          });
+        }, CANDIDATE_REFRESH_DEBOUNCE_MS);
+      }
       return;
     }
 
