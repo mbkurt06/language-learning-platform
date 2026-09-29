@@ -277,7 +277,9 @@
 
       if (Number.isFinite(programTime) && Number.isFinite(duration)) {
         const url = resolveUrl(line, playlistUrl);
-        if (url) segments.push({ url, startEpoch: programTime, duration });
+        if (url && /\.(?:webvtt|vtt)(?:[?#]|$)/i.test(url)) {
+          segments.push({ url, startEpoch: programTime, duration });
+        }
       }
       programTime = NaN;
       duration = NaN;
@@ -440,7 +442,10 @@
           firstSegmentEpoch: segments.length ? segments[0].startEpoch : null,
           lastSegmentEpoch: segments.length ? segments[segments.length - 1].startEpoch : null
         });
-        if (!segments.length) continue;
+        if (!segments.length) {
+          logEvent("playlist-skipped-non-subtitle", { playlistUrl });
+          continue;
+        }
 
         const latestEnd = segments.reduce((max, item) => Math.max(max, item.startEpoch + item.duration), 0);
         const video = findVideo();
