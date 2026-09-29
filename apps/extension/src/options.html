@@ -4,7 +4,7 @@
 <style>
 body{font:15px system-ui;max-width:650px;margin:40px auto;padding:0 20px}
 label{display:block;margin:18px 0 6px}
-input[type="url"]{width:100%;padding:9px;box-sizing:border-box}
+input[type="url"],select{width:100%;padding:9px;box-sizing:border-box}
 .row{display:flex;align-items:center;gap:10px}
 input[type="range"]{flex:1}
 button{margin-top:18px;padding:8px 14px}
@@ -18,8 +18,10 @@ button{margin-top:18px;padding:8px 14px}
 <label for="url">Platform API HTTP adresi</label>
 <input id="url" type="url" value="http://127.0.0.1:8000">
 <p><small>Extension dil motoruna doğrudan bağlanmaz. Analiz istekleri Platform API üzerinden yönlendirilir.</small></p>
-<label class="row"><input id="showVideoTranslation" type="checkbox"> Video üstünde Türkçe altyazı</label>
-<label class="row"><input id="showPanelTranslation" type="checkbox"> Panelde Türkçe çeviri</label>
+<label for="interfaceLanguage">Arayüz dili</label>
+<select id="interfaceLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option></select>
+<label class="row"><input id="showVideoTranslation" type="checkbox"> Video çevirisi</label>
+<label class="row"><input id="showPanelTranslation" type="checkbox"> Panel çevirisi</label>
 <label class="row"><input id="followActiveSubtitle" type="checkbox"> Aktif altyazıyı panelde otomatik takip et</label>
 <label for="germanSize">Almanca altyazı boyutu</label>
 <div class="row"><input id="germanSize" type="range" min="70" max="150" step="5" value="100"><output id="germanSizeValue">100%</output></div>
