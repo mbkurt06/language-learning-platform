@@ -1,4 +1,5 @@
 const url=document.querySelector("#url");
+const interfaceLanguage=document.querySelector("#interfaceLanguage");
 const showVideoTranslation=document.querySelector("#showVideoTranslation");
 const showPanelTranslation=document.querySelector("#showPanelTranslation");
 const followActiveSubtitle=document.querySelector("#followActiveSubtitle");
@@ -11,9 +12,10 @@ const learningList=document.querySelector("#learningList");
 let learningItems=[];
 let learningProfileId="";
 
-const defaults={platformApiUrl:"http://127.0.0.1:8000",showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100};
+const defaults={platformApiUrl:"http://127.0.0.1:8000",interfaceLanguage:"tr",showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100};
 chrome.storage.sync.get(defaults,async x=>{
   url.value=x.platformApiUrl;
+  interfaceLanguage.value=x.interfaceLanguage;
   showVideoTranslation.checked=x.showVideoTranslation;
   showPanelTranslation.checked=x.showPanelTranslation;
   followActiveSubtitle.checked=x.followActiveSubtitle;
@@ -33,6 +35,7 @@ germanSize.addEventListener("input",()=>germanSizeValue.value=germanSize.value+"
 translationSize.addEventListener("input",()=>sizeValue.value=translationSize.value+"%");
 document.querySelector("#save").onclick=()=>chrome.storage.sync.set({
   platformApiUrl:url.value.trim(),
+  interfaceLanguage:interfaceLanguage.value,
   showVideoTranslation:showVideoTranslation.checked,
   showPanelTranslation:showPanelTranslation.checked,
   followActiveSubtitle:followActiveSubtitle.checked,
