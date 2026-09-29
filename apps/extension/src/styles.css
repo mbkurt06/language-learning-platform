@@ -1264,3 +1264,56 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
   font-variant-numeric:tabular-nums;
   opacity:.62;
 }
+
+
+/* Shared panel export */
+.gle-header-export{
+  width:32px;height:32px;border:0;border-radius:8px;
+  background:transparent;color:inherit;font-size:20px;cursor:pointer;
+}
+.gle-header-export:hover{background:rgba(124,58,237,.16)}
+#gle-export-dialog{
+  position:fixed;inset:0;z-index:2147483647;
+  display:grid;place-items:center;padding:20px;
+  background:rgba(0,0,0,.45);font-family:system-ui,-apple-system,sans-serif;
+}
+.gle-export-card{
+  width:min(620px,calc(100vw - 40px));max-height:min(760px,calc(100vh - 40px));
+  display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid rgba(148,163,184,.28);border-radius:16px;
+  background:#171923;color:#f8fafc;box-shadow:0 24px 80px rgba(0,0,0,.45);
+}
+.gle-export-card header,.gle-export-card footer{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;
+}
+.gle-export-card header{border-bottom:1px solid rgba(148,163,184,.2)}
+.gle-export-card footer{border-top:1px solid rgba(148,163,184,.2);justify-content:flex-end}
+.gle-export-close{
+  border:0;background:transparent;color:inherit;font-size:24px;cursor:pointer;
+}
+.gle-export-options{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px 16px;
+}
+.gle-export-options label{display:grid;gap:6px;font-size:12px;color:#cbd5e1}
+.gle-export-options select{
+  width:100%;padding:9px 10px;border-radius:8px;border:1px solid rgba(148,163,184,.3);
+  background:#0f172a;color:#f8fafc;
+}
+.gle-export-selectbar{
+  display:flex;align-items:center;justify-content:space-between;padding:8px 16px;
+  border-top:1px solid rgba(148,163,184,.14);border-bottom:1px solid rgba(148,163,184,.14);
+  font-size:13px;
+}
+.gle-export-items{overflow:auto;padding:8px 12px;display:grid;gap:4px}
+.gle-export-items label{
+  display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:8px;cursor:pointer;
+}
+.gle-export-items label:hover{background:rgba(148,163,184,.10)}
+.gle-export-items span{font-size:13px;line-height:1.35}
+.gle-export-card footer button{
+  padding:8px 14px;border-radius:8px;border:1px solid rgba(148,163,184,.3);cursor:pointer;
+}
+.gle-export-cancel{background:transparent;color:#e2e8f0}
+.gle-export-go{background:#7c3aed;color:white;border-color:#7c3aed!important}
+.gle-saved-global{cursor:default}
+.gle-saved-global em{display:block;margin-top:3px;font-size:11px;color:#94a3b8;font-style:normal}
