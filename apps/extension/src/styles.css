@@ -955,13 +955,6 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 
 /* YouTube fullscreen: panel is rendered inside the fullscreen player, but the
    native video is left untouched so it cannot disappear. */
-.html5-video-player.gle-panel-player-fullscreen .html5-main-video{
-  left:auto!important;
-  width:auto!important;
-  max-width:none!important;
-  height:auto!important;
-  transform:none!important
-}
 #gle-shared-panel.gle-youtube-fullscreen-panel:not(.collapsed){
   top:0!important;
   right:0!important;
