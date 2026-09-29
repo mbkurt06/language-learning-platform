@@ -840,7 +840,12 @@
         const at=source.toLocaleLowerCase("de-DE").indexOf(String(form).toLocaleLowerCase("de-DE"));
         if(at<0) continue;
         const end=at+String(form).length;
-        const tokenIndices=tokens.filter(token=>token._end>at && token._start<end).map(token=>token.i);
+        const wantedParts=(expression.highlightParts||[]).map(preparedNormalize).filter(Boolean);
+        const tokenIndices=tokens.filter(token=>{
+          if(!(token._end>at && token._start<end)) return false;
+          if(!wantedParts.length) return true;
+          return wantedParts.includes(preparedNormalize(token.text));
+        }).map(token=>token.i);
         foundExpressions.push({
           canonical:expression.canonical,
           surface:source.slice(at,end),
@@ -902,7 +907,34 @@
     CSS.highlights.delete("gle-benchmark-word");
     CSS.highlights.delete("gle-benchmark-expression");
     const wordRanges=preparedRangesForForms((fixture.words||[]).flatMap(item=>item.forms||[]));
-    const expressionRanges=preparedRangesForForms((fixture.expressions||[]).flatMap(item=>item.forms||[]));
+    const expressionRanges=[];
+    for(const expression of fixture.expressions||[]){
+      if(!(expression.highlightParts||[]).length){
+        expressionRanges.push(...preparedRangesForForms(expression.forms||[]));
+        continue;
+      }
+      for(const segment of state.web.segments||[]){
+        const element=segment?.sourceElement;
+        if(!element?.isConnected) continue;
+        const fullText=String(element.textContent||"");
+        const lower=fullText.toLocaleLowerCase("de-DE");
+        for(const form of expression.forms||[]){
+          const formLower=String(form).toLocaleLowerCase("de-DE");
+          const formStart=lower.indexOf(formLower);
+          if(formStart<0) continue;
+          const formEnd=formStart+String(form).length;
+          for(const part of expression.highlightParts||[]){
+            const partLower=String(part).toLocaleLowerCase("de-DE");
+            let partStart=lower.indexOf(partLower,formStart);
+            while(partStart>=0 && partStart<formEnd){
+              const range=webRangeFromOffsets(element,partStart,partStart+String(part).length);
+              if(range) expressionRanges.push(range);
+              partStart=lower.indexOf(partLower,partStart+Math.max(1,String(part).length));
+            }
+          }
+        }
+      }
+    }
     if(wordRanges.length) CSS.highlights.set("gle-benchmark-word",new Highlight(...wordRanges));
     if(expressionRanges.length) CSS.highlights.set("gle-benchmark-expression",new Highlight(...expressionRanges));
   }
@@ -3066,6 +3098,26 @@
     return true;
   }
 
+  function preparedLearningItemAllowed(fixture,item){
+    if(!fixture || !item) return true;
+    const key=normalizeLearningIdentity(item.key);
+    const label=normalizeLearningIdentity(item.label);
+    if(item.kind==="expression"){
+      return (fixture.expressions||[]).some(expression=>{
+        const canonical=normalizeLearningIdentity(expression.canonical);
+        const pattern=normalizeLearningIdentity("prepared:"+preparedNormalize(expression.canonical));
+        return key===canonical || label===canonical || key===pattern;
+      });
+    }
+    if(item.kind==="word"){
+      return (fixture.words||[]).some(word=>{
+        const lemma=normalizeLearningIdentity(word.lemma);
+        return key===lemma || label===lemma;
+      });
+    }
+    return false;
+  }
+
   async function refreshWebLearningAnnotations(){
     if(adapter.id!=="web") return;
     const run=++state.web.annotationRun;
@@ -3073,7 +3125,10 @@
     layer.textContent="";
     state.web.annotationLabels=[];
     if(CSS?.highlights) CSS.highlights.delete("gle-learning-web");
-    const learningItems=state.learningItems.filter(item=>itemStatus(item)==="learning");
+    const preparedFixture=activePreparedBenchmark();
+    const learningItems=state.learningItems.filter(item=>
+      itemStatus(item)==="learning" && preparedLearningItemAllowed(preparedFixture,item)
+    );
     if(!learningItems.length) return;
     const allRanges=[];
     for(const item of learningItems){
