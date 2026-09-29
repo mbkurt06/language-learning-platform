@@ -4,7 +4,9 @@
   const REQUEST_SOURCE = "zdf-subtitle-lab-content";
   const REQUEST_TYPE = "request-latest";
 
-  const LIVE_REFRESH_MS = 6000;
+  const LIVE_REFRESH_MS = 15000;
+  const CANDIDATE_REFRESH_DEBOUNCE_MS = 8000;
+  const RETRY_BACKOFF_STEPS_MS = [15000, 30000, 60000, 120000, 300000];
   const LIVE_LOOKBACK_SECONDS = 90;
   const LIVE_MAX_SEGMENTS = 48;
   const SEGMENT_CACHE_LIMIT = 160;
@@ -25,7 +27,12 @@
     refreshBusy: false,
     lastError: "",
     lastCue: "",
-    sourceDetectedAt: 0
+    sourceDetectedAt: 0,
+    lastAttemptAt: 0,
+    nextAllowedRefreshAt: 0,
+    consecutiveRefreshFailures: 0,
+    candidateRefreshTimer: null,
+    cooldownReason: ""
   };
 
   const host = document.createElement("div");
@@ -166,8 +173,38 @@
 
   async function fetchText(url) {
     const response = await chrome.runtime.sendMessage({ type: "zdf-lab-fetch-text", url });
-    if (!response?.ok) throw new Error(response?.error || "Fetch failed");
+    if (!response?.ok) {
+      const error = new Error(response?.error || "Fetch failed");
+      error.status = Number(response?.status) || 0;
+      error.retryAfterMs = Number(response?.retryAfterMs) || 0;
+      throw error;
+    }
     return response.text || "";
+  }
+
+  function registerRefreshFailure(error) {
+    state.consecutiveRefreshFailures += 1;
+    const step = RETRY_BACKOFF_STEPS_MS[
+      Math.min(state.consecutiveRefreshFailures - 1, RETRY_BACKOFF_STEPS_MS.length - 1)
+    ];
+    const retryAfterMs = Number(error?.retryAfterMs) || 0;
+    const backoffMs = Math.max(step, retryAfterMs);
+    state.nextAllowedRefreshAt = Date.now() + backoffMs;
+    state.cooldownReason = error?.status === 429
+      ? "HTTP 429 / rate limit"
+      : "refresh backoff";
+    state.lastError = String(error?.message || error);
+  }
+
+  function registerRefreshSuccess() {
+    state.consecutiveRefreshFailures = 0;
+    state.nextAllowedRefreshAt = 0;
+    state.cooldownReason = "";
+    state.lastError = "";
+  }
+
+  function refreshCooldownRemainingMs() {
+    return Math.max(0, state.nextAllowedRefreshAt - Date.now());
   }
 
   function findVideo() {
@@ -251,8 +288,13 @@
 
   async function refreshLivePlaylist(force = false) {
     if (state.refreshBusy || !state.playlistUrls.length) return;
-    if (!force && Date.now() - state.lastRefreshAt < LIVE_REFRESH_MS) return;
+    const now = Date.now();
+    const cooldownMs = refreshCooldownRemainingMs();
+    if (cooldownMs > 0) return;
+    if (now - state.lastAttemptAt < LIVE_REFRESH_MS) return;
+    if (!force && now - state.lastRefreshAt < LIVE_REFRESH_MS) return;
 
+    state.lastAttemptAt = now;
     state.refreshBusy = true;
     try {
       for (const playlistUrl of state.playlistUrls) {
@@ -312,12 +354,13 @@
           state.seekableEnd = seekableEnd;
           state.videoAnchorTime = current;
           state.programAnchorEpoch = playbackEpoch;
-          state.lastError = "";
+          registerRefreshSuccess();
           return;
         }
       }
+      registerRefreshFailure(new Error("No usable live subtitle cues found"));
     } catch (error) {
-      state.lastError = String(error?.message || error);
+      registerRefreshFailure(error);
     } finally {
       state.refreshBusy = false;
     }
@@ -353,6 +396,8 @@
 
     const now = Date.now();
     const refreshAge = state.lastRefreshAt ? ((now - state.lastRefreshAt) / 1000).toFixed(1) + "s" : "-";
+    const cooldownMs = refreshCooldownRemainingMs();
+    const cooldownText = cooldownMs > 0 ? (cooldownMs / 1000).toFixed(1) + "s" : "-";
     const cueDelta = cue && Number.isFinite(playbackTime) ? playbackTime - cue.start : NaN;
 
     debug.textContent =
@@ -363,6 +408,9 @@
       "HLS subtitle playlists: " + state.playlistUrls.length + "\n" +
       "Cues: " + state.cues.length + "\n" +
       "Last refresh: " + refreshAge + "\n" +
+      "Refresh interval: " + (LIVE_REFRESH_MS / 1000) + "s\n" +
+      "Cooldown: " + cooldownText + (state.cooldownReason ? " (" + state.cooldownReason + ")" : "") + "\n" +
+      "Refresh failures: " + state.consecutiveRefreshFailures + "\n" +
       "Playback time: " + formatTime(playbackTime) + "\n" +
       "Cue start: " + formatTime(cue?.start) + "\n" +
       "Cue end: " + formatTime(cue?.end) + "\n" +
@@ -383,11 +431,16 @@
     state.playlistUrls = [...new Set([...(data.subtitlePlaylistUrls || []), ...state.playlistUrls].filter(Boolean))];
 
     if (state.playlistUrls.length) {
-      await refreshLivePlaylist(true);
+      window.clearTimeout(state.candidateRefreshTimer);
+      state.candidateRefreshTimer = window.setTimeout(() => {
+        refreshLivePlaylist(false).catch(error => {
+          registerRefreshFailure(error);
+        });
+      }, CANDIDATE_REFRESH_DEBOUNCE_MS);
       if (state.mode === "live-hls-webvtt") return;
     }
 
-    if (state.directUrls.length) await loadDirectVtt();
+    if (state.directUrls.length && state.mode !== "vod-direct-vtt") await loadDirectVtt();
   }
 
   function scanInlineZdfSubtitleUrls() {
@@ -427,5 +480,5 @@
       window.postMessage({ source: REQUEST_SOURCE, type: REQUEST_TYPE }, "*");
       scanInlineZdfSubtitleUrls();
     }
-  }, 2500);
+  }, 10000);
 })();
