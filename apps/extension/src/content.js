@@ -1134,6 +1134,7 @@
       handle.classList.toggle("collapsed",state.panel.collapsed);
     }
     syncSharedPanelHost();
+    if(!state.panel.collapsed && state.panel.tab==="subtitles") renderSharedPanel();
   }
 
   function zdfPlayerShell(video){
