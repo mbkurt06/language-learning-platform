@@ -3098,6 +3098,26 @@
     return true;
   }
 
+  function preparedLearningItemAllowed(fixture,item){
+    if(!fixture || !item) return true;
+    const key=normalizeLearningIdentity(item.key);
+    const label=normalizeLearningIdentity(item.label);
+    if(item.kind==="expression"){
+      return (fixture.expressions||[]).some(expression=>{
+        const canonical=normalizeLearningIdentity(expression.canonical);
+        const pattern=normalizeLearningIdentity("prepared:"+preparedNormalize(expression.canonical));
+        return key===canonical || label===canonical || key===pattern;
+      });
+    }
+    if(item.kind==="word"){
+      return (fixture.words||[]).some(word=>{
+        const lemma=normalizeLearningIdentity(word.lemma);
+        return key===lemma || label===lemma;
+      });
+    }
+    return false;
+  }
+
   async function refreshWebLearningAnnotations(){
     if(adapter.id!=="web") return;
     const run=++state.web.annotationRun;
@@ -3105,7 +3125,10 @@
     layer.textContent="";
     state.web.annotationLabels=[];
     if(CSS?.highlights) CSS.highlights.delete("gle-learning-web");
-    const learningItems=state.learningItems.filter(item=>itemStatus(item)==="learning");
+    const preparedFixture=activePreparedBenchmark();
+    const learningItems=state.learningItems.filter(item=>
+      itemStatus(item)==="learning" && preparedLearningItemAllowed(preparedFixture,item)
+    );
     if(!learningItems.length) return;
     const allRanges=[];
     for(const item of learningItems){
