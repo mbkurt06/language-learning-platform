@@ -10,31 +10,31 @@
       settings:"Ayarlar",close:"Kapat",general:"Genel",interfaceLanguage:"Arayüz dili",theme:"Tema",themeSystem:"Sistem",themeLight:"Açık",themeDark:"Koyu",
       languageLearningActive:"Language Learning aktif",languageLearningActiveHelp:"Video ve panel özelliklerini birlikte açar veya kapatır.",
       translationView:"Çeviri görünümü",videoTranslation:"Video çevirisi",videoTranslationHelp:"Videoda kaynak altyazının altında çeviriyi gösterir.",
-      panelTranslation:"Panel çevirisi",panelTranslationHelp:"Altyazılar sekmesindeki satırlarda çeviriyi gösterir.",
+      panelTranslation:"Panel çevirisi",panelTranslationHelp:"Cümleler sekmesindeki satırlarda çeviriyi gösterir.",
       followActiveSubtitle:"Aktif altyazıyı otomatik takip et",followActiveSubtitleHelp:"Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.",playbackBehavior:"Video davranışı",pauseOnWordHover:"Altyazı alanına gelince videoyu durdur",pauseOnWordHoverHelp:"Mouse Almanca/Türkçe altyazı alanındayken videoyu durdurur. Kelime açıklama penceresine geçildiğinde de video durmaya devam eder; ikisinden de çıkınca daha önce oynuyorsa devam eder.",autoPauseAfterSentence:"Her altyazı cümlesinden sonra durdur",autoPauseAfterSentenceHelp:"Her zamanlı altyazı bölümünün sonunda videoyu otomatik durdurur.",
       textSize:"Yazı boyutu",sourceSubtitle:"Kaynak altyazı",translationSubtitle:"Çeviri altyazısı",
-      subtitles:"Altyazılar",words:"Kelimeler",saved:"Kaydedilenler",active:"Aktif",inactive:"Pasif",
-      translation:"Çeviri",waitingSubtitles:"Altyazı bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült"
+      subtitles:"Cümleler",words:"Kelimeler",saved:"Kaydedilenler",active:"Aktif",inactive:"Pasif",
+      translation:"Çeviri",waitingSubtitles:"İçerikte cümle bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült"
     },
     en:{
       settings:"Settings",close:"Close",general:"General",interfaceLanguage:"Interface language",theme:"Theme",themeSystem:"System",themeLight:"Light",themeDark:"Dark",
       languageLearningActive:"Language Learning active",languageLearningActiveHelp:"Turns the video and panel features on or off together.",
       translationView:"Translation display",videoTranslation:"Video translation",videoTranslationHelp:"Shows the translation below the source subtitle on the video.",
-      panelTranslation:"Panel translation",panelTranslationHelp:"Shows translations in subtitle rows inside the panel.",
+      panelTranslation:"Panel translation",panelTranslationHelp:"Shows translations below sentences inside the panel.",
       followActiveSubtitle:"Follow active subtitle",followActiveSubtitleHelp:"Scrolls the panel to the currently playing subtitle.",playbackBehavior:"Playback behavior",pauseOnWordHover:"Pause video while hovering subtitles",pauseOnWordHoverHelp:"Pauses while the pointer is over the source/translation subtitle card. It stays paused when moving into the word tooltip and resumes after leaving both if it was playing before.",autoPauseAfterSentence:"Pause after every subtitle sentence",autoPauseAfterSentenceHelp:"Automatically pauses at the end of each timed subtitle cue.",
       textSize:"Text size",sourceSubtitle:"Source subtitle",translationSubtitle:"Translation subtitle",
-      subtitles:"Subtitles",words:"Words",saved:"Saved",active:"Active",inactive:"Inactive",
-      translation:"Translation",waitingSubtitles:"Waiting for subtitles…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel"
+      subtitles:"Sentences",words:"Words",saved:"Saved",active:"Active",inactive:"Inactive",
+      translation:"Translation",waitingSubtitles:"Waiting for sentences…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel"
     },
     de:{
       settings:"Einstellungen",close:"Schließen",general:"Allgemein",interfaceLanguage:"Oberflächensprache",theme:"Design",themeSystem:"System",themeLight:"Hell",themeDark:"Dunkel",
       languageLearningActive:"Language Learning aktiv",languageLearningActiveHelp:"Schaltet Video- und Panel-Funktionen gemeinsam ein oder aus.",
       translationView:"Übersetzungsanzeige",videoTranslation:"Videoübersetzung",videoTranslationHelp:"Zeigt die Übersetzung unter dem Quelluntertitel im Video.",
-      panelTranslation:"Panelübersetzung",panelTranslationHelp:"Zeigt Übersetzungen in den Untertitelzeilen des Panels.",
+      panelTranslation:"Panelübersetzung",panelTranslationHelp:"Zeigt Übersetzungen unter den Sätzen im Panel.",
       followActiveSubtitle:"Aktiven Untertitel automatisch verfolgen",followActiveSubtitleHelp:"Scrollt das Panel zum aktuell abgespielten Untertitel.",playbackBehavior:"Videowiedergabe",pauseOnWordHover:"Video beim Überfahren des Untertitelbereichs pausieren",pauseOnWordHoverHelp:"Pausiert, solange der Mauszeiger über dem Quell-/Übersetzungsbereich liegt. Beim Wechsel in das Wort-Popup bleibt das Video pausiert und läuft erst nach Verlassen beider Bereiche weiter, wenn es vorher lief.",autoPauseAfterSentence:"Nach jedem Untertitelsatz pausieren",autoPauseAfterSentenceHelp:"Pausiert das Video automatisch am Ende jedes zeitgesteuerten Untertitels.",
       textSize:"Textgröße",sourceSubtitle:"Quelluntertitel",translationSubtitle:"Übersetzungsuntertitel",
-      subtitles:"Untertitel",words:"Wörter",saved:"Gespeichert",active:"Aktiv",inactive:"Inaktiv",
-      translation:"Übersetzung",waitingSubtitles:"Untertitel werden geladen…",openPanel:"Language-Learning-Panel öffnen",collapsePanel:"Panel einklappen"
+      subtitles:"Sätze",words:"Wörter",saved:"Gespeichert",active:"Aktiv",inactive:"Inaktiv",
+      translation:"Übersetzung",waitingSubtitles:"Sätze werden geladen…",openPanel:"Language-Learning-Panel öffnen",collapsePanel:"Panel einklappen"
     }
   };
 
@@ -92,11 +92,11 @@
       expressionGroupsVideoId:"",
       expressionGroupsPromise:null,
     },
-    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null}
+    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null},
+    web:{segments:[],signature:"",url:"",highlightTimer:null}
   };
 
-  const adapter=ADAPTERS.find(a=>a.host.test(location.hostname));
-  if(!adapter) return;
+  const adapter=ADAPTERS.find(a=>a.host.test(location.hostname)) || {id:"web",host:/.*/,selectors:[]};
 
 
   function uiText(key){
@@ -320,6 +320,10 @@
   }
 
   function refreshLearningHighlights(){
+    if(adapter.id==="web"){
+      if(state.panel.element) renderSharedPanel();
+      return;
+    }
     if(adapter.id==="youtube" && state.youtube.cues?.length){
       state.youtube.cueIndex=-1;
       renderTimedCue();
@@ -391,7 +395,7 @@
     const payload=await response.json();
     state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
     refreshLearningHighlights();
-    if(adapter.id==="youtube" && state.panel.element && !state.panel.element.hidden){
+    if(["youtube","zdf","web"].includes(adapter.id) && state.panel.element && !state.panel.element.hidden){
       renderSharedPanel();
     }
   }
@@ -1213,6 +1217,10 @@
   }
 
   function playYouTubeCue(index){
+    if(adapter.id==="web"){
+      focusWebSegment(index);
+      return;
+    }
     const video=adapter.id==="zdf" ? bindZdfVideo() : bindYouTubeVideo();
     const range=contextualCueWindow(index);
     if(!video || !range) return;
@@ -1355,6 +1363,32 @@
       requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
+    if(adapter.id==="web"){
+      if(!panel) return;
+      if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
+      const handle=state.panel.handle;
+      if(handle && handle.parentElement!==document.documentElement) document.documentElement.appendChild(handle);
+      state.panel.docked=false;
+      panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
+      panel.classList.add("gle-youtube-external-panel","gle-web-page-panel");
+
+      const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
+      const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
+      const basePanelWidth=Math.min(408,Math.max(320,viewportWidth*0.30));
+      const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
+      const panelWidth=Math.min(viewportWidth*0.45,Math.max(220,basePanelWidth*factor));
+      const left=Math.max(0,viewportWidth-panelWidth);
+
+      document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
+      document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
+      document.documentElement.style.setProperty("--gle-youtube-panel-top","0px");
+      document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
+      document.documentElement.style.setProperty("--gle-youtube-panel-height",viewportHeight+"px");
+      document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
+      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+      return;
+    }
+
     const player=document.querySelector(".html5-video-player");
     if(!panel || !player) return;
 
@@ -1451,7 +1485,7 @@
   }
 
   function ensureSharedPanel(){
-    if(!["youtube","zdf"].includes(adapter.id)) return null;
+    if(!["youtube","zdf","web"].includes(adapter.id)) return null;
     if(state.panel.element?.isConnected){
       syncSharedPanelHost();
       return state.panel.element;
@@ -1766,7 +1800,9 @@
     }
     const controls=document.createElement("div");
     controls.className="gle-transcript-controls";
-    controls.innerHTML='<span>'+esc(uiText("translation"))+'</span><div class="gle-transcript-switches"><label class="gle-translation-switch"><em>'+esc(uiText("videoTranslation"))+'</em><input type="checkbox" data-setting="showVideoTranslation" '+(state.settings.showVideoTranslation!==false?"checked":"")+'><span></span></label><label class="gle-translation-switch"><em>'+esc(uiText("panelTranslation"))+'</em><input type="checkbox" data-setting="showPanelTranslation" '+(state.settings.showPanelTranslation!==false?"checked":"")+'><span></span></label></div>';
+    controls.innerHTML=adapter.id==="web"
+      ? '<span>'+esc(uiText("translation"))+'</span><div class="gle-transcript-switches"><label class="gle-translation-switch"><em>'+esc(uiText("panelTranslation"))+'</em><input type="checkbox" data-setting="showPanelTranslation" '+(state.settings.showPanelTranslation!==false?"checked":"")+'><span></span></label></div>'
+      : '<span>'+esc(uiText("translation"))+'</span><div class="gle-transcript-switches"><label class="gle-translation-switch"><em>'+esc(uiText("videoTranslation"))+'</em><input type="checkbox" data-setting="showVideoTranslation" '+(state.settings.showVideoTranslation!==false?"checked":"")+'><span></span></label><label class="gle-translation-switch"><em>'+esc(uiText("panelTranslation"))+'</em><input type="checkbox" data-setting="showPanelTranslation" '+(state.settings.showPanelTranslation!==false?"checked":"")+'><span></span></label></div>';
     controls.querySelectorAll("input[data-setting]").forEach(input=>input.addEventListener("change",async event=>{
       const name=event.target.dataset.setting;
       state.settings[name]=event.target.checked;
@@ -1782,7 +1818,10 @@
       row.className="gle-transcript-row"+(index===state.youtube.cueIndex?" active":"");
       row.dataset.cueIndex=String(index);
       const cached=state.panelTranslationCache.get(cue.text)||"";
-      row.innerHTML='<span class="gle-row-time">'+panelClock(cue.startMs)+'</span><span class="gle-row-text"><span class="gle-row-source">'+esc(cue.text)+'</span>'+(state.settings.showPanelTranslation!==false?'<span class="gle-row-translation" data-translation-index="'+index+'">'+esc(cached)+'</span>':"")+'</span><span class="gle-row-play">▶</span>';
+      row.innerHTML=(adapter.id==="web"
+        ? '<span class="gle-row-time gle-row-web-index">'+String(index+1)+'</span>'
+        : '<span class="gle-row-time">'+panelClock(cue.startMs)+'</span>')+
+        '<span class="gle-row-text"><span class="gle-row-source">'+esc(cue.text)+'</span>'+(state.settings.showPanelTranslation!==false?'<span class="gle-row-translation" data-translation-index="'+index+'">'+esc(cached)+'</span>':"")+'</span><span class="gle-row-play">'+(adapter.id==="web"?"↗":"▶")+'</span>';
       row.addEventListener("click",()=>playYouTubeCue(index));
       list.appendChild(row);
     });
@@ -1840,7 +1879,7 @@
       if(!cue) return "";
       return '<button type="button" class="gle-word-occurrence" data-cue-index="'+index+'"><span>▶</span><b>'+panelClock(cue.startMs)+'</b><em>'+esc(cue.text)+'</em></button>';
     }).join("");
-    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.lemma)+'</strong><span>'+entry.count+' kez'+(learning?" · ★ Öğreniyorum":"")+'</span></div></div><div class="gle-word-forms">Videodaki biçimler: '+esc(entry.forms.join(", "))+'</div><div class="gle-word-occurrences">'+rows+'</div>';
+    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.lemma)+'</strong><span>'+entry.count+' kez'+(learning?" · ★ Öğreniyorum":"")+'</span></div></div><div class="gle-word-forms">İçerikteki biçimler: '+esc(entry.forms.join(", "))+'</div><div class="gle-word-occurrences">'+rows+'</div>';
     body.querySelector(".gle-word-back").addEventListener("click",()=>{
       state.panel.selectedLemma="";
       renderSharedPanel();
@@ -1919,7 +1958,7 @@
     }).join("");
 
     body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.canonical)+'</strong><span>'+esc(expressionGroupLabel(entry.type))+' · '+entry.count+' kez</span></div></div>'+
-      '<div class="gle-word-forms">Videodaki biçimler: '+esc(entry.forms.join(", "))+'</div>'+
+      '<div class="gle-word-forms">İçerikteki biçimler: '+esc(entry.forms.join(", "))+'</div>'+
       '<div class="gle-word-occurrences">'+rows+'</div>';
 
     body.querySelector(".gle-word-back").addEventListener("click",()=>{
@@ -1944,7 +1983,7 @@
       '<div class="gle-words-subtabs">'+views.map(([id,label])=>
         '<button type="button" data-words-view="'+id+'" class="'+(state.panel.wordsView===id?"active":"")+'">'+label+'</button>'
       ).join("")+'</div>'+
-      '<label class="gle-word-search"><span>⌕</span><input type="search" placeholder="Bu videoda kelime ara…" value="'+escAttr(q)+'" aria-label="Bu videoda kelime ara"></label>'+
+      '<label class="gle-word-search"><span>⌕</span><input type="search" placeholder="Bu içerikte kelime ara…" value="'+escAttr(q)+'" aria-label="Bu içerikte kelime ara"></label>'+
     '</div>';
   }
 
@@ -2158,7 +2197,7 @@
 
   function renderWordSenseTable(body){
     if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
-      body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
+      body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
       bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
       analyzePanelWordSenses();
       return;
@@ -2171,7 +2210,7 @@
       const known=item?.status==="learned" || item?.status==="known";
       return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">★</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
     }).join("")+'</div>';
-    body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
     bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
     body.querySelectorAll("[data-sense-jump]").forEach(button=>button.addEventListener("click",()=>{
       const row=state.panel.senseRows.find(item=>item.key===button.dataset.senseJump);
@@ -2278,7 +2317,7 @@
   function renderPanelWords(body){
     const analysis=state.youtube.transcriptAnalysis;
     if(!analysis){
-      body.innerHTML='<div class="gle-panel-empty"><b>Video kelimeleri analiz ediliyor…</b><span>Altyazıdaki kelimeler lemma bazında gruplanıyor.</span></div>';
+      body.innerHTML='<div class="gle-panel-empty"><b>İçerikteki kelimeler analiz ediliyor…</b><span>Altyazıdaki kelimeler lemma bazında gruplanıyor.</span></div>';
       analyzeWholeYouTubeTranscript();
       return;
     }
@@ -2324,8 +2363,8 @@
     }else{
       content=
         expressionGroupsSection(groups)+
-        wordGroup("★ Bu videoda geçen öğrendiğim kelimeler",learning)+
-        wordGroup("Bu videoda sık geçenler",frequent)+
+        wordGroup("★ Bu içerikte geçen öğrendiğim kelimeler",learning)+
+        wordGroup("Bu içerikte sık geçenler",frequent)+
         wordGroup("Diğer kelimeler",others);
     }
 
@@ -2333,7 +2372,7 @@
       content='<div class="gle-panel-empty"><b>Sonuç bulunamadı.</b><span>Arama kelimesini değiştir.</span></div>';
     }
 
-    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+analysis.length+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+
       wordsToolbar(analysis)+content;
     bindPanelWordControls(body,analysis);
   }
@@ -2347,7 +2386,7 @@
     }
     const present=analysis.map(entry=>({entry,item:learningItemForLemma(entry.lemma)})).filter(value=>value.item);
     if(!present.length){
-      body.innerHTML='<div class="gle-panel-empty"><b>Bu videoda öğrenme listenden kelime yok.</b><span>Bir kelimeyi altyazıdan ★ Öğren olarak kaydettiğinde burada görünür.</span></div>';
+      body.innerHTML='<div class="gle-panel-empty"><b>Bu içerikte öğrenme listenden kelime yok.</b><span>Bir kelimeyi ★ Öğren olarak kaydettiğinde burada görünür.</span></div>';
       return;
     }
     body.innerHTML='<div class="gle-saved-list">'+present.map(({entry,item})=>'<button type="button" class="gle-saved-word" data-lemma="'+escAttr(entry.lemma)+'"><span><strong>★ '+esc(item.label||entry.lemma)+'</strong><small>'+esc(item.meaning_tr||"")+'</small></span><b>'+entry.count+'×</b></button>').join("")+'</div>';
@@ -2927,7 +2966,125 @@
     }
   }
 
+  function splitWebSentences(text){
+    const normalized=String(text||"").replace(/\s+/g," ").trim();
+    if(!normalized) return [];
+    if("Segmenter" in Intl){
+      try{
+        return [...new Intl.Segmenter("de",{granularity:"sentence"}).segment(normalized)]
+          .map(part=>part.segment.trim())
+          .filter(Boolean);
+      }catch(_error){}
+    }
+    return normalized.match(/[^.!?…]+(?:[.!?…]+|$)/g)?.map(part=>part.trim()).filter(Boolean) || [normalized];
+  }
+
+  function webElementVisible(element){
+    if(!element?.isConnected) return false;
+    if(element.closest("#gle-shared-panel,#gle-tooltip,#gle-settings-dialog")) return false;
+    if(element.closest("nav,header,footer,aside,form,script,style,noscript,template,pre,code")) return false;
+    const style=getComputedStyle(element);
+    if(style.display==="none" || style.visibility==="hidden") return false;
+    const rect=element.getBoundingClientRect();
+    return rect.width>0 && rect.height>0;
+  }
+
+  function collectWebSegments(){
+    const root=document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
+    if(!root) return [];
+    const candidates=[...root.querySelectorAll("h1,h2,h3,h4,p,li,blockquote")];
+    const segments=[];
+    const seen=new Set();
+
+    for(const element of candidates){
+      if(segments.length>=500) break;
+      if(!webElementVisible(element)) continue;
+      const raw=String(element.innerText||element.textContent||"").replace(/\s+/g," ").trim();
+      if(raw.length<12 || raw.length>2400) continue;
+      for(const sentence of splitWebSentences(raw)){
+        if(segments.length>=500) break;
+        const text=sentence.replace(/\s+/g," ").trim();
+        if(text.length<8 || text.length>900 || !/[\p{L}]/u.test(text)) continue;
+        const dedupe=text.toLocaleLowerCase("de-DE");
+        if(seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        segments.push({
+          index:segments.length,
+          text,
+          startMs:segments.length*1000,
+          endMs:segments.length*1000+900,
+          sourceElement:element,
+        });
+      }
+    }
+    return segments;
+  }
+
+  function resetSharedContentAnalysis(contentId){
+    if(state.youtube.videoId===contentId) return;
+    state.youtube.videoId=contentId;
+    state.youtube.cueIndex=-1;
+    state.youtube.transcriptAnalysis=null;
+    state.youtube.transcriptAnalysisVideoId="";
+    state.youtube.transcriptAnalysisRun+=1;
+    state.youtube.transcriptAnalysisPromise=null;
+    state.youtube.expressionGroupsAnalysis=null;
+    state.youtube.expressionGroupsVideoId="";
+    state.youtube.expressionGroupsPromise=null;
+    state.panel.selectedLemma="";
+    state.panel.selectedGroupKey="";
+    state.panel.wordsView="overview";
+    state.panel.wordsSearch="";
+    state.panel.senseRows=null;
+    state.panel.senseRowsVideoId="";
+    state.panel.senseRowsPromise=null;
+    state.youtube.videoUnknownLemmas=new Set();
+    state.youtube.videoUnknownExpressions=new Set();
+  }
+
+  function focusWebSegment(index){
+    const segment=state.web.segments[index];
+    const element=segment?.sourceElement;
+    if(!element?.isConnected) return;
+    state.youtube.cueIndex=index;
+    element.scrollIntoView({behavior:"smooth",block:"center"});
+    document.querySelectorAll(".gle-web-source-highlight").forEach(node=>node.classList.remove("gle-web-source-highlight"));
+    element.classList.add("gle-web-source-highlight");
+    clearTimeout(state.web.highlightTimer);
+    state.web.highlightTimer=setTimeout(()=>element.classList.remove("gle-web-source-highlight"),2200);
+    updatePanelActiveCue();
+  }
+
+  function scanWebPage(){
+    ensureSharedPanel();
+    syncSharedPanelHost();
+    const segments=collectWebSegments();
+    const signature=segments.map(item=>item.text).join("\n").slice(0,60000);
+    if(signature===state.web.signature && state.web.url===location.href) return;
+
+    state.web.signature=signature;
+    state.web.url=location.href;
+    state.web.segments=segments;
+    const contentId="web:"+location.href;
+    resetSharedContentAnalysis(contentId);
+    state.youtube.cues=segments;
+    state.youtube.timedAvailable=false;
+    state.youtube.cueIndex=-1;
+
+    loadVideoUnknownLemmas().catch(()=>{});
+    loadVideoUnknownExpressions().catch(()=>{});
+    if(segments.length){
+      analyzeWholeYouTubeTranscript();
+      analyzeWholeYouTubeExpressionGroups();
+    }
+    renderSharedPanel();
+  }
+
   function scan(){
+    if(adapter.id==="web"){
+      scanWebPage();
+      return;
+    }
     if(adapter.id==="youtube"){
       scanYouTube();
       return;

@@ -1243,3 +1243,24 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
 .gle-youtube-german .gle-subtitle-translation{
   text-align:center!important
 }
+
+
+/* Generic web-page reading mode */
+.gle-web-page-panel{
+  position:fixed!important;
+  top:var(--gle-youtube-panel-top,0)!important;
+  left:var(--gle-youtube-panel-left,auto)!important;
+  width:var(--gle-youtube-panel-width,408px)!important;
+  height:var(--gle-youtube-panel-height,100vh)!important;
+  z-index:2147483000!important;
+}
+.gle-web-source-highlight{
+  outline:3px solid rgba(124,58,237,.72)!important;
+  outline-offset:4px!important;
+  border-radius:4px!important;
+  transition:outline-color .2s ease!important;
+}
+.gle-row-web-index{
+  font-variant-numeric:tabular-nums;
+  opacity:.62;
+}

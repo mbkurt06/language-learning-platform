@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "German Language Context",
   "version": "0.1.0",
-  "description": "Context-first German subtitle analysis for ZDF, ARD and YouTube.",
+  "description": "Context-first language analysis for video subtitles and web-page text.",
   "permissions": [
     "storage",
     "activeTab"
@@ -31,9 +31,8 @@
     },
     {
       "matches": [
-        "https://*.zdf.de/*",
-        "https://*.ardmediathek.de/*",
-        "https://www.youtube.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
         "src/youtube-cues.js",
