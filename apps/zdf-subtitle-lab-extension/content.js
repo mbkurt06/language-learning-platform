@@ -10,6 +10,8 @@
   const LIVE_LOOKBACK_SECONDS = 30;
   const LIVE_MAX_SEGMENTS = 8;
   const SEGMENT_CACHE_LIMIT = 48;
+  const DEBUG_EVENT_LIMIT = 600;
+  const DEBUG_STORAGE_KEY = "zdfSubtitleLabDebugSession";
 
   const state = {
     video: null,
@@ -32,7 +34,11 @@
     nextAllowedRefreshAt: 0,
     consecutiveRefreshFailures: 0,
     candidateRefreshTimer: null,
-    cooldownReason: ""
+    cooldownReason: "",
+    activePlaylistUrl: "",
+    debugEvents: [],
+    debugSessionId: new Date().toISOString(),
+    debugPersistTimer: null
   };
 
   const host = document.createElement("div");
@@ -92,6 +98,35 @@
       overflow-wrap: anywhere;
       pointer-events: none;
     }
+
+    #controls {
+      all: initial;
+      position: fixed;
+      top: 12px;
+      right: 404px;
+      z-index: 2147483647;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #controls button {
+      all: initial;
+      display: inline-block;
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: rgba(12, 16, 24, .96);
+      color: #dbeafe;
+      border: 1px solid rgba(147, 197, 253, .35);
+      font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    #controls button:hover {
+      background: rgba(30, 41, 59, .98);
+    }
   `;
 
   const overlay = document.createElement("div");
@@ -100,8 +135,87 @@
   const debug = document.createElement("pre");
   debug.id = "debug";
 
-  shadow.append(shadowStyle, overlay, debug);
+  const controls = document.createElement("div");
+  controls.id = "controls";
+  const exportButton = document.createElement("button");
+  exportButton.type = "button";
+  exportButton.textContent = "Export Debug";
+  controls.appendChild(exportButton);
+
+  shadow.append(shadowStyle, overlay, debug, controls);
   (document.documentElement || document.body).appendChild(host);
+
+  function safeNumber(value) {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function buildDiagnosticPayload() {
+    const video = state.video;
+    let seekableEnd = null;
+    try {
+      if (video?.seekable?.length) seekableEnd = video.seekable.end(video.seekable.length - 1);
+    } catch {}
+    return {
+      format: "zdf-subtitle-lab-debug-v1",
+      exportedAt: new Date().toISOString(),
+      sessionId: state.debugSessionId,
+      page: { href: location.href, title: document.title },
+      state: {
+        mode: state.mode,
+        sourceUrl: state.sourceUrl,
+        activePlaylistUrl: state.activePlaylistUrl,
+        directUrls: [...state.directUrls],
+        playlistUrls: [...state.playlistUrls],
+        cueCount: state.cues.length,
+        lastRefreshAt: state.lastRefreshAt || null,
+        latestSubtitleEpoch: safeNumber(state.latestSubtitleEpoch),
+        videoAnchorTime: safeNumber(state.videoAnchorTime),
+        programAnchorEpoch: safeNumber(state.programAnchorEpoch),
+        seekableEnd: safeNumber(seekableEnd),
+        videoCurrentTime: safeNumber(Number(video?.currentTime)),
+        refreshFailures: state.consecutiveRefreshFailures,
+        cooldownReason: state.cooldownReason,
+        nextAllowedRefreshAt: state.nextAllowedRefreshAt || null,
+        lastError: state.lastError
+      },
+      cues: state.cues.slice(-120),
+      events: [...state.debugEvents]
+    };
+  }
+
+  function persistDebugSoon() {
+    window.clearTimeout(state.debugPersistTimer);
+    state.debugPersistTimer = window.setTimeout(() => {
+      chrome.storage.local.set({ [DEBUG_STORAGE_KEY]: buildDiagnosticPayload() }).catch(() => {});
+    }, 750);
+  }
+
+  function logEvent(type, details = {}) {
+    state.debugEvents.push({ at: new Date().toISOString(), epochMs: Date.now(), type, ...details });
+    if (state.debugEvents.length > DEBUG_EVENT_LIMIT) {
+      state.debugEvents.splice(0, state.debugEvents.length - DEBUG_EVENT_LIMIT);
+    }
+    persistDebugSoon();
+  }
+
+  function downloadDebugExport() {
+    const payload = buildDiagnosticPayload();
+    chrome.storage.local.set({ [DEBUG_STORAGE_KEY]: payload }).catch(() => {});
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "zdf-subtitle-lab-debug-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+    anchor.style.display = "none";
+    document.documentElement.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    logEvent("debug-exported", { eventCount: state.debugEvents.length, cueCount: state.cues.length });
+  }
+
+  exportButton.addEventListener("click", downloadDebugExport);
+  logEvent("session-start", { href: location.href });
 
   function normalizeText(value) {
     return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -172,14 +286,30 @@
   }
 
   async function fetchText(url) {
+    const startedAt = performance.now();
+    logEvent("fetch-start", { url });
     const response = await chrome.runtime.sendMessage({ type: "zdf-lab-fetch-text", url });
     if (!response?.ok) {
       const error = new Error(response?.error || "Fetch failed");
       error.status = Number(response?.status) || 0;
       error.retryAfterMs = Number(response?.retryAfterMs) || 0;
+      logEvent("fetch-error", {
+        url,
+        status: error.status,
+        retryAfterMs: error.retryAfterMs,
+        durationMs: Math.round(performance.now() - startedAt),
+        message: error.message
+      });
       throw error;
     }
-    return response.text || "";
+    const text = response.text || "";
+    logEvent("fetch-success", {
+      url,
+      status: Number(response?.status) || 200,
+      durationMs: Math.round(performance.now() - startedAt),
+      bytes: text.length
+    });
+    return text;
   }
 
   function registerRefreshFailure(error) {
@@ -296,10 +426,20 @@
 
     state.lastAttemptAt = now;
     state.refreshBusy = true;
+    logEvent("refresh-start", {
+      playlistCount: state.playlistUrls.length,
+      playlists: [...state.playlistUrls]
+    });
     try {
       for (const playlistUrl of state.playlistUrls) {
         const playlistText = await fetchText(playlistUrl);
         const segments = parseHlsSegments(playlistText, playlistUrl);
+        logEvent("playlist-parsed", {
+          playlistUrl,
+          segmentCount: segments.length,
+          firstSegmentEpoch: segments.length ? segments[0].startEpoch : null,
+          lastSegmentEpoch: segments.length ? segments[segments.length - 1].startEpoch : null
+        });
         if (!segments.length) continue;
 
         const latestEnd = segments.reduce((max, item) => Math.max(max, item.startEpoch + item.duration), 0);
@@ -348,6 +488,7 @@
         const cues = dedupeCues(merged);
         if (cues.length) {
           state.mode = "live-hls-webvtt";
+          state.activePlaylistUrl = playlistUrl;
           state.cues = cues;
           state.lastRefreshAt = Date.now();
           state.latestSubtitleEpoch = latestEnd;
@@ -355,6 +496,15 @@
           state.videoAnchorTime = current;
           state.programAnchorEpoch = playbackEpoch;
           registerRefreshSuccess();
+          logEvent("refresh-success", {
+            activePlaylistUrl: playlistUrl,
+            cueCount: cues.length,
+            latestSubtitleEpoch: latestEnd,
+            videoCurrentTime: safeNumber(current),
+            seekableEnd: safeNumber(seekableEnd),
+            playbackEpoch: safeNumber(playbackEpoch),
+            selectedSegmentCount: selected.length
+          });
           return;
         }
       }
@@ -416,6 +566,8 @@
       "Cue end: " + formatTime(cue?.end) + "\n" +
       "Cue delta: " + formatTime(cueDelta) + "\n" +
       "Source: " + (state.sourceUrl || "-") + "\n" +
+      "Active playlist: " + (state.activePlaylistUrl || "-") + "\n" +
+      "Debug events: " + state.debugEvents.length + "\n" +
       "Current cue: " + (text || "-") + "\n" +
       "Error: " + (state.lastError || "-");
 
@@ -427,8 +579,22 @@
 
     state.sourceDetectedAt = Date.now();
     state.sourceUrl = String(data.sourceUrl || state.sourceUrl || "");
+    const beforeDirect = new Set(state.directUrls);
+    const beforePlaylists = new Set(state.playlistUrls);
     state.directUrls = [...new Set([...(data.subtitleUrls || []), ...state.directUrls].filter(Boolean))];
     state.playlistUrls = [...new Set([...(data.subtitlePlaylistUrls || []), ...state.playlistUrls].filter(Boolean))];
+
+    const addedDirect = state.directUrls.filter(url => !beforeDirect.has(url));
+    const addedPlaylists = state.playlistUrls.filter(url => !beforePlaylists.has(url));
+    if (addedDirect.length || addedPlaylists.length) {
+      logEvent("candidates-added", {
+        sourceUrl: state.sourceUrl,
+        addedDirect,
+        addedPlaylists,
+        totalDirect: state.directUrls.length,
+        totalPlaylists: state.playlistUrls.length
+      });
+    }
 
     if (state.playlistUrls.length) {
       if (!state.candidateRefreshTimer) {
