@@ -1227,14 +1227,7 @@
     player.classList.toggle("gle-panel-docked",!state.panel.collapsed);
     player.classList.toggle("gle-panel-docked-collapsed",state.panel.collapsed);
 
-    if(!state.panel.collapsed){
-      const contentWidth=Math.max(320,width-panelWidth);
-      const scale=Math.max(0.45,Math.min(1,contentWidth/width));
-      player.style.setProperty("--gle-video-scale",String(scale));
-    }else{
-      player.style.removeProperty("--gle-video-scale");
-    }
-
+    player.style.removeProperty("--gle-video-scale");
     player.classList.toggle("gle-panel-player-fullscreen",fullscreen);
     requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
   }
