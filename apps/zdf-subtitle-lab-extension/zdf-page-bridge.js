@@ -104,7 +104,11 @@
       }
     }
 
-    if (isZdfHlsUrl(sourceUrl) && /WEBVTT|#EXT-X-PROGRAM-DATE-TIME|#EXTINF:/i.test(String(text || ""))) {
+    const input = String(text || "");
+    const hasWebVttSegments = /(?:^|\n)\s*[^#\n][^\n]*\.(?:webvtt|vtt)(?:[?#][^\n]*)?\s*(?:\n|$)/i.test(input);
+    const isWebVttPlaylist = /WEBVTT/i.test(input) || hasWebVttSegments;
+
+    if (isZdfHlsUrl(sourceUrl) && isWebVttPlaylist) {
       if (!seen.has(sourceUrl)) found.push(sourceUrl);
     }
 
