@@ -1066,17 +1066,17 @@ html[data-gle-theme="light"] .gle-settings-track{
 
 
 /* YouTube fullscreen native controls must remain usable beside the open panel. */
-.html5-video-player.gle-panel-player-fullscreen .ytp-chrome-bottom{
+.html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-chrome-bottom{
   width:calc(100% - var(--gle-panel-width,420px) - 24px)!important;
   right:var(--gle-panel-width,420px)!important;
   left:12px!important
 }
-.html5-video-player.gle-panel-player-fullscreen .ytp-gradient-bottom{
+.html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-gradient-bottom{
   right:var(--gle-panel-width,420px)!important
 }
-.html5-video-player.gle-panel-player-fullscreen .ytp-right-controls{
+.html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-right-controls{
   margin-right:0!important
 }
-.html5-video-player.gle-panel-player-fullscreen .ytp-chrome-top{
+.html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-chrome-top{
   right:var(--gle-panel-width,420px)!important
 }
