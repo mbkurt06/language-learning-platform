@@ -38,7 +38,8 @@
     activePlaylistUrl: "",
     debugEvents: [],
     debugSessionId: new Date().toISOString(),
-    debugPersistTimer: null
+    debugPersistTimer: null,
+    routeKey: location.pathname + location.search
   };
 
   const host = document.createElement("div");
@@ -216,6 +217,49 @@
 
   exportButton.addEventListener("click", downloadDebugExport);
   logEvent("session-start", { href: location.href });
+
+  function currentRouteKey() {
+    return location.pathname + location.search;
+  }
+
+  function isLiveRoute() {
+    return /\/play\/live-tv\//.test(location.pathname);
+  }
+
+  function resetForRoute(nextRouteKey) {
+    if (state.candidateRefreshTimer) {
+      window.clearTimeout(state.candidateRefreshTimer);
+      state.candidateRefreshTimer = null;
+    }
+
+    state.routeKey = nextRouteKey;
+    state.mode = "waiting";
+    state.directUrls = [];
+    state.playlistUrls = [];
+    state.sourceUrl = "";
+    state.activePlaylistUrl = "";
+    state.cues = [];
+    state.segmentCache.clear();
+    state.lastRefreshAt = 0;
+    state.latestSubtitleEpoch = 0;
+    state.videoAnchorTime = NaN;
+    state.programAnchorEpoch = NaN;
+    state.seekableEnd = NaN;
+    state.lastCue = "";
+    state.lastError = "";
+    state.lastAttemptAt = 0;
+    state.nextAllowedRefreshAt = 0;
+    state.consecutiveRefreshFailures = 0;
+    state.cooldownReason = "";
+    overlay.textContent = "";
+    overlay.style.display = "none";
+    logEvent("route-reset", { routeKey: nextRouteKey, href: location.href });
+  }
+
+  function ensureRouteState() {
+    const nextRouteKey = currentRouteKey();
+    if (nextRouteKey !== state.routeKey) resetForRoute(nextRouteKey);
+  }
 
   function normalizeText(value) {
     return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -540,6 +584,7 @@
   }
 
   function render() {
+    ensureRouteState();
     const playbackTime = currentPlaybackTime();
     const cue = currentCue();
     const text = cue?.text || "";
@@ -580,7 +625,8 @@
   }
 
   async function acceptCandidates(data) {
-    if (!data || data.routeKey !== location.pathname + location.search) return;
+    ensureRouteState();
+    if (!data || data.routeKey !== currentRouteKey()) return;
 
     state.sourceDetectedAt = Date.now();
     state.sourceUrl = String(data.sourceUrl || state.sourceUrl || "");
@@ -599,6 +645,11 @@
         totalDirect: state.directUrls.length,
         totalPlaylists: state.playlistUrls.length
       });
+    }
+
+    if (!isLiveRoute() && state.directUrls.length) {
+      await loadDirectVtt();
+      return;
     }
 
     if (state.playlistUrls.length) {
@@ -648,6 +699,7 @@
 
   setInterval(render, 160);
   setInterval(() => {
+    ensureRouteState();
     findVideo();
     if (!state.directUrls.length && !state.playlistUrls.length) {
       window.postMessage({ source: REQUEST_SOURCE, type: REQUEST_TYPE }, "*");
