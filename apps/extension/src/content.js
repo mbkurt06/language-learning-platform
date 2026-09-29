@@ -3616,6 +3616,120 @@
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
 
+  function exportExpressionPriority(expressions){
+    return [...(expressions||[])].sort((a,b)=>{
+      const tokenDiff=(b.token_indices||[]).length-(a.token_indices||[]).length;
+      if(tokenDiff) return tokenDiff;
+      return String(b.canonical||"").length-String(a.canonical||"").length;
+    });
+  }
+
+  function exportLearningExpression(expr){
+    const pattern=normalizeLearningIdentity(expr?.pattern_id||"");
+    const canonical=normalizeLearningIdentity(expr?.canonical||"");
+    return state.learningItems.some(item=>
+      itemStatus(item)==="learning" &&
+      item.kind==="expression" &&
+      (normalizeLearningIdentity(item.key)===pattern ||
+       normalizeLearningIdentity(item.key)===canonical ||
+       normalizeLearningIdentity(item.label)===canonical)
+    );
+  }
+
+  function exportLearningWord(token){
+    const lemma=normalizeLearningIdentity(token?.lemma||token?.text||"");
+    return state.learningItems.some(item=>
+      itemStatus(item)==="learning" &&
+      item.kind==="word" &&
+      (normalizeLearningIdentity(item.key)===lemma || normalizeLearningIdentity(item.label)===lemma)
+    );
+  }
+
+  async function highlightedWebExportRows(){
+    if(adapter.id!=="web") return [];
+    const preparedFixture=activePreparedBenchmark();
+    const preparedWordSet=new Set((preparedFixture?.words||[]).map(item=>preparedNormalize(item.lemma)));
+    const transcriptWordSet=new Set((state.youtube.transcriptAnalysis||[]).map(item=>preparedNormalize(item.lemma)));
+    const rows=[];
+    for(let index=0;index<(state.web.segments||[]).length;index++){
+      const segment=state.web.segments[index];
+      if(!segment?.text) continue;
+      let data=null;
+      try{ data=await analyze(segment.text); }catch(_error){}
+      const tokens=data?.tokens||[];
+      const expressions=exportExpressionPriority(data?.expressions||[]);
+      const expressionByToken=new Map();
+      for(const expr of expressions){
+        for(const tokenIndex of expr.token_indices||[]){
+          if(!expressionByToken.has(tokenIndex)) expressionByToken.set(tokenIndex,expr);
+        }
+      }
+
+      let html="";
+      for(let i=0;i<tokens.length;i++){
+        const token=tokens[i];
+        const expr=expressionByToken.get(token.i);
+        const learningExpr=expr && exportLearningExpression(expr);
+        const learningWord=exportLearningWord(token);
+        const lemma=preparedNormalize(token.lemma||token.text||"");
+        const isWord=(preparedFixture ? preparedWordSet : transcriptWordSet).has(lemma);
+        let cls="";
+        let title="";
+        if(learningExpr || learningWord){
+          cls="learning";
+          title=expr?.canonical||token.lemma||token.text||"";
+        }else if(expr){
+          cls="expression";
+          title=expr.canonical||"";
+        }else if(isWord){
+          cls="word";
+          title=token.lemma||token.text||"";
+        }
+        const piece=cls
+          ? '<mark class="'+cls+'" title="'+escAttr(title)+'">'+esc(token.text)+'</mark>'
+          : esc(token.text);
+        html+=piece;
+        if(shouldInsertSpace(token,tokens[i+1])) html+=" ";
+      }
+      if(!tokens.length) html=esc(segment.text);
+      rows.push({index:index+1,html});
+    }
+    return rows;
+  }
+
+  async function printHighlightedWebExport(){
+    if(adapter.id!=="web") throw new Error("Highlight PDF yalnız web sayfalarında kullanılabilir");
+    const rows=await highlightedWebExportRows();
+    if(!rows.length) throw new Error("PDF için web metni bulunamadı");
+    const title=safeExportName("Highlight_Metin");
+    const iframe=document.createElement("iframe");
+    iframe.setAttribute("aria-hidden","true");
+    iframe.style.position="fixed";
+    iframe.style.right="0";
+    iframe.style.bottom="0";
+    iframe.style.width="1px";
+    iframe.style.height="1px";
+    iframe.style.border="0";
+    iframe.style.opacity="0";
+    document.documentElement.appendChild(iframe);
+    const doc=iframe.contentDocument;
+    if(!doc){iframe.remove();throw new Error("Highlight PDF belgesi oluşturulamadı");}
+    const body=rows.map(row=>'<p><span class="index">'+row.index+'</span>'+row.html+'</p>').join("");
+    doc.open();
+    doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+
+      '@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;margin:0;font-size:13px;line-height:1.65}'+
+      'h1{font-size:20px;line-height:1.2;margin:0 0 4px}.meta{font-size:10px;color:#64748b;margin-bottom:14px;overflow-wrap:anywhere}.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;font-size:10px}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.lw{background:rgba(59,130,246,.28)}.le{background:rgba(168,85,247,.30)}.ll{background:rgba(250,204,21,.55)}'+
+      'p{margin:0 0 9px;break-inside:avoid}.index{display:inline-block;color:#94a3b8;font-size:9px;width:24px;vertical-align:2px}mark{color:inherit;padding:1px 2px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}mark.word{background:rgba(59,130,246,.28)}mark.expression{background:rgba(168,85,247,.30)}mark.learning{background:rgba(250,204,21,.55)}'+
+      '</style></head><body><h1>'+esc(document.title||"Web Highlight Export")+'</h1><div class="meta">'+esc(location.href)+'</div>'+
+      '<div class="legend"><span><i class="lw"></i>Kelime</span><span><i class="le"></i>Kelime grubu / yapı</span><span><i class="ll"></i>Öğreniyorum</span></div>'+body+'</body></html>');
+    doc.close();
+    try{doc.title=title;}catch(_error){}
+    setTimeout(()=>{
+      try{iframe.contentWindow?.focus();iframe.contentWindow?.print();}
+      finally{setTimeout(()=>iframe.remove(),1800);}
+    },350);
+  }
+
   function printExport(records,title){
     const rows=records.map(record=>
       '<div class="r">'+Object.entries(record).filter(([,v])=>String(v??"")!=="").map(([k,v])=>
@@ -3692,11 +3806,24 @@
       wordSections+
       '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all"> '+esc(uiText("exportSelectAll"))+'</label><span class="gle-export-count">0</span></div>'+
       '<div class="gle-export-items"></div>'+
-      '<footer><button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
+      '<footer>'+(adapter.id==="web"?'<button type="button" class="gle-export-highlight-pdf">Highlight PDF</button>':"")+'<button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
     document.documentElement.appendChild(dialog);
     const close=()=>dialog.remove();
     dialog.querySelector(".gle-export-close").addEventListener("click",close);
     dialog.querySelector(".gle-export-cancel").addEventListener("click",close);
+    dialog.querySelector(".gle-export-highlight-pdf")?.addEventListener("click",async event=>{
+      const button=event.currentTarget;
+      button.disabled=true;
+      button.textContent="Hazırlanıyor…";
+      try{
+        await printHighlightedWebExport();
+        close();
+      }catch(error){
+        console.warn("Highlight PDF export failed",error);
+        button.disabled=false;
+        button.textContent="Highlight PDF";
+      }
+    });
     dialog.addEventListener("click",event=>{if(event.target===dialog)close();});
     const itemBox=dialog.querySelector(".gle-export-items");
     const all=dialog.querySelector(".gle-export-all");
