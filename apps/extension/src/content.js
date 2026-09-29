@@ -2889,8 +2889,8 @@
 
   document.addEventListener("mousemove",event=>{
     const overTooltip=state.tooltip?.contains(event.target);
-    const overWord=event.target.closest?.(".gle-word");
-    if(overTooltip || overWord){
+    const overTooltipAnchor=event.target.closest?.(".gle-word,.gle-word-chip,.gle-expression-chip");
+    if(overTooltip || overTooltipAnchor){
       cancelTooltipHide();
       return;
     }
