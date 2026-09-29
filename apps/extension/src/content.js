@@ -14,7 +14,7 @@
       followActiveSubtitle:"Aktif altyazıyı otomatik takip et",followActiveSubtitleHelp:"Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.",playbackBehavior:"Video davranışı",pauseOnWordHover:"Altyazı alanına gelince videoyu durdur",pauseOnWordHoverHelp:"Mouse Almanca/Türkçe altyazı alanındayken videoyu durdurur. Kelime açıklama penceresine geçildiğinde de video durmaya devam eder; ikisinden de çıkınca daha önce oynuyorsa devam eder.",autoPauseAfterSentence:"Her altyazı cümlesinden sonra durdur",autoPauseAfterSentenceHelp:"Her zamanlı altyazı bölümünün sonunda videoyu otomatik durdurur.",
       textSize:"Yazı boyutu",sourceSubtitle:"Kaynak altyazı",translationSubtitle:"Çeviri altyazısı",
       subtitles:"Cümleler",words:"Kelimeler",saved:"Kaydedilenler",active:"Aktif",inactive:"Pasif",
-      translation:"Çeviri",waitingSubtitles:"İçerikte cümle bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült"
+      translation:"Çeviri",waitingSubtitles:"İçerikte cümle bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült",exportData:"Dışa aktar",exportTitle:"Dışa aktar",exportAll:"Tümü",exportSelected:"Seçilenler",exportOriginal:"Yalnız orijinal",exportBilingual:"Orijinal + Türkçe",exportTranslationOnly:"Yalnız Türkçe",exportFormat:"Format",exportContent:"İçerik",exportScope:"Kapsam",exportDownload:"Aktar",exportCancel:"Vazgeç",exportSelectAll:"Tümünü seç",globalSaved:"Tüm kayıtlar",inThisContent:"Bu içerikte"
     },
     en:{
       settings:"Settings",close:"Close",general:"General",interfaceLanguage:"Interface language",theme:"Theme",themeSystem:"System",themeLight:"Light",themeDark:"Dark",
@@ -24,7 +24,7 @@
       followActiveSubtitle:"Follow active subtitle",followActiveSubtitleHelp:"Scrolls the panel to the currently playing subtitle.",playbackBehavior:"Playback behavior",pauseOnWordHover:"Pause video while hovering subtitles",pauseOnWordHoverHelp:"Pauses while the pointer is over the source/translation subtitle card. It stays paused when moving into the word tooltip and resumes after leaving both if it was playing before.",autoPauseAfterSentence:"Pause after every subtitle sentence",autoPauseAfterSentenceHelp:"Automatically pauses at the end of each timed subtitle cue.",
       textSize:"Text size",sourceSubtitle:"Source subtitle",translationSubtitle:"Translation subtitle",
       subtitles:"Sentences",words:"Words",saved:"Saved",active:"Active",inactive:"Inactive",
-      translation:"Translation",waitingSubtitles:"Waiting for sentences…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel"
+      translation:"Translation",waitingSubtitles:"Waiting for sentences…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel",exportData:"Export",exportTitle:"Export",exportAll:"All",exportSelected:"Selected",exportOriginal:"Original only",exportBilingual:"Original + Turkish",exportTranslationOnly:"Turkish only",exportFormat:"Format",exportContent:"Content",exportScope:"Scope",exportDownload:"Export",exportCancel:"Cancel",exportSelectAll:"Select all",globalSaved:"All saved",inThisContent:"In this content"
     },
     de:{
       settings:"Einstellungen",close:"Schließen",general:"Allgemein",interfaceLanguage:"Oberflächensprache",theme:"Design",themeSystem:"System",themeLight:"Hell",themeDark:"Dunkel",
@@ -34,7 +34,7 @@
       followActiveSubtitle:"Aktiven Untertitel automatisch verfolgen",followActiveSubtitleHelp:"Scrollt das Panel zum aktuell abgespielten Untertitel.",playbackBehavior:"Videowiedergabe",pauseOnWordHover:"Video beim Überfahren des Untertitelbereichs pausieren",pauseOnWordHoverHelp:"Pausiert, solange der Mauszeiger über dem Quell-/Übersetzungsbereich liegt. Beim Wechsel in das Wort-Popup bleibt das Video pausiert und läuft erst nach Verlassen beider Bereiche weiter, wenn es vorher lief.",autoPauseAfterSentence:"Nach jedem Untertitelsatz pausieren",autoPauseAfterSentenceHelp:"Pausiert das Video automatisch am Ende jedes zeitgesteuerten Untertitels.",
       textSize:"Textgröße",sourceSubtitle:"Quelluntertitel",translationSubtitle:"Übersetzungsuntertitel",
       subtitles:"Sätze",words:"Wörter",saved:"Gespeichert",active:"Aktiv",inactive:"Inaktiv",
-      translation:"Übersetzung",waitingSubtitles:"Sätze werden geladen…",openPanel:"Language-Learning-Panel öffnen",collapsePanel:"Panel einklappen"
+      translation:"Übersetzung",waitingSubtitles:"Sätze werden geladen…",openPanel:"Language-Learning-Panel öffnen",collapsePanel:"Panel einklappen",exportData:"Exportieren",exportTitle:"Exportieren",exportAll:"Alle",exportSelected:"Ausgewählte",exportOriginal:"Nur Original",exportBilingual:"Original + Türkisch",exportTranslationOnly:"Nur Türkisch",exportFormat:"Format",exportContent:"Inhalt",exportScope:"Umfang",exportDownload:"Exportieren",exportCancel:"Abbrechen",exportSelectAll:"Alle auswählen",globalSaved:"Alle gespeicherten",inThisContent:"In diesem Inhalt"
     }
   };
 
@@ -110,6 +110,11 @@
     const active=state.settings.extensionEnabled!==false;
     const label=panel.querySelector(".gle-master-switch em");
     if(label) label.textContent=active?uiText("active"):uiText("inactive");
+    const exportButton=panel.querySelector(".gle-header-export");
+    if(exportButton){
+      exportButton.title=uiText("exportData");
+      exportButton.setAttribute("aria-label",uiText("exportData"));
+    }
     const settingsButton=panel.querySelector(".gle-header-settings");
     if(settingsButton){
       settingsButton.title=uiText("settings");
@@ -1507,7 +1512,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -1527,6 +1532,7 @@
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
       renderPlayerControls();
     });
+    panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
     panel.querySelector(".gle-header-settings").addEventListener("click",()=>ensureSettingsDialog());
 
     panel.querySelectorAll("[data-tab]").forEach(button=>{
@@ -2390,26 +2396,283 @@
     bindPanelWordControls(body,analysis);
   }
 
+  function currentContentLearningKeys(){
+    const keys=new Set();
+    for(const entry of state.youtube.transcriptAnalysis||[]){
+      keys.add(learningKey("word",entry.lemma));
+    }
+    for(const entry of state.youtube.expressionGroupsAnalysis||[]){
+      keys.add(learningKey("expression",entry.patternId||entry.canonical));
+    }
+    for(const row of state.panel.senseRows||[]){
+      keys.add(learningKey("learning-unit",row.key));
+    }
+    return keys;
+  }
+
   function renderPanelSaved(body){
-    const analysis=state.youtube.transcriptAnalysis;
-    if(!analysis){
-      body.innerHTML='<div class="gle-panel-empty">Kayıtlar hazırlanıyor…</div>';
-      analyzeWholeYouTubeTranscript();
+    const items=[...state.learningItems].sort((a,b)=>
+      String(a.label||a.key||"").localeCompare(String(b.label||b.key||""),"de")
+    );
+    if(!items.length){
+      body.innerHTML='<div class="gle-panel-empty"><b>Henüz kayıtlı öğrenme öğesi yok.</b><span>Bir kelime veya ifadeyi ★ Öğren olarak kaydettiğinde burada görünür.</span></div>';
       return;
     }
-    const present=analysis.map(entry=>({entry,item:learningItemForLemma(entry.lemma)})).filter(value=>value.item);
-    if(!present.length){
-      body.innerHTML='<div class="gle-panel-empty"><b>Bu içerikte öğrenme listenden kelime yok.</b><span>Bir kelimeyi ★ Öğren olarak kaydettiğinde burada görünür.</span></div>';
+    const presentKeys=currentContentLearningKeys();
+    body.innerHTML='<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>'+esc(uiText("globalSaved"))+'</span></div>'+
+      '<div class="gle-saved-list">'+items.map(item=>{
+        const present=presentKeys.has(learningKey(item.kind,item.key));
+        const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
+        const status=item.status==="learned"||item.status==="known"?"Biliyorum":"Öğreniyorum";
+        return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(learningKey(item.kind,item.key))+'">'+
+          '<span><strong>★ '+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(type)+' · '+esc(status)+(present?' · '+esc(uiText("inThisContent")):"")+'</em></span>'+
+        '</div>';
+      }).join("")+'</div>';
+  }
+
+  function csvCell(value){
+    const text=String(value??"");
+    return '"'+text.replace(/"/g,'""')+'"';
+  }
+
+  function safeExportName(){
+    const raw=(adapter.id==="youtube" ? currentYouTubeTitle() : document.title || "language-learning")
+      .replace(/\s+/g," ").trim()
+      .replace(/[\\/:*?"<>|]+/g,"-")
+      .slice(0,90);
+    return raw || "language-learning";
+  }
+
+  async function translationForCue(cue){
+    let value=state.panelTranslationCache.get(cue.text)||"";
+    if(value) return value;
+    try{
+      const data=await analyze(cue.text);
+      value=cleanTranslationText(data?.sentence_meaning_tr||"");
+      if(value) state.panelTranslationCache.set(cue.text,value);
+    }catch(_error){}
+    return value;
+  }
+
+  async function exportItemsForCurrentTab(){
+    if(state.panel.tab==="subtitles"){
+      return (state.youtube.cues||[]).map((cue,index)=>({
+        id:"sentence:"+index,
+        label:(index+1)+". "+cue.text.slice(0,90),
+        kind:"sentence",
+        cue,
+        index,
+      }));
+    }
+
+    if(state.panel.tab==="saved"){
+      return state.learningItems.map((item,index)=>({
+        id:"saved:"+index,
+        label:item.label||item.key||("Kayıt "+(index+1)),
+        kind:"saved",
+        item,
+      }));
+    }
+
+    if(state.panel.wordsView==="senses"){
+      if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
+        await analyzePanelWordSenses();
+      }
+      return (state.panel.senseRows||[]).map((row,index)=>({
+        id:"sense:"+index,
+        label:row.canonical+(row.meaningTr?" — "+row.meaningTr:""),
+        kind:"sense",
+        row,
+      }));
+    }
+
+    if(state.panel.wordsView==="groups"){
+      if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups();
+      return (state.youtube.expressionGroupsAnalysis||[]).map((entry,index)=>({
+        id:"group:"+index,
+        label:entry.canonical,
+        kind:"group",
+        entry,
+      }));
+    }
+
+    let words=filterPanelWords(state.youtube.transcriptAnalysis||[]);
+    if(state.panel.wordsView==="alphabetical"){
+      words=[...words].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
+    }else if(state.panel.wordsView==="frequency" || state.panel.wordsView==="overview"){
+      words=[...words].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+    }
+    return words.map((entry,index)=>({
+      id:"word:"+index,
+      label:entry.lemma+" · "+entry.count+"×",
+      kind:"word",
+      entry,
+    }));
+  }
+
+  function exportRecordForItem(exportItem,sentenceMode="bilingual"){
+    if(exportItem.kind==="saved"){
+      const item=exportItem.item;
+      return {
+        type:item.kind||"",
+        item:item.label||item.key||"",
+        meaning_tr:item.meaning_tr||"",
+        status:item.status||"",
+        key:item.key||"",
+      };
+    }
+    if(exportItem.kind==="sense"){
+      const row=exportItem.row;
+      return {
+        type:"learning-unit",
+        item:row.canonical||row.lemma||"",
+        meaning_tr:row.meaningTr||"",
+        unit_type:row.unitType||"",
+        surface:row.surface||"",
+        occurrences:(row.occurrences||[]).length,
+      };
+    }
+    if(exportItem.kind==="group"){
+      const entry=exportItem.entry;
+      return {
+        type:"expression",
+        item:entry.canonical||"",
+        expression_type:expressionGroupLabel(entry.type),
+        meaning_tr:entry.meaningTr||"",
+        forms:(entry.forms||[]).join(", "),
+        frequency:entry.count||0,
+      };
+    }
+    if(exportItem.kind==="word"){
+      const entry=exportItem.entry;
+      const learning=learningItemForLemma(entry.lemma);
+      return {
+        type:"word",
+        lemma:entry.lemma||"",
+        pos:entry.pos||"",
+        forms:(entry.forms||[]).join(", "),
+        frequency:entry.count||0,
+        status:learning?.status||"",
+        meaning_tr:learning?.meaning_tr||"",
+      };
+    }
+    const cue=exportItem.cue;
+    return {
+      index:exportItem.index+1,
+      original:sentenceMode==="translation"?"":cue.text,
+      translation:"",
+      position:adapter.id==="web" ? String(exportItem.index+1) : panelClock(cue.startMs),
+    };
+  }
+
+  function downloadTextFile(filename,mime,text){
+    const blob=new Blob([text],{type:mime});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=filename;
+    link.style.display="none";
+    document.documentElement.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+
+  function printExport(records,title){
+    const popup=window.open("","_blank","noopener,noreferrer");
+    if(!popup) throw new Error("PDF/Print penceresi açılamadı");
+    const rows=records.map(record=>
+      '<div class="r">'+Object.entries(record).filter(([,v])=>String(v??"")!=="").map(([k,v])=>
+        '<div><b>'+esc(k)+'</b><span>'+esc(String(v??""))+'</span></div>'
+      ).join("")+'</div>'
+    ).join("");
+    popup.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>body{font-family:system-ui,-apple-system,sans-serif;margin:32px;color:#111}h1{font-size:22px}.r{padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid}.r div{display:grid;grid-template-columns:150px 1fr;gap:12px;margin:4px 0}.r b{font-size:12px;text-transform:uppercase;color:#666}.r span{white-space:pre-wrap}</style></head><body><h1>'+esc(title)+'</h1>'+rows+'</body></html>');
+    popup.document.close();
+    setTimeout(()=>{ popup.focus(); popup.print(); },250);
+  }
+
+  async function performExport(selected,format,sentenceMode){
+    const records=[];
+    for(const item of selected){
+      const record=exportRecordForItem(item,sentenceMode);
+      if(item.kind==="sentence" && sentenceMode!=="original"){
+        record.translation=await translationForCue(item.cue);
+      }
+      if(item.kind==="sentence" && sentenceMode==="translation"){
+        delete record.original;
+      }else if(item.kind==="sentence" && sentenceMode==="original"){
+        delete record.translation;
+      }
+      records.push(record);
+    }
+    const base=safeExportName()+"-"+state.panel.tab;
+    if(format==="json"){
+      downloadTextFile(base+".json","application/json;charset=utf-8",JSON.stringify(records,null,2));
       return;
     }
-    body.innerHTML='<div class="gle-saved-list">'+present.map(({entry,item})=>'<button type="button" class="gle-saved-word" data-lemma="'+escAttr(entry.lemma)+'"><span><strong>★ '+esc(item.label||entry.lemma)+'</strong><small>'+esc(item.meaning_tr||"")+'</small></span><b>'+entry.count+'×</b></button>').join("")+'</div>';
-    body.querySelectorAll(".gle-saved-word").forEach(button=>{
-      button.addEventListener("click",()=>{
-        state.panel.tab="words";
-        state.panel.selectedLemma=button.dataset.lemma;
-        renderSharedPanel();
-      });
+    if(format==="csv"){
+      const keys=[...new Set(records.flatMap(record=>Object.keys(record)))];
+      const csv=[keys.map(csvCell).join(","),...records.map(record=>keys.map(key=>csvCell(record[key]??"")).join(","))].join("\n");
+      downloadTextFile(base+".csv","text/csv;charset=utf-8",csv);
+      return;
+    }
+    if(format==="pdf"){
+      printExport(records,safeExportName());
+      return;
+    }
+    const txt=records.map(record=>Object.entries(record)
+      .filter(([,value])=>String(value??"")!=="")
+      .map(([key,value])=>key+": "+value).join("\n")).join("\n\n");
+    downloadTextFile(base+".txt","text/plain;charset=utf-8",txt);
+  }
+
+  async function ensureExportDialog(){
+    document.getElementById("gle-export-dialog")?.remove();
+    const items=await exportItemsForCurrentTab();
+    const dialog=document.createElement("div");
+    dialog.id="gle-export-dialog";
+    const sentenceOptions=state.panel.tab==="subtitles"
+      ? '<label>'+esc(uiText("exportContent"))+'<select name="sentenceMode"><option value="bilingual">'+esc(uiText("exportBilingual"))+'</option><option value="original">'+esc(uiText("exportOriginal"))+'</option><option value="translation">'+esc(uiText("exportTranslationOnly"))+'</option></select></label>'
+      : "";
+    dialog.innerHTML='<div class="gle-export-card" role="dialog" aria-modal="true"><header><strong>'+esc(uiText("exportTitle"))+'</strong><button type="button" class="gle-export-close">×</button></header>'+
+      '<div class="gle-export-options">'+sentenceOptions+
+      '<label>'+esc(uiText("exportFormat"))+'<select name="format"><option value="txt">TXT</option><option value="csv">CSV</option><option value="json">JSON</option><option value="pdf">PDF / Print</option></select></label></div>'+
+      '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all" checked> '+esc(uiText("exportSelectAll"))+'</label><span>'+items.length+'</span></div>'+
+      '<div class="gle-export-items">'+items.map(item=>'<label><input type="checkbox" data-export-id="'+escAttr(item.id)+'" checked><span>'+esc(item.label)+'</span></label>').join("")+'</div>'+
+      '<footer><button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
+    document.documentElement.appendChild(dialog);
+    const close=()=>dialog.remove();
+    dialog.querySelector(".gle-export-close").addEventListener("click",close);
+    dialog.querySelector(".gle-export-cancel").addEventListener("click",close);
+    dialog.addEventListener("click",event=>{ if(event.target===dialog) close(); });
+    const all=dialog.querySelector(".gle-export-all");
+    all.addEventListener("change",()=>{
+      dialog.querySelectorAll("[data-export-id]").forEach(input=>{input.checked=all.checked;});
     });
+    dialog.querySelectorAll("[data-export-id]").forEach(input=>input.addEventListener("change",()=>{
+      const boxes=[...dialog.querySelectorAll("[data-export-id]")];
+      all.checked=boxes.length>0 && boxes.every(box=>box.checked);
+      all.indeterminate=!all.checked && boxes.some(box=>box.checked);
+    }));
+    dialog.querySelector(".gle-export-go").addEventListener("click",async()=>{
+      const selectedIds=new Set([...dialog.querySelectorAll("[data-export-id]:checked")].map(input=>input.dataset.exportId));
+      const selected=items.filter(item=>selectedIds.has(item.id));
+      if(!selected.length) return;
+      const button=dialog.querySelector(".gle-export-go");
+      button.disabled=true;
+      try{
+        await performExport(
+          selected,
+          dialog.querySelector('[name="format"]').value,
+          dialog.querySelector('[name="sentenceMode"]')?.value || "bilingual"
+        );
+        close();
+      }catch(error){
+        console.warn("Export failed",error);
+        button.disabled=false;
+      }
+    });
+    return dialog;
   }
 
   function renderSharedPanel(){
@@ -3002,6 +3265,17 @@
     return rect.width>0 && rect.height>0;
   }
 
+  function webCandidateText(element){
+    const isHeaderMeta=element.matches?.("article header [class*=category],article header [class*=kicker]");
+    if(isHeaderMeta){
+      const parts=[...element.querySelectorAll(":scope > a,:scope > span")]
+        .map(node=>String(node.innerText||node.textContent||"").replace(/\s+/g," ").trim())
+        .filter(Boolean);
+      if(parts.length>1) return [...new Set(parts)].join(" | ");
+    }
+    return String(element.innerText||element.textContent||"").replace(/\s+/g," ").trim();
+  }
+
   function collectWebSegments(){
     const root=document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
     if(!root) return [];
@@ -3012,7 +3286,7 @@
     for(const element of candidates){
       if(segments.length>=500) break;
       if(!webElementVisible(element)) continue;
-      const raw=String(element.innerText||element.textContent||"").replace(/\s+/g," ").trim();
+      const raw=webCandidateText(element);
       if(raw.length<12 || raw.length>2400) continue;
       for(const sentence of splitWebSentences(raw)){
         if(segments.length>=500) break;
