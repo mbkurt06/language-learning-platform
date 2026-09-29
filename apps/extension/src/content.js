@@ -1183,6 +1183,13 @@
 
     document.documentElement.appendChild(panel);
     state.youtube.panel=panel;
+
+    const active=state.settings.extensionEnabled!==false;
+    const mainToggle=panel.querySelector(".gle-header-main-toggle");
+    if(mainToggle) mainToggle.checked=active;
+    const mainLabel=panel.querySelector(".gle-master-switch em");
+    if(mainLabel) mainLabel.textContent=active?"Aktif":"Pasif";
+
     setYouTubePanelCollapsed(state.youtube.panelCollapsed);
     syncYouTubePanelHost();
     return panel;
