@@ -145,7 +145,7 @@
       {lemma:"das Gesamtbild",forms:["Gesamtbild"],pos:"NOUN",meaningTr:"genel tablo"}
     ],
     expressions:[
-      {canonical:"viel vorhaben",type:"FIXED_CONSTRUCTION",forms:["hat Schwarz-Rot viel vor"],highlightParts:["hat","viel","vor"],meaningTr:"çok şey planlamak",grammarHint:"vorhaben · ayrılabilen fiil"},
+      {canonical:"vorhaben",type:"PARTICLE_VERB",forms:["hat Schwarz-Rot viel vor"],highlightParts:["hat","vor"],meaningTr:"planlamak, niyetinde olmak",grammarHint:"vorhaben · ayrılabilen fiil"},
       {canonical:"drohen, etwas zu tun",type:"GRAMMAR_CONSTRUCTION",forms:["droht sich in Diskussionen zu verlieren"],highlightParts:["droht","zu"],meaningTr:"bir şey olma / yapma riski bulunmak",grammarHint:"drohen + zu + Infinitiv"},
       {canonical:"sich in etwas verlieren",type:"REFLEXIVE_VERB_PREPOSITION",forms:["sich in Diskussionen zu verlieren"],highlightParts:["sich","in","verlieren"],meaningTr:"bir şeyin içinde kaybolmak; burada: tartışmalara saplanmak",grammarHint:"sich verlieren in + Dat."},
       {canonical:"mitten in etwas stecken",type:"FIXED_CONSTRUCTION",forms:["steckt mitten in der Debatte"],highlightParts:["steckt","mitten","in"],meaningTr:"bir şeyin tam ortasında olmak",grammarHint:"in + Dat."},
