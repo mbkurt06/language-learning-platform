@@ -1240,17 +1240,14 @@
     player.style.removeProperty("--gle-video-scale");
 
     const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
+    const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
     const left=Math.max(0,rect.right);
-    const rightInset=12;
-    const available=Math.max(220,viewportWidth-left-rightInset);
-    const panelWidth=Math.min(420,available);
-    const top=Math.max(0,rect.top);
-    const height=Math.max(240,Math.min(rect.height,window.innerHeight-top));
+    const panelWidth=Math.max(220,viewportWidth-left);
 
     document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
-    document.documentElement.style.setProperty("--gle-youtube-panel-top",top+"px");
+    document.documentElement.style.setProperty("--gle-youtube-panel-top","0px");
     document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
-    document.documentElement.style.setProperty("--gle-youtube-panel-height",height+"px");
+    document.documentElement.style.setProperty("--gle-youtube-panel-height",viewportHeight+"px");
     document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
     document.documentElement.style.setProperty("--gle-panel-handle-right",Math.max(0,viewportWidth-left)+"px");
     requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
@@ -2346,7 +2343,13 @@
     }
 
     if(message.type==="track-status" && message.enabled===false){
-      resetYouTube(message.videoId || state.youtube.videoId);
+      // YouTube can emit transient disabled states while its UI/player is
+      // reflowing (for example when our panel is collapsed/reopened). Preserve
+      // the already loaded timed cue list for the same video; only a real video
+      // identity change should clear it.
+      if(message.videoId && state.youtube.videoId && message.videoId!==state.youtube.videoId){
+        resetYouTube(message.videoId);
+      }
       return;
     }
 
