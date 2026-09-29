@@ -1182,10 +1182,11 @@
     if(!panel || !handle || state.panel.collapsed) return;
     const rect=panel.getBoundingClientRect();
     if(!rect.height) return;
-    // Keep the shared handle at the same viewport-relative height on every
-    // provider. ZDF's 12px panel inset must not push the handle lower than YouTube.
+    // Anchor the shared handle to the panel's actual rendered left edge.
+    // This avoids provider-specific right insets making ZDF overlap the handle.
     const centerY=Math.max(52,Math.min(innerHeight-52,Math.min(120,rect.height*0.22)));
     document.documentElement.style.setProperty("--gle-panel-handle-top",centerY+"px");
+    document.documentElement.style.setProperty("--gle-panel-handle-left",rect.left+"px");
   }
 
   function syncSharedPanelHost(){
