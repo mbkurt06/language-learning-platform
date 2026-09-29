@@ -7,9 +7,9 @@
   const LIVE_REFRESH_MS = 15000;
   const CANDIDATE_REFRESH_DEBOUNCE_MS = 8000;
   const RETRY_BACKOFF_STEPS_MS = [15000, 30000, 60000, 120000, 300000];
-  const LIVE_LOOKBACK_SECONDS = 90;
-  const LIVE_MAX_SEGMENTS = 48;
-  const SEGMENT_CACHE_LIMIT = 160;
+  const LIVE_LOOKBACK_SECONDS = 30;
+  const LIVE_MAX_SEGMENTS = 8;
+  const SEGMENT_CACHE_LIMIT = 48;
 
   const state = {
     video: null,
@@ -437,7 +437,7 @@
           registerRefreshFailure(error);
         });
       }, CANDIDATE_REFRESH_DEBOUNCE_MS);
-      if (state.mode === "live-hls-webvtt") return;
+      return;
     }
 
     if (state.directUrls.length && state.mode !== "vod-direct-vtt") await loadDirectVtt();
