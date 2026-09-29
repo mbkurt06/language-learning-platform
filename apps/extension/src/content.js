@@ -1212,37 +1212,30 @@
     const player=document.querySelector(".html5-video-player");
     if(!panel || !player) return;
 
-    const flexy=document.querySelector("ytd-watch-flexy");
     const fullscreen=Boolean(document.fullscreenElement) || player.classList.contains("ytp-fullscreen");
-    const theater=Boolean(flexy?.hasAttribute("theater")) && player.getBoundingClientRect().width>=900;
-    const shouldDock=fullscreen || theater;
+    const width=player.getBoundingClientRect().width || 1;
+    const panelWidth=Math.min(420,Math.max(260,width*0.32));
+    const shouldDock=true;
 
-    if(shouldDock && panel.parentElement!==player){
-      player.appendChild(panel);
-    }else if(!shouldDock && panel.parentElement!==document.documentElement){
-      document.documentElement.appendChild(panel);
-    }
+    if(panel.parentElement!==player) player.appendChild(panel);
 
-    state.panel.docked=shouldDock;
+    state.panel.docked=true;
     panel.classList.remove("gle-provider-panel-layout");
-    panel.classList.toggle("docked",shouldDock);
-    const currentPanelWidth=shouldDock
-      ? Math.min(420,(player.getBoundingClientRect().width||1)*0.35)
-      : Math.min(420,Math.max(320,panel.getBoundingClientRect().width||420));
-    document.documentElement.style.setProperty("--gle-panel-current-width",currentPanelWidth+"px");
-    player.classList.toggle("gle-panel-docked",shouldDock && !state.panel.collapsed);
-    player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.panel.collapsed);
+    panel.classList.add("docked");
+    document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
+    player.style.setProperty("--gle-panel-width",panelWidth+"px");
+    player.classList.toggle("gle-panel-docked",!state.panel.collapsed);
+    player.classList.toggle("gle-panel-docked-collapsed",state.panel.collapsed);
 
-    if(shouldDock && !state.panel.collapsed){
-      const width=player.getBoundingClientRect().width || 1;
-      const panelWidth=Math.min(420,width*0.35);
-      const scale=Math.max(0.55,(width-panelWidth)/width);
+    if(!state.panel.collapsed){
+      const contentWidth=Math.max(320,width-panelWidth);
+      const scale=Math.max(0.45,Math.min(1,contentWidth/width));
       player.style.setProperty("--gle-video-scale",String(scale));
-      player.style.setProperty("--gle-panel-width",panelWidth+"px");
     }else{
       player.style.removeProperty("--gle-video-scale");
-      player.style.removeProperty("--gle-panel-width");
     }
+
+    player.classList.toggle("gle-panel-player-fullscreen",fullscreen);
     requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
   }
 
