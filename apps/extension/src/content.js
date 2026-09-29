@@ -2948,12 +2948,13 @@
     return "Cumleler";
   }
 
-  function safeExportName(){
+  function safeExportName(sectionOverride=""){
     const raw=(adapter.id==="youtube" ? currentYouTubeTitle() : document.title || "language-learning")
       .replace(/\s+/g," ").trim()
       .replace(/[\\/:*?"<>|]+/g,"-")
       .slice(0,72);
-    return (raw || "language-learning")+"-"+exportSectionName()+"-"+exportTimestamp();
+    const section=(sectionOverride||exportSectionName()).replace(/[\\/:*?"<>|\s]+/g,"_");
+    return (raw || "language-learning")+"-"+section+"-"+exportTimestamp();
   }
 
   async function translationForCue(cue){
@@ -2967,104 +2968,90 @@
     return value;
   }
 
-  async function exportItemsForCurrentTab(){
-    if(state.panel.tab==="subtitles"){
-      return (state.youtube.cues||[]).map((cue,index)=>({
-        id:"sentence:"+index,
-        label:(index+1)+". "+cue.text.slice(0,90),
-        kind:"sentence",
-        cue,
-        index,
-      }));
-    }
-
-    if(state.panel.tab==="saved"){
-      return filteredSavedItems().map((item,index)=>({
-        id:"saved:"+index,
-        label:item.label||item.key||("Kayıt "+(index+1)),
-        kind:"saved",
-        item,
-      }));
-    }
-
-    if(state.panel.wordsView==="senses"){
-      if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
-        await analyzePanelWordSenses();
-      }
-      return (state.panel.senseRows||[]).map((row,index)=>({
-        id:"sense:"+index,
+  async function exportItemsForWordsView(view){
+    if(view==="senses"){
+      if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows) await analyzePanelWordSenses();
+      if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups();
+      return senseRowsWithExpressions().map((row,index)=>({
+        id:"senses:item:"+index,section:"Anlamlar",sectionId:"senses",
         label:row.canonical+(row.meaningTr?" — "+row.meaningTr:""),
-        kind:"sense",
-        row,
+        kind:row.expressionEntry?"group":"sense",row,entry:row.expressionEntry||null,
       }));
     }
-
-    if(state.panel.wordsView==="groups"){
+    if(view==="groups"){
       if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups();
       return (state.youtube.expressionGroupsAnalysis||[]).map((entry,index)=>({
-        id:"group:"+index,
-        label:entry.canonical,
-        kind:"group",
-        entry,
+        id:"groups:item:"+index,section:"Kelime grupları",sectionId:"groups",label:entry.canonical,kind:"group",entry,
       }));
     }
-
     let words=filterPanelWords(state.youtube.transcriptAnalysis||[]);
-    if(state.panel.wordsView==="alphabetical"){
-      words=[...words].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
-    }else if(state.panel.wordsView==="frequency" || state.panel.wordsView==="overview"){
-      words=[...words].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
-    }
+    if(view==="alphabetical") words=[...words].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
+    else words=[...words].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+    const labels={overview:"Genel",alphabetical:"A-Z",frequency:"Sıklık"};
     return words.map((entry,index)=>({
-      id:"word:"+index,
-      label:entry.lemma+" · "+entry.count+"×",
-      kind:"word",
-      entry,
+      id:view+":item:"+index,section:labels[view]||"Kelimeler",sectionId:view,label:entry.lemma+" · "+entry.count+"×",kind:"word",entry,
     }));
   }
 
+  async function exportItemsForCurrentTab(){
+    if(state.panel.tab==="subtitles"){
+      return (state.youtube.cues||[]).map((cue,index)=>({
+        id:"sentence:"+index,label:(index+1)+". "+cue.text.slice(0,90),kind:"sentence",cue,index,
+      }));
+    }
+    if(state.panel.tab==="saved"){
+      return filteredSavedItems().map((item,index)=>({
+        id:"saved:"+index,label:item.label||item.key||("Kayıt "+(index+1)),kind:"saved",item,
+      }));
+    }
+    const result=[];
+    for(const view of ["overview","alphabetical","frequency","groups","senses"]) result.push(...await exportItemsForWordsView(view));
+    return result;
+  }
+
   function exportRecordForItem(exportItem,sentenceMode="bilingual"){
+    const withSection=record=>exportItem.section ? {"Bölüm":exportItem.section,...record} : record;
     if(exportItem.kind==="saved"){
       const item=exportItem.item;
       const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
-      return {
+      return withSection({
         "Kelime / İfade":item.label||item.key||"",
         "Türkçe anlam":item.meaning_tr||"",
         "Tür":type,
         "Durum":itemStatus(item)==="learned"?"Biliyorum":"Öğreniyorum",
-      };
+      });
     }
     if(exportItem.kind==="sense"){
       const row=exportItem.row;
-      return {
+      return withSection({
         "Kelime / İfade":row.canonical||row.lemma||"",
         "Türkçe anlam":row.meaningTr||"",
         "Tür":row.unitType||"Anlam/Kullanım",
         "İçerikteki biçim":row.surface||"",
         "Geçiş sayısı":(row.occurrences||[]).length,
-      };
+      });
     }
     if(exportItem.kind==="group"){
       const entry=exportItem.entry;
-      return {
+      return withSection({
         "İfade":entry.canonical||"",
         "Tür":expressionGroupLabel(entry.type),
         "Türkçe anlam":entry.meaningTr||"",
         "İçerikteki biçimler":(entry.forms||[]).join(", "),
         "Sıklık":entry.count||0,
-      };
+      });
     }
     if(exportItem.kind==="word"){
       const entry=exportItem.entry;
       const learning=learningItemForLemma(entry.lemma);
-      return {
+      return withSection({
         "Kelime":entry.lemma||"",
         "Kelime türü":posLabel(entry.pos||""),
         "İçerikteki biçimler":(entry.forms||[]).join(", "),
         "Sıklık":entry.count||0,
         "Türkçe anlam":learning?.meaning_tr||"",
         "Durum":learning?(itemStatus(learning)==="learned"?"Biliyorum":"Öğreniyorum"):"",
-      };
+      });
     }
     const cue=exportItem.cue;
     return {
@@ -3105,35 +3092,29 @@
     iframe.style.opacity="0";
     document.documentElement.appendChild(iframe);
     const doc=iframe.contentDocument;
-    if(!doc){ iframe.remove(); throw new Error("PDF/Print belgesi oluşturulamadı"); }
+    if(!doc){iframe.remove();throw new Error("PDF/Print belgesi oluşturulamadı");}
     doc.open();
     doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{margin:16mm}body{font-family:system-ui,-apple-system,sans-serif;margin:0;color:#111}h1{font-size:22px}.r{padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid}.r div{display:grid;grid-template-columns:150px 1fr;gap:12px;margin:4px 0}.r b{font-size:12px;text-transform:uppercase;color:#666}.r span{white-space:pre-wrap}</style></head><body><h1>'+esc(title)+'</h1>'+rows+'</body></html>');
     doc.close();
+    try{doc.title=title;}catch(_error){}
+    const previousTitle=document.title;
+    document.title=title;
     setTimeout(()=>{
-      try{
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      }finally{
-        setTimeout(()=>iframe.remove(),1500);
-      }
+      try{iframe.contentWindow?.focus();iframe.contentWindow?.print();}
+      finally{setTimeout(()=>{document.title=previousTitle;iframe.remove();},1800);}
     },300);
   }
 
-  async function performExport(selected,format,sentenceMode){
+  async function performExport(selected,format,sentenceMode,sectionOverride=""){
     const records=[];
     for(const item of selected){
       const record=exportRecordForItem(item,sentenceMode);
-      if(item.kind==="sentence" && sentenceMode!=="original"){
-        record["Türkçe"]=await translationForCue(item.cue);
-      }
-      if(item.kind==="sentence" && sentenceMode==="translation"){
-        delete record["Almanca"];
-      }else if(item.kind==="sentence" && sentenceMode==="original"){
-        delete record["Türkçe"];
-      }
+      if(item.kind==="sentence" && sentenceMode!=="original") record["Türkçe"]=await translationForCue(item.cue);
+      if(item.kind==="sentence" && sentenceMode==="translation") delete record["Almanca"];
+      else if(item.kind==="sentence" && sentenceMode==="original") delete record["Türkçe"];
       records.push(record);
     }
-    const base=safeExportName();
+    const base=safeExportName(sectionOverride);
     if(format==="json"){
       downloadTextFile(base+".json","application/json;charset=utf-8",JSON.stringify(records,null,2));
       return;
@@ -3144,10 +3125,7 @@
       downloadTextFile(base+".csv","text/csv;charset=utf-8",csv);
       return;
     }
-    if(format==="pdf"){
-      printExport(records,safeExportName());
-      return;
-    }
+    if(format==="pdf"){printExport(records,base);return;}
     const txt=records.map(record=>Object.entries(record)
       .filter(([,value])=>String(value??"")!=="")
       .map(([key,value])=>key+": "+value).join("\n")).join("\n\n");
@@ -3162,37 +3140,67 @@
     const sentenceOptions=state.panel.tab==="subtitles"
       ? '<label>'+esc(uiText("exportContent"))+'<select name="sentenceMode"><option value="bilingual">'+esc(uiText("exportBilingual"))+'</option><option value="original">'+esc(uiText("exportOriginal"))+'</option><option value="translation">'+esc(uiText("exportTranslationOnly"))+'</option></select></label>'
       : "";
+    const wordSections=state.panel.tab==="words"
+      ? '<div class="gle-export-sections">'+[
+          ["overview","Genel"],["alphabetical","A-Z"],["frequency","Sıklık"],["groups","Kelime grupları"],["senses","Anlamlar"]
+        ].map(([id,label])=>'<label><input type="checkbox" data-export-section="'+id+'" '+(id===state.panel.wordsView?"checked":"")+'><span>'+label+'</span></label>').join("")+'</div>'
+      : "";
     dialog.innerHTML='<div class="gle-export-card" role="dialog" aria-modal="true"><header><strong>'+esc(uiText("exportTitle"))+'</strong><button type="button" class="gle-export-close">×</button></header>'+
       '<div class="gle-export-options">'+sentenceOptions+
       '<label>'+esc(uiText("exportFormat"))+'<select name="format"><option value="txt">TXT</option><option value="csv">CSV</option><option value="json">JSON</option><option value="pdf">PDF / Print</option></select></label></div>'+
-      '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all" checked> '+esc(uiText("exportSelectAll"))+'</label><span>'+items.length+'</span></div>'+
-      '<div class="gle-export-items">'+items.map(item=>'<label><input type="checkbox" data-export-id="'+escAttr(item.id)+'" checked><span>'+esc(item.label)+'</span></label>').join("")+'</div>'+
+      wordSections+
+      '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all"> '+esc(uiText("exportSelectAll"))+'</label><span class="gle-export-count">0</span></div>'+
+      '<div class="gle-export-items"></div>'+
       '<footer><button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
     document.documentElement.appendChild(dialog);
     const close=()=>dialog.remove();
     dialog.querySelector(".gle-export-close").addEventListener("click",close);
     dialog.querySelector(".gle-export-cancel").addEventListener("click",close);
-    dialog.addEventListener("click",event=>{ if(event.target===dialog) close(); });
+    dialog.addEventListener("click",event=>{if(event.target===dialog)close();});
+    const itemBox=dialog.querySelector(".gle-export-items");
     const all=dialog.querySelector(".gle-export-all");
+    const count=dialog.querySelector(".gle-export-count");
+    const visibleItems=()=>state.panel.tab!=="words"
+      ? items
+      : items.filter(item=>dialog.querySelector('[data-export-section="'+item.sectionId+'"]')?.checked);
+    const renderItems=()=>{
+      const list=visibleItems();
+      itemBox.innerHTML=list.map(item=>'<label><input type="checkbox" data-export-id="'+escAttr(item.id)+'" checked><span>'+(item.section?'<b>'+esc(item.section)+'</b> · ':"")+esc(item.label)+'</span></label>').join("");
+      all.checked=list.length>0;
+      all.indeterminate=false;
+      count.textContent=String(list.length);
+      itemBox.querySelectorAll("[data-export-id]").forEach(input=>input.addEventListener("change",()=>{
+        const boxes=[...itemBox.querySelectorAll("[data-export-id]")];
+        all.checked=boxes.length>0&&boxes.every(box=>box.checked);
+        all.indeterminate=!all.checked&&boxes.some(box=>box.checked);
+        count.textContent=String(boxes.filter(box=>box.checked).length)+"/"+boxes.length;
+      }));
+    };
+    dialog.querySelectorAll("[data-export-section]").forEach(input=>input.addEventListener("change",renderItems));
     all.addEventListener("change",()=>{
-      dialog.querySelectorAll("[data-export-id]").forEach(input=>{input.checked=all.checked;});
+      itemBox.querySelectorAll("[data-export-id]").forEach(input=>{input.checked=all.checked;});
+      const boxes=[...itemBox.querySelectorAll("[data-export-id]")];
+      count.textContent=String(boxes.filter(box=>box.checked).length)+"/"+boxes.length;
     });
-    dialog.querySelectorAll("[data-export-id]").forEach(input=>input.addEventListener("change",()=>{
-      const boxes=[...dialog.querySelectorAll("[data-export-id]")];
-      all.checked=boxes.length>0 && boxes.every(box=>box.checked);
-      all.indeterminate=!all.checked && boxes.some(box=>box.checked);
-    }));
+    renderItems();
     dialog.querySelector(".gle-export-go").addEventListener("click",async()=>{
-      const selectedIds=new Set([...dialog.querySelectorAll("[data-export-id]:checked")].map(input=>input.dataset.exportId));
-      const selected=items.filter(item=>selectedIds.has(item.id));
-      if(!selected.length) return;
+      const selectedIds=new Set([...itemBox.querySelectorAll("[data-export-id]:checked")].map(input=>input.dataset.exportId));
+      const selected=visibleItems().filter(item=>selectedIds.has(item.id));
+      if(!selected.length)return;
+      const sectionIds=[...new Set(selected.map(item=>item.sectionId).filter(Boolean))];
+      const sectionOverride=state.panel.tab==="words"
+        ? (sectionIds.length===1
+          ? ({overview:"Kelimeler",alphabetical:"Kelimeler_A-Z",frequency:"Kelimeler_Siklik",groups:"Kelime_Gruplari",senses:"Anlamlar"})[sectionIds[0]]
+          : "Kelimeler_Coklu")
+        : "";
       const button=dialog.querySelector(".gle-export-go");
       button.disabled=true;
       try{
         await performExport(
           selected,
           dialog.querySelector('[name="format"]').value,
-          dialog.querySelector('[name="sentenceMode"]')?.value || "bilingual"
+          dialog.querySelector('[name="sentenceMode"]')?.value||"bilingual",
+          sectionOverride
         );
         close();
       }catch(error){
