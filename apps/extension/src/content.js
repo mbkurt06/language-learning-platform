@@ -1870,7 +1870,7 @@
           for(const token of item.tokens||[]){
             const pos=String(token.pos||"").toUpperCase();
             if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
-            const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
+            const lemma=sanitizeLearningText(token.lemma).toLocaleLowerCase("de-DE");
             if(!lemma || !/[\p{L}]/u.test(lemma)) continue;
             let entry=words.get(lemma);
             if(!entry){
@@ -1878,7 +1878,8 @@
               words.set(lemma,entry);
             }
             entry.count+=1;
-            entry.forms.add(String(token.text||lemma));
+            const surface=sanitizeLearningText(token.text||lemma);
+            if(surface && /[\p{L}]/u.test(surface)) entry.forms.add(surface);
             if(!entry.occurrences.includes(index)) entry.occurrences.push(index);
           }
         });
@@ -2206,6 +2207,13 @@
     return state.learningItems.find(item=>item.kind==="learning-unit" && item.key===row.key);
   }
 
+  function sanitizeLearningText(value){
+    return String(value||"")
+      .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/gu,"")
+      .replace(/\s+/g," ")
+      .trim();
+  }
+
   async function analyzePanelWordSenses(){
     const videoId=state.youtube.videoId;
     const cues=state.youtube.cues||[];
@@ -2231,21 +2239,21 @@
           (payload.items||[]).forEach((item,index)=>{
             const cueIndex=offset+index;
             for(const unit of item.learning_units||[]){
+              const canonical=sanitizeLearningText(unit.canonical||unit.lemma||"");
+              const lemma=sanitizeLearningText(unit.lemma||canonical);
+              const surface=sanitizeLearningText(unit.surface||canonical);
+              if(!canonical || !/[\p{L}]/u.test(canonical)) continue;
               const key=String(unit.id||"");
               if(!key) continue;
               let row=rows.get(key);
               if(!row){
                 row={
-                  key,
-                  lemma:String(unit.lemma||unit.canonical||""),
-                  canonical:String(unit.canonical||unit.lemma||""),
-                  meaningTr:String(unit.meaning_tr||""),
-                  unitType:String(unit.unit_type||"Kelime"),
+                  key,lemma,canonical,
+                  meaningTr:sanitizeLearningText(unit.meaning_tr||""),
+                  unitType:sanitizeLearningText(unit.unit_type||"Kelime"),
                   senseId:String(unit.sense_id||""),
                   patternId:String(unit.pattern_id||""),
-                  cueIndex,
-                  surface:String(unit.surface||unit.canonical||""),
-                  occurrences:[],
+                  cueIndex,surface,occurrences:[],
                 };
                 rows.set(key,row);
               }
@@ -2266,6 +2274,30 @@
     return task;
   }
 
+  function senseRowsWithExpressions(){
+    const rows=[...(state.panel.senseRows||[])];
+    const seen=new Set(rows.map(row=>"expr:"+String(row.patternId||row.canonical||"").toLocaleLowerCase("de-DE")));
+    for(const entry of state.youtube.expressionGroupsAnalysis||[]){
+      const exprKey=String(entry.patternId||entry.canonical||"").toLocaleLowerCase("de-DE");
+      if(!exprKey || seen.has("expr:"+exprKey)) continue;
+      rows.push({
+        key:"expression:"+exprKey,
+        lemma:entry.canonical,
+        canonical:entry.canonical,
+        meaningTr:entry.meaningTr||"",
+        unitType:expressionGroupLabel(entry.type),
+        senseId:"",
+        patternId:entry.patternId||"",
+        cueIndex:entry.occurrences?.[0]??0,
+        surface:entry.forms?.[0]||entry.canonical,
+        occurrences:[...(entry.occurrences||[])],
+        expressionEntry:entry,
+      });
+      seen.add("expr:"+exprKey);
+    }
+    return rows.sort((a,b)=>a.canonical.localeCompare(b.canonical,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
+  }
+
   async function setSenseStatus(row,status){
     await setLearningStatus({
       kind:"learning-unit",
@@ -2279,30 +2311,38 @@
     if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
       body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
       bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
-      analyzePanelWordSenses();
+      Promise.all([analyzePanelWordSenses(),analyzeWholeYouTubeExpressionGroups()]).catch(()=>{});
       return;
     }
     const q=String(state.panel.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
-    const rows=state.panel.senseRows.filter(row=>!q || row.lemma.includes(q) || row.meaningTr.toLocaleLowerCase("tr-TR").includes(q));
+    const rows=senseRowsWithExpressions().filter(row=>!q || String(row.lemma||"").toLocaleLowerCase("de-DE").includes(q) || String(row.meaningTr||"").toLocaleLowerCase("tr-TR").includes(q));
     const table='<div class="gle-sense-table"><div class="gle-sense-head"><span>Öğrenme birimi</span><span>Bu kullanımdaki anlam</span><span>Tür</span><span>Durum</span></div>'+rows.map(row=>{
-      const item=learningItemForSense(row);
-      const learning=item?.status==="learning";
-      const known=item?.status==="learned" || item?.status==="known";
-      return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">★</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
+      const item=row.expressionEntry
+        ? state.learningItems.find(entry=>entry.kind==="expression" && [row.expressionEntry.patternId,row.expressionEntry.canonical].map(v=>String(v||"").toLocaleLowerCase("de-DE")).includes(String(entry.key||"").toLocaleLowerCase("de-DE")))
+        : learningItemForSense(row);
+      const learning=item && itemStatus(item)==="learning";
+      const known=item && itemStatus(item)==="learned";
+      return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">'+(learning?"★":"☆")+'</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
     }).join("")+'</div>';
     body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
     bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
     body.querySelectorAll("[data-sense-jump]").forEach(button=>button.addEventListener("click",()=>{
-      const row=state.panel.senseRows.find(item=>item.key===button.dataset.senseJump);
+      const row=senseRowsWithExpressions().find(item=>item.key===button.dataset.senseJump);
       if(row) playYouTubeCue(row.cueIndex);
     }));
     const bindStatus=(selector,status)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
       const key=button.dataset.senseLearn||button.dataset.senseKnown;
-      const row=state.panel.senseRows.find(item=>item.key===key);
+      const row=senseRowsWithExpressions().find(item=>item.key===key);
       if(!row) return;
       button.disabled=true;
-      try{ await setSenseStatus(row,status); renderSharedPanel(); }
-      catch(error){ console.warn("Word sense status failed",error); button.disabled=false; }
+      try{
+        if(row.expressionEntry){
+          await setLearningStatus({kind:"expression",key:row.expressionEntry.patternId||row.expressionEntry.canonical,label:row.expressionEntry.canonical,meaning_tr:row.expressionEntry.meaningTr||"",surface:row.surface},status);
+        }else{
+          await setSenseStatus(row,status);
+        }
+        renderSharedPanel();
+      }catch(error){console.warn("Word sense status failed",error);button.disabled=false;}
     }));
     bindStatus("[data-sense-learn]","learning");
     bindStatus("[data-sense-known]","learned");
