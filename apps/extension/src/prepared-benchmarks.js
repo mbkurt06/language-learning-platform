@@ -73,7 +73,7 @@
       {canonical:"sich in etwas verlieren",type:"REFLEXIVE_VERB_PREPOSITION",forms:["sich in Diskussionen zu verlieren"],meaningTr:"bir şeyin içinde kaybolmak; burada: tartışmalara saplanmak",grammarHint:"sich verlieren in + Dat."},
       {canonical:"mitten in etwas stecken",type:"FIXED_CONSTRUCTION",forms:["steckt mitten in der Debatte"],meaningTr:"bir şeyin tam ortasında olmak",grammarHint:"in + Dat."},
       {canonical:"etwas ins Kabinett bringen",type:"COLLOCATION",forms:["einen Gesetzentwurf zur Pflegereform ins Kabinett bringen"],meaningTr:"bir yasa tasarısını Bakanlar Kuruluna sunmak"},
-      {canonical:"unter Druck stehen",type:"FIXED_CONSTRUCTION",forms:["steht unter immensem Druck"],meaningTr:"baskı altında olmak"},
+      {canonical:"unter Druck stehen",type:"FIXED_CONSTRUCTION",forms:["steht unter immensem Druck"],highlightParts:["steht","unter","Druck"],meaningTr:"baskı altında olmak"},
       {canonical:"mit etwas rechnen",type:"VERB_PREPOSITION",forms:["rechnen in diesem Jahr mit"],meaningTr:"bir şeyi beklemek / hesaba katmak",grammarHint:"rechnen mit + Dat."},
       {canonical:"etwas auf den Weg bringen",type:"FUNCTION_VERB",forms:["ein Gesetz auf den Weg bringen","auf den Weg gebracht"],meaningTr:"bir süreci veya düzenlemeyi başlatmak / hayata geçirmek"},
       {canonical:"bei etwas mitmachen",type:"VERB_PREPOSITION",forms:["nicht mitmachen"],meaningTr:"bir şeye katılmak; burada: bu yaklaşıma razı olmak"},
