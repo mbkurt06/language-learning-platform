@@ -59,7 +59,7 @@
       docked:false,
       wordsView:"overview",
       wordsSearch:"",
-      savedView:"all",
+      savedView:"learning",
       savedOccurrencePositions:{},
       senseRows:null,
       senseRowsVideoId:"",
@@ -95,7 +95,7 @@
       expressionGroupsPromise:null,
     },
     zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null},
-    web:{segments:[],signature:"",url:"",highlightTimer:null}
+    web:{segments:[],signature:"",url:"",highlightTimer:null,annotationRun:0,annotationLayer:null,annotationLabels:[],annotationTimer:null,interactionReady:false,hoverTimer:null,hoverKey:""}
   };
 
   const adapter=ADAPTERS.find(a=>a.host.test(location.hostname)) || {id:"web",host:/.*/,selectors:[]};
@@ -343,6 +343,7 @@
   function refreshLearningHighlights(){
     if(adapter.id==="web"){
       if(state.panel.element) renderSharedPanel();
+      scheduleWebLearningAnnotations();
       return;
     }
     if(adapter.id==="youtube" && state.youtube.cues?.length){
@@ -550,7 +551,7 @@
     const metadata={
       ...(existing?.metadata||{}),
       source:"chrome-extension",
-      saved:existing?.metadata?.saved!==false,
+      saved:status==="learning",
       content_source:existing?.metadata?.content_source||currentContentDescriptor(),
     };
     const response=await platformFetch(apiBase+"/api/v1/learning-items",{
@@ -568,6 +569,10 @@
       }),
     });
     if(!response.ok) throw new Error("learning status "+response.status);
+    let updated=null;
+    try{ updated=await response.json(); }catch(_error){}
+    const targetId=updated?.id||existing?.id;
+    if(targetId) await captureCurrentEncounter(targetId,payload.surface||payload.label||existing?.label||key).catch(()=>{});
     await loadLearningItems();
   }
 
@@ -637,46 +642,39 @@
       meaning:primaryMeaning,
       surface:sourceToken?.text||lemma,
     };
-    const encounterSnapshot=currentYouTubeEncounter(learnTarget.surface);
-    const learning=learnTarget.key && isLearning(learnTarget.kind,learnTarget.key);
+    const encounterSnapshot=currentContentEncounter(learnTarget.surface);
+    const existingLearningItem=learnTarget.key
+      ? state.learningItems.find(item=>learningKey(item.kind,item.key)===learningKey(learnTarget.kind,learnTarget.key))
+      : null;
+    const currentStatus=existingLearningItem ? itemStatus(existingLearningItem) : "";
     const learnAction=learnTarget.key
-      ? `<div class="gle-learn-actions"><button type="button" class="gle-learn-button gle-learn-toggle" title="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" aria-label="${learning?"Öğreniyorum listesinden kaldır":"Öğreniyorum listesine ekle"}" data-kind="${escAttr(learnTarget.kind)}" data-key="${escAttr(learnTarget.key)}" data-label="${escAttr(learnTarget.label)}" data-meaning="${escAttr(learnTarget.meaning)}" data-surface="${escAttr(learnTarget.surface)}">${learning?"★":"☆"} <span>Öğren</span></button></div>`
+      ? '<div class="gle-learn-actions">'+
+          '<button type="button" class="gle-learn-button gle-learn-star '+(currentStatus==="learning"?"active":"")+'" title="Öğreniyorum" data-kind="'+escAttr(learnTarget.kind)+'" data-key="'+escAttr(learnTarget.key)+'" data-label="'+escAttr(learnTarget.label)+'" data-meaning="'+escAttr(learnTarget.meaning)+'" data-surface="'+escAttr(learnTarget.surface)+'">'+(currentStatus==="learning"?"★":"☆")+'</button>'+
+          '<button type="button" class="gle-learn-button gle-learn-known '+(currentStatus==="learned"?"active":"")+'" title="Biliyorum" data-kind="'+escAttr(learnTarget.kind)+'" data-key="'+escAttr(learnTarget.key)+'" data-label="'+escAttr(learnTarget.label)+'" data-meaning="'+escAttr(learnTarget.meaning)+'" data-surface="'+escAttr(learnTarget.surface)+'">✓</button>'+
+        '</div>'
       : "";
 
     state.tooltip.innerHTML=header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>";
-    const learnButton=state.tooltip.querySelector(".gle-learn-toggle");
-    if(learnButton){
-      learnButton.addEventListener("click",async()=>{
-        const kind=learnButton.dataset.kind;
-        const key=learnButton.dataset.key;
-        const id=learningKey(kind,key);
-        const existing=state.learningItems.some(item=>learningKey(item.kind,item.key)===id);
-        learnButton.disabled=true;
-        try{
-          if(existing){
-            await removeLearningItem(kind,key);
-            learnButton.innerHTML="☆ <span>Öğren</span>";
-            learnButton.title="Öğreniyorum listesine ekle";
-            learnButton.setAttribute("aria-label","Öğreniyorum listesine ekle");
-          }else{
-            await saveLearningItem({
-              kind,
-              key,
-              label:learnButton.dataset.label,
-              meaning_tr:learnButton.dataset.meaning,
-              surface:learnButton.dataset.surface,
-            },encounterSnapshot);
-            learnButton.innerHTML="★ <span>Öğren</span>";
-            learnButton.title="Öğreniyorum listesinden kaldır";
-            learnButton.setAttribute("aria-label","Öğreniyorum listesinden kaldır");
-          }
-        }catch(error){
-          console.warn("Learning item sync failed",error);
-        }finally{
-          learnButton.disabled=false;
-        }
-      });
-    }
+    const bindTooltipStatus=(selector,status)=>state.tooltip.querySelector(selector)?.addEventListener("click",async event=>{
+      const button=event.currentTarget;
+      button.disabled=true;
+      try{
+        const payload={kind:button.dataset.kind,key:button.dataset.key,label:button.dataset.label,meaning_tr:button.dataset.meaning,surface:button.dataset.surface};
+        const id=learningKey(payload.kind,payload.key);
+        const existing=state.learningItems.find(item=>learningKey(item.kind,item.key)===id);
+        if(existing && itemStatus(existing)===status) await removeLearningItem(payload.kind,payload.key);
+        else if(!existing && status==="learning") await saveLearningItem(payload,encounterSnapshot);
+        else await setLearningStatus(payload,status);
+        if(adapter.id==="web") scheduleWebLearningAnnotations();
+        state.tooltip.hidden=true;
+      }catch(error){
+        console.warn("Learning item sync failed",error);
+      }finally{
+        button.disabled=false;
+      }
+    });
+    bindTooltipStatus(".gle-learn-star","learning");
+    bindTooltipStatus(".gle-learn-known","learned");
 
     const r=anchor.getBoundingClientRect();
     state.tooltip.hidden=false;
@@ -1470,21 +1468,22 @@
       state.panel.docked=false;
       panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
       panel.classList.add("gle-youtube-external-panel","gle-web-page-panel");
-
       const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
       const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
       const basePanelWidth=Math.min(408,Math.max(320,viewportWidth*0.30));
       const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
       const panelWidth=Math.min(viewportWidth*0.45,Math.max(220,basePanelWidth*factor));
+      const open=!state.panel.collapsed;
       const left=Math.max(0,viewportWidth-panelWidth);
-
       document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-top","0px");
       document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-height",viewportHeight+"px");
       document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
-      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+      document.documentElement.style.setProperty("--gle-web-panel-space",open?panelWidth+"px":"0px");
+      document.documentElement.classList.toggle("gle-web-panel-open",open);
+      requestAnimationFrame(()=>{syncPanelHandleGeometry(panel);scheduleWebLearningAnnotations();});
       return;
     }
 
@@ -1593,7 +1592,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-reset" aria-label="Paneli varsayılana döndür" title="Paneli varsayılana döndür">↺</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -1614,6 +1613,12 @@
       renderPlayerControls();
     });
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
+    panel.querySelector(".gle-header-reset").addEventListener("click",async()=>{
+      state.settings.panelWidthFactor=1;
+      await chrome.storage.sync.set({panelWidthFactor:1});
+      setSharedPanelCollapsed(false);
+      syncSharedPanelHost();
+    });
     panel.querySelector(".gle-header-settings").addEventListener("click",()=>ensureSettingsDialog());
 
     panel.querySelectorAll("[data-tab]").forEach(button=>{
@@ -1829,6 +1834,7 @@
           state.youtube.transcriptAnalysis=cached[cacheKey];
           analyzeWholeYouTubeExpressionGroups();
           if(state.panel.element) renderSharedPanel();
+          if(adapter.id==="web") scheduleWebLearningAnnotations();
           return;
         }
       }catch(_error){}
@@ -1864,7 +1870,7 @@
           for(const token of item.tokens||[]){
             const pos=String(token.pos||"").toUpperCase();
             if(!token.lemma || ["PUNCT","SPACE","SYM"].includes(pos)) continue;
-            const lemma=String(token.lemma).toLocaleLowerCase("de-DE");
+            const lemma=sanitizeLearningText(token.lemma).toLocaleLowerCase("de-DE");
             if(!lemma || !/[\p{L}]/u.test(lemma)) continue;
             let entry=words.get(lemma);
             if(!entry){
@@ -1872,7 +1878,8 @@
               words.set(lemma,entry);
             }
             entry.count+=1;
-            entry.forms.add(String(token.text||lemma));
+            const surface=sanitizeLearningText(token.text||lemma);
+            if(surface && /[\p{L}]/u.test(surface)) entry.forms.add(surface);
             if(!entry.occurrences.includes(index)) entry.occurrences.push(index);
           }
         });
@@ -1885,6 +1892,7 @@
         chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
         analyzeWholeYouTubeExpressionGroups();
         if(state.panel.element) renderSharedPanel();
+        if(adapter.id==="web") scheduleWebLearningAnnotations();
       }catch(error){
         console.warn("Video word analysis failed",error);
         if(state.panel.element && state.panel.tab==="words"){
@@ -1969,15 +1977,12 @@
   function wordGroup(title,entries){
     if(!entries.length) return "";
     const chips=entries.map(entry=>{
-      const learning=Boolean(learningItemForLemma(entry.lemma));
-      const unknown=state.youtube.videoUnknownLemmas.has(entry.lemma);
       const item=learningItemForLemma(entry.lemma);
-      const status=itemStatus(item);
-      return '<div class="gle-word-chip-wrap'+(unknown?" unknown":"")+'">'+
-        '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
-        '<button type="button" class="gle-word-status '+(item&&status==="learning"?"active":"")+'" data-word-learning="'+escAttr(entry.lemma)+'" title="Öğreniyorum">Ö</button>'+
-        '<button type="button" class="gle-word-status '+(item&&status==="learned"?"active":"")+'" data-word-known="'+escAttr(entry.lemma)+'" title="Biliyorum">✓</button>'+
-        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Altyazıda anlam gösterimini kapat":"Bu kelimenin anlamını altyazıda göster")+'">'+(unknown?"Aa":"a")+'</button>'+
+      const status=item ? itemStatus(item) : "";
+      return '<div class="gle-word-chip-wrap">'+
+        '<button type="button" class="gle-word-chip'+(status==="learning"?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
+        '<button type="button" class="gle-word-status gle-word-star '+(status==="learning"?"active":"")+'" data-word-learning="'+escAttr(entry.lemma)+'" title="Öğreniyorum">'+(status==="learning"?"★":"☆")+'</button>'+
+        '<button type="button" class="gle-word-status '+(status==="learned"?"active":"")+'" data-word-known="'+escAttr(entry.lemma)+'" title="Biliyorum">✓</button>'+
       '</div>';
     }).join("");
     return '<section class="gle-word-group"><h3>'+esc(title)+'</h3><div class="gle-word-grid">'+chips+'</div></section>';
@@ -2022,47 +2027,23 @@
 
   function expressionGroupsSection(entries){
     if(entries===null) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-loading">Kelime grupları analiz ediliyor…</div></section>';
-    if(!entries?.length) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-empty">Bu videoda desteklenen kelime grubu bulunamadı.</div></section>';
-
-    const order=[
-      "IDIOM",
-      "NOMEN_VERB",
-      "FUNCTION_VERB",
-      "FIXED_CONSTRUCTION",
-      "COLLOCATION",
-      "VERB_PREPOSITION",
-      "REFLEXIVE_VERB_PREPOSITION",
-      "REFLEXIVE_VERB",
-      "NOUN_PREPOSITION",
-      "ADJECTIVE_PREPOSITION",
-      "PARTICLE_VERB",
-      "COPULAR_CONSTRUCTION",
-      "CONNECTOR",
-      "GRAMMAR_CONSTRUCTION",
-    ];
+    if(!entries?.length) return '<section class="gle-expression-groups"><h3>Kelime grupları</h3><div class="gle-groups-empty">Bu içerikte desteklenen kelime grubu bulunamadı.</div></section>';
+    const order=["IDIOM","NOMEN_VERB","FUNCTION_VERB","FIXED_CONSTRUCTION","COLLOCATION","VERB_PREPOSITION","REFLEXIVE_VERB_PREPOSITION","REFLEXIVE_VERB","NOUN_PREPOSITION","ADJECTIVE_PREPOSITION","PARTICLE_VERB","COPULAR_CONSTRUCTION","CONNECTOR","GRAMMAR_CONSTRUCTION"];
     const sections=order.map(type=>{
       const items=entries.filter(entry=>entry.type===type);
       if(!items.length) return "";
       const chips=items.map(entry=>{
-        const learning=isLearning("expression",entry.patternId||entry.canonical);
-        const videoUnknown=state.youtube.videoUnknownExpressions.has(
-          String(entry.patternId||entry.canonical||"").toLocaleLowerCase("de-DE")
-        );
         const savedItem=state.learningItems.find(item=>item.kind==="expression" &&
           [entry.patternId,entry.canonical].map(value=>String(value||"").toLocaleLowerCase("de-DE")).includes(String(item.key||"").toLocaleLowerCase("de-DE")));
-        const status=itemStatus(savedItem);
-        return '<div class="gle-expression-chip-wrap'+(videoUnknown?" unknown":"")+'">'+
-          '<button type="button" class="gle-expression-chip'+(learning?" learning":"")+'" data-group-key="'+escAttr(entry.key)+'">'+
-            '<span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
-          '</button>'+
-          '<button type="button" class="gle-expression-status '+(savedItem&&status==="learning"?"active":"")+'" data-expression-learning="'+escAttr(entry.key)+'" title="Öğreniyorum">Ö</button>'+
-          '<button type="button" class="gle-expression-status '+(savedItem&&status==="learned"?"active":"")+'" data-expression-known="'+escAttr(entry.key)+'" title="Biliyorum">✓</button>'+
-          '<button type="button" class="gle-expression-learn'+(videoUnknown?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(videoUnknown?"Bu video için anlam gösterimini kapat":"Bu video için anlamını altyazıda göster")+'">'+(videoUnknown?"Aa":"a")+'</button>'+
+        const status=savedItem ? itemStatus(savedItem) : "";
+        return '<div class="gle-expression-chip-wrap">'+
+          '<button type="button" class="gle-expression-chip'+(status==="learning"?" learning":"")+'" data-group-key="'+escAttr(entry.key)+'"><span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b></button>'+
+          '<button type="button" class="gle-expression-status gle-expression-star '+(status==="learning"?"active":"")+'" data-expression-learning="'+escAttr(entry.key)+'" title="Öğreniyorum">'+(status==="learning"?"★":"☆")+'</button>'+
+          '<button type="button" class="gle-expression-status '+(status==="learned"?"active":"")+'" data-expression-known="'+escAttr(entry.key)+'" title="Biliyorum">✓</button>'+
         '</div>';
       }).join("");
       return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
     }).join("");
-
     return '<section class="gle-expression-groups"><h3>Kelime grupları</h3>'+sections+'</section>';
   }
 
@@ -2226,6 +2207,13 @@
     return state.learningItems.find(item=>item.kind==="learning-unit" && item.key===row.key);
   }
 
+  function sanitizeLearningText(value){
+    return String(value||"")
+      .replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/gu,"")
+      .replace(/\s+/g," ")
+      .trim();
+  }
+
   async function analyzePanelWordSenses(){
     const videoId=state.youtube.videoId;
     const cues=state.youtube.cues||[];
@@ -2251,21 +2239,21 @@
           (payload.items||[]).forEach((item,index)=>{
             const cueIndex=offset+index;
             for(const unit of item.learning_units||[]){
+              const canonical=sanitizeLearningText(unit.canonical||unit.lemma||"");
+              const lemma=sanitizeLearningText(unit.lemma||canonical);
+              const surface=sanitizeLearningText(unit.surface||canonical);
+              if(!canonical || !/[\p{L}]/u.test(canonical)) continue;
               const key=String(unit.id||"");
               if(!key) continue;
               let row=rows.get(key);
               if(!row){
                 row={
-                  key,
-                  lemma:String(unit.lemma||unit.canonical||""),
-                  canonical:String(unit.canonical||unit.lemma||""),
-                  meaningTr:String(unit.meaning_tr||""),
-                  unitType:String(unit.unit_type||"Kelime"),
+                  key,lemma,canonical,
+                  meaningTr:sanitizeLearningText(unit.meaning_tr||""),
+                  unitType:sanitizeLearningText(unit.unit_type||"Kelime"),
                   senseId:String(unit.sense_id||""),
                   patternId:String(unit.pattern_id||""),
-                  cueIndex,
-                  surface:String(unit.surface||unit.canonical||""),
-                  occurrences:[],
+                  cueIndex,surface,occurrences:[],
                 };
                 rows.set(key,row);
               }
@@ -2286,6 +2274,30 @@
     return task;
   }
 
+  function senseRowsWithExpressions(){
+    const rows=[...(state.panel.senseRows||[])];
+    const seen=new Set(rows.map(row=>"expr:"+String(row.patternId||row.canonical||"").toLocaleLowerCase("de-DE")));
+    for(const entry of state.youtube.expressionGroupsAnalysis||[]){
+      const exprKey=String(entry.patternId||entry.canonical||"").toLocaleLowerCase("de-DE");
+      if(!exprKey || seen.has("expr:"+exprKey)) continue;
+      rows.push({
+        key:"expression:"+exprKey,
+        lemma:entry.canonical,
+        canonical:entry.canonical,
+        meaningTr:entry.meaningTr||"",
+        unitType:expressionGroupLabel(entry.type),
+        senseId:"",
+        patternId:entry.patternId||"",
+        cueIndex:entry.occurrences?.[0]??0,
+        surface:entry.forms?.[0]||entry.canonical,
+        occurrences:[...(entry.occurrences||[])],
+        expressionEntry:entry,
+      });
+      seen.add("expr:"+exprKey);
+    }
+    return rows.sort((a,b)=>a.canonical.localeCompare(b.canonical,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
+  }
+
   async function setSenseStatus(row,status){
     await setLearningStatus({
       kind:"learning-unit",
@@ -2299,30 +2311,38 @@
     if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
       body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
       bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
-      analyzePanelWordSenses();
+      Promise.all([analyzePanelWordSenses(),analyzeWholeYouTubeExpressionGroups()]).catch(()=>{});
       return;
     }
     const q=String(state.panel.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
-    const rows=state.panel.senseRows.filter(row=>!q || row.lemma.includes(q) || row.meaningTr.toLocaleLowerCase("tr-TR").includes(q));
+    const rows=senseRowsWithExpressions().filter(row=>!q || String(row.lemma||"").toLocaleLowerCase("de-DE").includes(q) || String(row.meaningTr||"").toLocaleLowerCase("tr-TR").includes(q));
     const table='<div class="gle-sense-table"><div class="gle-sense-head"><span>Öğrenme birimi</span><span>Bu kullanımdaki anlam</span><span>Tür</span><span>Durum</span></div>'+rows.map(row=>{
-      const item=learningItemForSense(row);
-      const learning=item?.status==="learning";
-      const known=item?.status==="learned" || item?.status==="known";
-      return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">★</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
+      const item=row.expressionEntry
+        ? state.learningItems.find(entry=>entry.kind==="expression" && [row.expressionEntry.patternId,row.expressionEntry.canonical].map(v=>String(v||"").toLocaleLowerCase("de-DE")).includes(String(entry.key||"").toLocaleLowerCase("de-DE")))
+        : learningItemForSense(row);
+      const learning=item && itemStatus(item)==="learning";
+      const known=item && itemStatus(item)==="learned";
+      return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">'+(learning?"★":"☆")+'</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
     }).join("")+'</div>';
     body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>cümle</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
     bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
     body.querySelectorAll("[data-sense-jump]").forEach(button=>button.addEventListener("click",()=>{
-      const row=state.panel.senseRows.find(item=>item.key===button.dataset.senseJump);
+      const row=senseRowsWithExpressions().find(item=>item.key===button.dataset.senseJump);
       if(row) playYouTubeCue(row.cueIndex);
     }));
     const bindStatus=(selector,status)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
       const key=button.dataset.senseLearn||button.dataset.senseKnown;
-      const row=state.panel.senseRows.find(item=>item.key===key);
+      const row=senseRowsWithExpressions().find(item=>item.key===key);
       if(!row) return;
       button.disabled=true;
-      try{ await setSenseStatus(row,status); renderSharedPanel(); }
-      catch(error){ console.warn("Word sense status failed",error); button.disabled=false; }
+      try{
+        if(row.expressionEntry){
+          await setLearningStatus({kind:"expression",key:row.expressionEntry.patternId||row.expressionEntry.canonical,label:row.expressionEntry.canonical,meaning_tr:row.expressionEntry.meaningTr||"",surface:row.surface},status);
+        }else{
+          await setSenseStatus(row,status);
+        }
+        renderSharedPanel();
+      }catch(error){console.warn("Word sense status failed",error);button.disabled=false;}
     }));
     bindStatus("[data-sense-learn]","learning");
     bindStatus("[data-sense-known]","learned");
@@ -2414,21 +2434,6 @@
     bindExpressionStatus("[data-expression-learning]","learning","expressionLearning");
     bindExpressionStatus("[data-expression-known]","learned","expressionKnown");
 
-    body.querySelectorAll(".gle-expression-learn").forEach(button=>{
-      button.addEventListener("click",async event=>{
-        event.stopPropagation();
-        const entry=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===button.dataset.groupLearnKey);
-        if(!entry) return;
-        button.disabled=true;
-        try{
-          await toggleVideoUnknownExpression(entry);
-        }catch(error){
-          console.warn("Expression video-mark sync failed",error);
-          button.disabled=false;
-        }
-      });
-    });
-
     const bindWordStatus=(selector,status,dataKey)=>body.querySelectorAll(selector).forEach(button=>{
       button.addEventListener("click",async event=>{
         event.stopPropagation();
@@ -2447,12 +2452,6 @@
     bindWordStatus("[data-word-learning]","learning","wordLearning");
     bindWordStatus("[data-word-known]","learned","wordKnown");
 
-    body.querySelectorAll(".gle-word-mark").forEach(button=>{
-      button.addEventListener("click",event=>{
-        event.stopPropagation();
-        toggleVideoUnknownLemma(button.dataset.markLemma);
-      });
-    });
   }
 
   function renderPanelWords(body){
@@ -2520,42 +2519,49 @@
 
   function currentContentLearningKeys(){
     const keys=new Set();
-    for(const entry of state.youtube.transcriptAnalysis||[]) keys.add(learningKey("word",entry.lemma));
-    for(const entry of state.youtube.expressionGroupsAnalysis||[]) keys.add(learningKey("expression",entry.patternId||entry.canonical));
+    const words=state.youtube.transcriptAnalysis||[];
+    const expressions=state.youtube.expressionGroupsAnalysis||[];
+    for(const entry of words) keys.add(learningKey("word",entry.lemma));
+    for(const entry of expressions){
+      if(entry.patternId) keys.add(learningKey("expression",entry.patternId));
+      if(entry.canonical) keys.add(learningKey("expression",entry.canonical));
+    }
     for(const row of state.panel.senseRows||[]) keys.add(learningKey("learning-unit",row.key));
+    for(const item of state.learningItems){
+      if(item.kind!=="learning-unit") continue;
+      const label=String(item.label||"").toLocaleLowerCase("de-DE");
+      if(words.some(entry=>String(entry.lemma||"").toLocaleLowerCase("de-DE")===label) ||
+         expressions.some(entry=>String(entry.canonical||"").toLocaleLowerCase("de-DE")===label)){
+        keys.add(learningKey(item.kind,item.key));
+      }
+    }
     return keys;
   }
 
   function learningItemSavedFromCurrentContent(item){
     const descriptor=currentContentDescriptor();
     const source=item?.metadata?.content_source||{};
-    if(
-      String(source.provider||"")===descriptor.provider &&
-      String(source.externalId||source.external_id||"")===String(descriptor.externalId||"")
-    ) return true;
+    if(String(source.provider||"")===descriptor.provider &&
+       String(source.externalId||source.external_id||"")===String(descriptor.externalId||"")) return true;
     if(String(source.url||"") && String(source.url)===String(descriptor.url||"")) return true;
     const encounters=Array.isArray(item?.encounters)?item.encounters:[];
-    return encounters.some(encounter=>{
+    if(encounters.some(encounter=>{
       const provider=String(encounter.provider||"");
       const external=String(encounter.external_id||"");
       const url=String(encounter.url||encounter.context?.page_url||"");
       if(provider && provider===descriptor.provider && external && external===descriptor.externalId) return true;
       return Boolean(url && (url===descriptor.url || url===location.href));
-    });
+    })) return true;
+    const hasSource=Boolean(source.provider||source.url||encounters.length);
+    return !hasSource && contentOccurrencesForLearningItem(item).length>0;
   }
 
   function filteredSavedItems(){
-    const all=[...state.learningItems].sort((a,b)=>
-      String(a.label||a.key||"").localeCompare(String(b.label||b.key||""),"de")
-    );
+    const all=[...state.learningItems].sort((a,b)=>String(a.label||a.key||"").localeCompare(String(b.label||b.key||""),"de"));
     if(state.panel.savedView==="from-content") return all.filter(learningItemSavedFromCurrentContent);
-    if(state.panel.savedView==="present-content"){
-      const present=currentContentLearningKeys();
-      return all.filter(item=>present.has(learningKey(item.kind,item.key)));
-    }
-    if(state.panel.savedView==="learning") return all.filter(item=>itemStatus(item)==="learning");
+    if(state.panel.savedView==="present-content") return all.filter(item=>contentOccurrencesForLearningItem(item).length>0);
     if(state.panel.savedView==="known") return all.filter(item=>itemStatus(item)==="learned");
-    return all;
+    return all.filter(item=>itemStatus(item)==="learning");
   }
 
   function contentOccurrencesForLearningItem(item){
@@ -2582,47 +2588,276 @@
     ])].sort((a,b)=>a-b);
   }
 
+  function webTextNodes(element){
+    const nodes=[];
+    if(!element) return nodes;
+    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT,{
+      acceptNode(node){
+        const parent=node.parentElement;
+        if(!parent || parent.closest("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+
+  function webRangeFromOffsets(element,start,end){
+    if(!element || end<=start) return null;
+    const nodes=webTextNodes(element);
+    let cursor=0,startNode=null,endNode=null,startOffset=0,endOffset=0;
+    for(const node of nodes){
+      const length=String(node.nodeValue||"").length;
+      if(!startNode && start>=cursor && start<=cursor+length){
+        startNode=node;
+        startOffset=Math.min(length,Math.max(0,start-cursor));
+      }
+      if(!endNode && end>=cursor && end<=cursor+length){
+        endNode=node;
+        endOffset=Math.min(length,Math.max(0,end-cursor));
+        break;
+      }
+      cursor+=length;
+    }
+    if(!startNode || !endNode) return null;
+    const range=document.createRange();
+    try{ range.setStart(startNode,startOffset); range.setEnd(endNode,endOffset); return range; }
+    catch(_error){ return null; }
+  }
+
+  function tokenOffsetsInText(text,tokens){
+    const offsets=new Map();
+    let cursor=0;
+    for(const token of tokens||[]){
+      const surface=String(token.text||"");
+      if(!surface) continue;
+      let at=text.indexOf(surface,cursor);
+      if(at<0) at=text.toLocaleLowerCase("de-DE").indexOf(surface.toLocaleLowerCase("de-DE"),cursor);
+      if(at<0) continue;
+      offsets.set(token.i,{start:at,end:at+surface.length});
+      cursor=at+surface.length;
+    }
+    return offsets;
+  }
+
+  async function webRangesForLearningItem(item,cueIndex){
+    if(adapter.id!=="web") return {ranges:[],meaning:item?.meaning_tr||""};
+    const segment=state.web.segments?.[cueIndex];
+    const element=segment?.sourceElement;
+    if(!segment?.text || !element?.isConnected) return {ranges:[],meaning:item?.meaning_tr||""};
+    const fullText=String(element.textContent||"");
+    let sentenceStart=fullText.indexOf(segment.text);
+    if(sentenceStart<0) sentenceStart=fullText.toLocaleLowerCase("de-DE").indexOf(segment.text.toLocaleLowerCase("de-DE"));
+    if(sentenceStart<0) return {ranges:[],meaning:item?.meaning_tr||""};
+
+    let data=null;
+    try{ data=await analyze(segment.text); }catch(_error){}
+    const tokens=data?.tokens||[];
+    const offsets=tokenOffsetsInText(segment.text,tokens);
+    const ranges=[];
+    let meaning=item?.meaning_tr||"";
+
+    if(item?.kind==="expression"){
+      const wanted=[item.key,item.label].map(v=>String(v||"").toLocaleLowerCase("de-DE"));
+      const match=(data?.expressions||[]).find(expr=>
+        wanted.includes(String(expr.pattern_id||"").toLocaleLowerCase("de-DE")) ||
+        wanted.includes(String(expr.canonical||"").toLocaleLowerCase("de-DE"))
+      );
+      if(match){
+        meaning=match.contextual_meaning_tr||(match.meaning_tr||[])[0]||meaning;
+        for(const tokenIndex of match.token_indices||[]){
+          const off=offsets.get(tokenIndex);
+          if(!off) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+          if(range) ranges.push(range);
+        }
+      }
+    }else{
+      const wanted=String(item?.key||item?.label||"").toLocaleLowerCase("de-DE");
+      for(const token of tokens){
+        if(String(token.lemma||token.text||"").toLocaleLowerCase("de-DE")!==wanted) continue;
+        const off=offsets.get(token.i);
+        if(!off) continue;
+        const hover=data?.hover?.[String(token.i)]||data?.hover?.[token.i]||{};
+        meaning=hover.contextual_word_meaning_tr||(hover.dictionary_meanings_tr||[])[0]||meaning;
+        const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+        if(range) ranges.push(range);
+      }
+      if(!ranges.length){
+        const forms=(state.youtube.transcriptAnalysis||[]).find(entry=>String(entry.lemma||"").toLocaleLowerCase("de-DE")===wanted)?.forms||[];
+        for(const form of [item?.label,item?.key,...forms].filter(Boolean).sort((a,b)=>String(b).length-String(a).length)){
+          const needle=String(form);
+          const at=segment.text.toLocaleLowerCase("de-DE").indexOf(needle.toLocaleLowerCase("de-DE"));
+          if(at<0) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+at,sentenceStart+at+needle.length);
+          if(range) ranges.push(range);
+        }
+      }
+    }
+    return {ranges,meaning:cleanTranslationText(meaning)};
+  }
+
+  async function highlightWebLearningItem(item,cueIndex,highlightName="gle-saved-target"){
+    if(!CSS?.highlights || typeof Highlight==="undefined") return;
+    const result=await webRangesForLearningItem(item,cueIndex);
+    CSS.highlights.delete(highlightName);
+    if(result.ranges.length) CSS.highlights.set(highlightName,new Highlight(...result.ranges));
+  }
+
   function focusSavedOccurrence(item,cueIndex){
     playYouTubeCue(cueIndex);
-    if(adapter.id==="web"){
-      const word=(state.youtube.transcriptAnalysis||[]).find(entry=>
-        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.key||item?.label||"").toLocaleLowerCase("de-DE") ||
-        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.label||"").toLocaleLowerCase("de-DE")
-      );
-      const forms=word?.forms?.length ? word.forms : [item?.label,item?.key].filter(Boolean);
-      requestAnimationFrame(()=>highlightWebTarget(cueIndex,forms));
-    }
+    if(adapter.id==="web") requestAnimationFrame(()=>highlightWebLearningItem(item,cueIndex,"gle-saved-target"));
   }
 
   function highlightWebTarget(cueIndex,forms){
-    if(adapter.id!=="web") return;
+    if(adapter.id!=="web" || !CSS?.highlights || typeof Highlight==="undefined") return;
     const segment=state.web.segments?.[cueIndex];
     const element=segment?.sourceElement;
     if(!element?.isConnected) return;
-    if(!CSS?.highlights || typeof Highlight==="undefined") return;
-    const candidates=(forms||[]).map(value=>String(value||"").trim()).filter(Boolean).sort((a,b)=>b.length-a.length);
-    if(!candidates.length) return;
-    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);
+    const fullText=String(element.textContent||"");
     const ranges=[];
-    while(walker.nextNode()){
-      const node=walker.currentNode;
-      const text=String(node.nodeValue||"");
-      const lower=text.toLocaleLowerCase("de-DE");
-      for(const form of candidates){
-        const needle=form.toLocaleLowerCase("de-DE");
-        let start=0;
-        while(needle && (start=lower.indexOf(needle,start))!==-1){
-          const range=document.createRange();
-          range.setStart(node,start);
-          range.setEnd(node,start+form.length);
-          ranges.push(range);
-          start+=Math.max(1,form.length);
-        }
-        if(ranges.length) break;
+    for(const form of (forms||[]).map(v=>String(v||"").trim()).filter(Boolean)){
+      const lower=fullText.toLocaleLowerCase("de-DE");
+      const needle=form.toLocaleLowerCase("de-DE");
+      let start=0;
+      while(needle && (start=lower.indexOf(needle,start))!==-1){
+        const range=webRangeFromOffsets(element,start,start+form.length);
+        if(range) ranges.push(range);
+        start+=Math.max(1,form.length);
       }
     }
     CSS.highlights.delete("gle-saved-target");
     if(ranges.length) CSS.highlights.set("gle-saved-target",new Highlight(...ranges));
+  }
+
+  function ensureWebAnnotationLayer(){
+    if(state.web.annotationLayer?.isConnected) return state.web.annotationLayer;
+    const layer=document.createElement("div");
+    layer.className="gle-web-learning-layer";
+    document.documentElement.appendChild(layer);
+    state.web.annotationLayer=layer;
+    return layer;
+  }
+
+  function positionWebAnnotationLabel(label,range){
+    const rect=range.getBoundingClientRect();
+    if(!rect.width || !rect.height) return false;
+    label.style.left=Math.max(4,rect.left)+"px";
+    label.style.top=Math.max(2,rect.top-22)+"px";
+    return true;
+  }
+
+  async function refreshWebLearningAnnotations(){
+    if(adapter.id!=="web") return;
+    const run=++state.web.annotationRun;
+    const layer=ensureWebAnnotationLayer();
+    layer.textContent="";
+    if(CSS?.highlights) CSS.highlights.delete("gle-learning-web");
+    const learningItems=state.learningItems.filter(item=>itemStatus(item)==="learning");
+    if(!learningItems.length) return;
+    const allRanges=[];
+    const labels=[];
+    for(const item of learningItems){
+      const occurrences=contentOccurrencesForLearningItem(item);
+      for(const cueIndex of occurrences){
+        if(run!==state.web.annotationRun) return;
+        const result=await webRangesForLearningItem(item,cueIndex);
+        if(run!==state.web.annotationRun) return;
+        if(!result.ranges.length) continue;
+        allRanges.push(...result.ranges);
+        const label=document.createElement("span");
+        label.className="gle-web-learning-label";
+        label.textContent=result.meaning||item.meaning_tr||"";
+        if(label.textContent && positionWebAnnotationLabel(label,result.ranges[0])){
+          layer.appendChild(label);
+          labels.push({label,range:result.ranges[0]});
+        }
+      }
+    }
+    if(run!==state.web.annotationRun) return;
+    if(allRanges.length && CSS?.highlights && typeof Highlight!=="undefined") CSS.highlights.set("gle-learning-web",new Highlight(...allRanges));
+    state.web.annotationLabels=labels;
+  }
+
+  function scheduleWebLearningAnnotations(){
+    if(adapter.id!=="web") return;
+    clearTimeout(state.web.annotationTimer);
+    state.web.annotationTimer=setTimeout(()=>refreshWebLearningAnnotations().catch(()=>{}),80);
+  }
+
+  function webCaretAtPoint(x,y){
+    if(document.caretPositionFromPoint){
+      const pos=document.caretPositionFromPoint(x,y);
+      return pos ? {node:pos.offsetNode,offset:pos.offset} : null;
+    }
+    if(document.caretRangeFromPoint){
+      const range=document.caretRangeFromPoint(x,y);
+      return range ? {node:range.startContainer,offset:range.startOffset} : null;
+    }
+    return null;
+  }
+
+  function webWordHitAtPoint(x,y){
+    const caret=webCaretAtPoint(x,y);
+    const node=caret?.node;
+    if(!node || node.nodeType!==Node.TEXT_NODE) return null;
+    const parent=node.parentElement;
+    if(!parent || parent.closest("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer,a,button,input,textarea,select,[contenteditable=true]")) return null;
+    const segmentIndex=state.web.segments.findIndex(segment=>segment.sourceElement?.contains(node));
+    if(segmentIndex<0) return null;
+    const text=String(node.nodeValue||"");
+    const isWord=ch=>/[\p{L}\p{M}ßÄÖÜäöü]/u.test(ch||"");
+    let start=Math.min(caret.offset,text.length),end=start;
+    if(start===text.length || !isWord(text[start])){
+      if(start>0 && isWord(text[start-1])) start-=1;
+      else return null;
+    }
+    end=start+1;
+    while(start>0 && isWord(text[start-1])) start--;
+    while(end<text.length && isWord(text[end])) end++;
+    const word=text.slice(start,end);
+    if(!word) return null;
+    const range=document.createRange();
+    range.setStart(node,start);
+    range.setEnd(node,end);
+    return {word,segmentIndex,range,rect:range.getBoundingClientRect(),start};
+  }
+
+  async function showWebWordTooltip(hit){
+    if(adapter.id!=="web" || !hit) return;
+    const segment=state.web.segments[hit.segmentIndex];
+    if(!segment?.text) return;
+    state.youtube.cueIndex=hit.segmentIndex;
+    try{
+      const data=await analyze(segment.text);
+      const wanted=hit.word.toLocaleLowerCase("de-DE");
+      const token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+        (data.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+      if(!token) return;
+      renderCard(data,token.i,{getBoundingClientRect:()=>hit.rect,contains:()=>false});
+    }catch(_error){}
+  }
+
+  function installWebTextInteraction(){
+    if(adapter.id!=="web" || state.web.interactionReady) return;
+    state.web.interactionReady=true;
+    document.addEventListener("mousemove",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const hit=webWordHitAtPoint(event.clientX,event.clientY);
+      const key=hit ? hit.segmentIndex+":"+hit.word+":"+hit.start : "";
+      if(!hit){ state.web.hoverKey=""; clearTimeout(state.web.hoverTimer); return; }
+      if(key===state.web.hoverKey) return;
+      state.web.hoverKey=key;
+      clearTimeout(state.web.hoverTimer);
+      state.web.hoverTimer=setTimeout(()=>showWebWordTooltip(hit),260);
+    },true);
+    document.addEventListener("click",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const hit=webWordHitAtPoint(event.clientX,event.clientY);
+      if(hit) showWebWordTooltip(hit);
+    },true);
+    window.addEventListener("scroll",()=>{ for(const entry of state.web.annotationLabels||[]) positionWebAnnotationLabel(entry.label,entry.range); },{passive:true});
+    window.addEventListener("resize",()=>{ syncSharedPanelHost(); scheduleWebLearningAnnotations(); },{passive:true});
   }
 
   function navigateSavedItem(item,direction=0){
@@ -2639,70 +2874,42 @@
   }
 
   function renderPanelSaved(body){
+    if(state.panel.savedView==="all") state.panel.savedView="learning";
+    if(adapter.id==="web" && (!state.panel.senseRows || state.panel.senseRowsVideoId!==state.youtube.videoId)) analyzePanelWordSenses().catch(()=>{});
     const items=filteredSavedItems();
-    const presentKeys=currentContentLearningKeys();
-    const tabs=[
-      ["all","Tüm Kaydedilenler"],
-      ["from-content","Bu İçerikten Kaydedilenler"],
-      ["present-content","Bu İçerikte Geçenler"],
-      ["learning","Öğreniyorum"],
-      ["known","Biliyorum"],
-    ];
-    const toolbar='<div class="gle-saved-filters">'+tabs.map(([id,label])=>
-      '<button type="button" data-saved-view="'+id+'" class="'+(state.panel.savedView===id?"active":"")+'">'+esc(label)+'</button>'
-    ).join("")+'</div>';
+    const tabs=[["learning","Öğreniyorum"],["from-content","Bu İçerikten Kaydedilenler"],["present-content","Bu İçerikte Geçenler"],["known","Biliyorum"]];
+    const toolbar='<div class="gle-saved-filters">'+tabs.map(([id,label])=>'<button type="button" data-saved-view="'+id+'" class="'+(state.panel.savedView===id?"active":"")+'">'+esc(label)+'</button>').join("")+'</div>';
     if(!items.length){
       body.innerHTML=toolbar+'<div class="gle-panel-empty"><b>Bu görünümde kayıt yok.</b><span>Filtreyi değiştir veya bu içerikten yeni bir öğe işaretle.</span></div>';
     }else{
-      body.innerHTML=toolbar+'<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>kayıt</span></div>'+
-        '<div class="gle-saved-list">'+items.map(item=>{
-          const itemKey=learningKey(item.kind,item.key);
-          const present=presentKeys.has(itemKey);
-          const fromHere=learningItemSavedFromCurrentContent(item);
-          const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
-          const status=itemStatus(item)==="learned"?"Biliyorum":"Öğreniyorum";
-          const flags=[type,status];
-          if(fromHere) flags.push("Bu içerikten");
-          if(present) flags.push("Bu içerikte");
-          const occurrences=contentOccurrencesForLearningItem(item);
-          const pos=Math.min(Number(state.panel.savedOccurrencePositions[itemKey]||0),Math.max(0,occurrences.length-1));
-          return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(itemKey)+'">'+
-            '<button type="button" class="gle-saved-main" data-saved-open="'+escAttr(itemKey)+'"><strong>'+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(flags.join(" · "))+'</em></button>'+
-            '<div class="gle-saved-row-actions">'+
-              (occurrences.length?'<div class="gle-saved-nav"><button type="button" data-saved-prev="'+escAttr(itemKey)+'" title="Önceki kullanım">‹</button><span>'+(pos+1)+'/'+occurrences.length+'</span><button type="button" data-saved-next="'+escAttr(itemKey)+'" title="Sonraki kullanım">›</button></div>':'')+
-              '<button type="button" class="gle-saved-star active" data-saved-remove="'+escAttr(itemKey)+'" title="Kaydedilenlerden çıkar">★</button>'+
-              '<button type="button" class="gle-saved-status '+(itemStatus(item)==="learning"?"active":"")+'" data-saved-learning="'+escAttr(itemKey)+'" title="Öğreniyorum">Ö</button>'+
-              '<button type="button" class="gle-saved-status '+(itemStatus(item)==="learned"?"active":"")+'" data-saved-known="'+escAttr(itemKey)+'" title="Biliyorum">✓</button>'+
-            '</div>'+
-          '</div>';
-        }).join("")+'</div>';
+      body.innerHTML=toolbar+'<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>kayıt</span></div><div class="gle-saved-list">'+items.map(item=>{
+        const itemKey=learningKey(item.kind,item.key);
+        const fromHere=learningItemSavedFromCurrentContent(item);
+        const present=contentOccurrencesForLearningItem(item).length>0;
+        const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
+        const status=itemStatus(item);
+        const flags=[type,status==="learned"?"Biliyorum":"Öğreniyorum"];
+        if(fromHere) flags.push("Bu içerikten");
+        if(present) flags.push("Bu içerikte");
+        const occurrences=contentOccurrencesForLearningItem(item);
+        const pos=Math.min(Number(state.panel.savedOccurrencePositions[itemKey]||0),Math.max(0,occurrences.length-1));
+        return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(itemKey)+'">'+
+          '<button type="button" class="gle-saved-main" data-saved-open="'+escAttr(itemKey)+'"><strong>'+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(flags.join(" · "))+'</em></button>'+
+          '<div class="gle-saved-row-actions">'+
+          (occurrences.length?'<div class="gle-saved-nav"><button type="button" data-saved-prev="'+escAttr(itemKey)+'">‹</button><span>'+(pos+1)+'/'+occurrences.length+'</span><button type="button" data-saved-next="'+escAttr(itemKey)+'">›</button></div>':'')+
+          '<button type="button" class="gle-saved-star '+(status==="learning"?"active":"")+'" data-saved-learning="'+escAttr(itemKey)+'" title="Öğreniyorum">'+(status==="learning"?"★":"☆")+'</button>'+
+          '<button type="button" class="gle-saved-status '+(status==="learned"?"active":"")+'" data-saved-known="'+escAttr(itemKey)+'" title="Biliyorum">✓</button></div></div>';
+      }).join("")+'</div>';
     }
-    body.querySelectorAll("[data-saved-view]").forEach(button=>button.addEventListener("click",()=>{
-      state.panel.savedView=button.dataset.savedView||"all";
-      renderSharedPanel();
-    }));
+    body.querySelectorAll("[data-saved-view]").forEach(button=>button.addEventListener("click",()=>{state.panel.savedView=button.dataset.savedView||"learning";renderSharedPanel();}));
     const findItem=key=>state.learningItems.find(item=>learningKey(item.kind,item.key)===key);
-    body.querySelectorAll("[data-saved-open]").forEach(button=>button.addEventListener("click",()=>{
-      const item=findItem(button.dataset.savedOpen); if(item) navigateSavedItem(item,0);
-    }));
-    body.querySelectorAll("[data-saved-prev]").forEach(button=>button.addEventListener("click",event=>{
-      event.stopPropagation(); const item=findItem(button.dataset.savedPrev); if(item) navigateSavedItem(item,-1);
-    }));
-    body.querySelectorAll("[data-saved-next]").forEach(button=>button.addEventListener("click",event=>{
-      event.stopPropagation(); const item=findItem(button.dataset.savedNext); if(item) navigateSavedItem(item,1);
-    }));
-    body.querySelectorAll("[data-saved-remove]").forEach(button=>button.addEventListener("click",async()=>{
-      const item=findItem(button.dataset.savedRemove); if(!item) return;
-      button.disabled=true;
-      try{ await setSavedFlag(item,false); renderSharedPanel(); }catch(error){console.warn("Saved remove failed",error);button.disabled=false;}
-    }));
+    body.querySelectorAll("[data-saved-open]").forEach(button=>button.addEventListener("click",()=>{const item=findItem(button.dataset.savedOpen);if(item)navigateSavedItem(item,0);}));
+    body.querySelectorAll("[data-saved-prev]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();const item=findItem(button.dataset.savedPrev);if(item)navigateSavedItem(item,-1);}));
+    body.querySelectorAll("[data-saved-next]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();const item=findItem(button.dataset.savedNext);if(item)navigateSavedItem(item,1);}));
     const bindSavedStatus=(selector,status,dataKey)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
-      const item=findItem(button.dataset[dataKey]); if(!item) return;
-      button.disabled=true;
-      try{
-        await setLearningStatus({kind:item.kind,key:item.key,label:item.label,meaning_tr:item.meaning_tr},status);
-        renderSharedPanel();
-      }catch(error){console.warn("Saved status failed",error);button.disabled=false;}
+      const item=findItem(button.dataset[dataKey]);if(!item)return;button.disabled=true;
+      try{await setLearningStatus({kind:item.kind,key:item.key,label:item.label,meaning_tr:item.meaning_tr,surface:item.label},status);renderSharedPanel();}
+      catch(error){console.warn("Saved status failed",error);button.disabled=false;}
     }));
     bindSavedStatus("[data-saved-learning]","learning","savedLearning");
     bindSavedStatus("[data-saved-known]","learned","savedKnown");
@@ -2741,12 +2948,13 @@
     return "Cumleler";
   }
 
-  function safeExportName(){
+  function safeExportName(sectionOverride=""){
     const raw=(adapter.id==="youtube" ? currentYouTubeTitle() : document.title || "language-learning")
       .replace(/\s+/g," ").trim()
       .replace(/[\\/:*?"<>|]+/g,"-")
       .slice(0,72);
-    return (raw || "language-learning")+"-"+exportSectionName()+"-"+exportTimestamp();
+    const section=(sectionOverride||exportSectionName()).replace(/[\\/:*?"<>|\s]+/g,"_");
+    return (raw || "language-learning")+"-"+section+"-"+exportTimestamp();
   }
 
   async function translationForCue(cue){
@@ -2760,104 +2968,90 @@
     return value;
   }
 
-  async function exportItemsForCurrentTab(){
-    if(state.panel.tab==="subtitles"){
-      return (state.youtube.cues||[]).map((cue,index)=>({
-        id:"sentence:"+index,
-        label:(index+1)+". "+cue.text.slice(0,90),
-        kind:"sentence",
-        cue,
-        index,
-      }));
-    }
-
-    if(state.panel.tab==="saved"){
-      return filteredSavedItems().map((item,index)=>({
-        id:"saved:"+index,
-        label:item.label||item.key||("Kayıt "+(index+1)),
-        kind:"saved",
-        item,
-      }));
-    }
-
-    if(state.panel.wordsView==="senses"){
-      if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
-        await analyzePanelWordSenses();
-      }
-      return (state.panel.senseRows||[]).map((row,index)=>({
-        id:"sense:"+index,
+  async function exportItemsForWordsView(view){
+    if(view==="senses"){
+      if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows) await analyzePanelWordSenses();
+      if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups();
+      return senseRowsWithExpressions().map((row,index)=>({
+        id:"senses:item:"+index,section:"Anlamlar",sectionId:"senses",
         label:row.canonical+(row.meaningTr?" — "+row.meaningTr:""),
-        kind:"sense",
-        row,
+        kind:row.expressionEntry?"group":"sense",row,entry:row.expressionEntry||null,
       }));
     }
-
-    if(state.panel.wordsView==="groups"){
+    if(view==="groups"){
       if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups();
       return (state.youtube.expressionGroupsAnalysis||[]).map((entry,index)=>({
-        id:"group:"+index,
-        label:entry.canonical,
-        kind:"group",
-        entry,
+        id:"groups:item:"+index,section:"Kelime grupları",sectionId:"groups",label:entry.canonical,kind:"group",entry,
       }));
     }
-
     let words=filterPanelWords(state.youtube.transcriptAnalysis||[]);
-    if(state.panel.wordsView==="alphabetical"){
-      words=[...words].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
-    }else if(state.panel.wordsView==="frequency" || state.panel.wordsView==="overview"){
-      words=[...words].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
-    }
+    if(view==="alphabetical") words=[...words].sort((a,b)=>a.lemma.localeCompare(b.lemma,"de"));
+    else words=[...words].sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+    const labels={overview:"Genel",alphabetical:"A-Z",frequency:"Sıklık"};
     return words.map((entry,index)=>({
-      id:"word:"+index,
-      label:entry.lemma+" · "+entry.count+"×",
-      kind:"word",
-      entry,
+      id:view+":item:"+index,section:labels[view]||"Kelimeler",sectionId:view,label:entry.lemma+" · "+entry.count+"×",kind:"word",entry,
     }));
   }
 
+  async function exportItemsForCurrentTab(){
+    if(state.panel.tab==="subtitles"){
+      return (state.youtube.cues||[]).map((cue,index)=>({
+        id:"sentence:"+index,label:(index+1)+". "+cue.text.slice(0,90),kind:"sentence",cue,index,
+      }));
+    }
+    if(state.panel.tab==="saved"){
+      return filteredSavedItems().map((item,index)=>({
+        id:"saved:"+index,label:item.label||item.key||("Kayıt "+(index+1)),kind:"saved",item,
+      }));
+    }
+    const result=[];
+    for(const view of ["overview","alphabetical","frequency","groups","senses"]) result.push(...await exportItemsForWordsView(view));
+    return result;
+  }
+
   function exportRecordForItem(exportItem,sentenceMode="bilingual"){
+    const withSection=record=>exportItem.section ? {"Bölüm":exportItem.section,...record} : record;
     if(exportItem.kind==="saved"){
       const item=exportItem.item;
       const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
-      return {
+      return withSection({
         "Kelime / İfade":item.label||item.key||"",
         "Türkçe anlam":item.meaning_tr||"",
         "Tür":type,
         "Durum":itemStatus(item)==="learned"?"Biliyorum":"Öğreniyorum",
-      };
+      });
     }
     if(exportItem.kind==="sense"){
       const row=exportItem.row;
-      return {
+      return withSection({
         "Kelime / İfade":row.canonical||row.lemma||"",
         "Türkçe anlam":row.meaningTr||"",
         "Tür":row.unitType||"Anlam/Kullanım",
         "İçerikteki biçim":row.surface||"",
         "Geçiş sayısı":(row.occurrences||[]).length,
-      };
+      });
     }
     if(exportItem.kind==="group"){
       const entry=exportItem.entry;
-      return {
+      return withSection({
         "İfade":entry.canonical||"",
         "Tür":expressionGroupLabel(entry.type),
         "Türkçe anlam":entry.meaningTr||"",
         "İçerikteki biçimler":(entry.forms||[]).join(", "),
         "Sıklık":entry.count||0,
-      };
+      });
     }
     if(exportItem.kind==="word"){
       const entry=exportItem.entry;
       const learning=learningItemForLemma(entry.lemma);
-      return {
+      return withSection({
         "Kelime":entry.lemma||"",
         "Kelime türü":posLabel(entry.pos||""),
         "İçerikteki biçimler":(entry.forms||[]).join(", "),
         "Sıklık":entry.count||0,
         "Türkçe anlam":learning?.meaning_tr||"",
         "Durum":learning?(itemStatus(learning)==="learned"?"Biliyorum":"Öğreniyorum"):"",
-      };
+      });
     }
     const cue=exportItem.cue;
     return {
@@ -2898,35 +3092,29 @@
     iframe.style.opacity="0";
     document.documentElement.appendChild(iframe);
     const doc=iframe.contentDocument;
-    if(!doc){ iframe.remove(); throw new Error("PDF/Print belgesi oluşturulamadı"); }
+    if(!doc){iframe.remove();throw new Error("PDF/Print belgesi oluşturulamadı");}
     doc.open();
     doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{margin:16mm}body{font-family:system-ui,-apple-system,sans-serif;margin:0;color:#111}h1{font-size:22px}.r{padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid}.r div{display:grid;grid-template-columns:150px 1fr;gap:12px;margin:4px 0}.r b{font-size:12px;text-transform:uppercase;color:#666}.r span{white-space:pre-wrap}</style></head><body><h1>'+esc(title)+'</h1>'+rows+'</body></html>');
     doc.close();
+    try{doc.title=title;}catch(_error){}
+    const previousTitle=document.title;
+    document.title=title;
     setTimeout(()=>{
-      try{
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      }finally{
-        setTimeout(()=>iframe.remove(),1500);
-      }
+      try{iframe.contentWindow?.focus();iframe.contentWindow?.print();}
+      finally{setTimeout(()=>{document.title=previousTitle;iframe.remove();},1800);}
     },300);
   }
 
-  async function performExport(selected,format,sentenceMode){
+  async function performExport(selected,format,sentenceMode,sectionOverride=""){
     const records=[];
     for(const item of selected){
       const record=exportRecordForItem(item,sentenceMode);
-      if(item.kind==="sentence" && sentenceMode!=="original"){
-        record["Türkçe"]=await translationForCue(item.cue);
-      }
-      if(item.kind==="sentence" && sentenceMode==="translation"){
-        delete record["Almanca"];
-      }else if(item.kind==="sentence" && sentenceMode==="original"){
-        delete record["Türkçe"];
-      }
+      if(item.kind==="sentence" && sentenceMode!=="original") record["Türkçe"]=await translationForCue(item.cue);
+      if(item.kind==="sentence" && sentenceMode==="translation") delete record["Almanca"];
+      else if(item.kind==="sentence" && sentenceMode==="original") delete record["Türkçe"];
       records.push(record);
     }
-    const base=safeExportName();
+    const base=safeExportName(sectionOverride);
     if(format==="json"){
       downloadTextFile(base+".json","application/json;charset=utf-8",JSON.stringify(records,null,2));
       return;
@@ -2937,10 +3125,7 @@
       downloadTextFile(base+".csv","text/csv;charset=utf-8",csv);
       return;
     }
-    if(format==="pdf"){
-      printExport(records,safeExportName());
-      return;
-    }
+    if(format==="pdf"){printExport(records,base);return;}
     const txt=records.map(record=>Object.entries(record)
       .filter(([,value])=>String(value??"")!=="")
       .map(([key,value])=>key+": "+value).join("\n")).join("\n\n");
@@ -2955,37 +3140,67 @@
     const sentenceOptions=state.panel.tab==="subtitles"
       ? '<label>'+esc(uiText("exportContent"))+'<select name="sentenceMode"><option value="bilingual">'+esc(uiText("exportBilingual"))+'</option><option value="original">'+esc(uiText("exportOriginal"))+'</option><option value="translation">'+esc(uiText("exportTranslationOnly"))+'</option></select></label>'
       : "";
+    const wordSections=state.panel.tab==="words"
+      ? '<div class="gle-export-sections">'+[
+          ["overview","Genel"],["alphabetical","A-Z"],["frequency","Sıklık"],["groups","Kelime grupları"],["senses","Anlamlar"]
+        ].map(([id,label])=>'<label><input type="checkbox" data-export-section="'+id+'" '+(id===state.panel.wordsView?"checked":"")+'><span>'+label+'</span></label>').join("")+'</div>'
+      : "";
     dialog.innerHTML='<div class="gle-export-card" role="dialog" aria-modal="true"><header><strong>'+esc(uiText("exportTitle"))+'</strong><button type="button" class="gle-export-close">×</button></header>'+
       '<div class="gle-export-options">'+sentenceOptions+
       '<label>'+esc(uiText("exportFormat"))+'<select name="format"><option value="txt">TXT</option><option value="csv">CSV</option><option value="json">JSON</option><option value="pdf">PDF / Print</option></select></label></div>'+
-      '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all" checked> '+esc(uiText("exportSelectAll"))+'</label><span>'+items.length+'</span></div>'+
-      '<div class="gle-export-items">'+items.map(item=>'<label><input type="checkbox" data-export-id="'+escAttr(item.id)+'" checked><span>'+esc(item.label)+'</span></label>').join("")+'</div>'+
+      wordSections+
+      '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all"> '+esc(uiText("exportSelectAll"))+'</label><span class="gle-export-count">0</span></div>'+
+      '<div class="gle-export-items"></div>'+
       '<footer><button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
     document.documentElement.appendChild(dialog);
     const close=()=>dialog.remove();
     dialog.querySelector(".gle-export-close").addEventListener("click",close);
     dialog.querySelector(".gle-export-cancel").addEventListener("click",close);
-    dialog.addEventListener("click",event=>{ if(event.target===dialog) close(); });
+    dialog.addEventListener("click",event=>{if(event.target===dialog)close();});
+    const itemBox=dialog.querySelector(".gle-export-items");
     const all=dialog.querySelector(".gle-export-all");
+    const count=dialog.querySelector(".gle-export-count");
+    const visibleItems=()=>state.panel.tab!=="words"
+      ? items
+      : items.filter(item=>dialog.querySelector('[data-export-section="'+item.sectionId+'"]')?.checked);
+    const renderItems=()=>{
+      const list=visibleItems();
+      itemBox.innerHTML=list.map(item=>'<label><input type="checkbox" data-export-id="'+escAttr(item.id)+'" checked><span>'+(item.section?'<b>'+esc(item.section)+'</b> · ':"")+esc(item.label)+'</span></label>').join("");
+      all.checked=list.length>0;
+      all.indeterminate=false;
+      count.textContent=String(list.length);
+      itemBox.querySelectorAll("[data-export-id]").forEach(input=>input.addEventListener("change",()=>{
+        const boxes=[...itemBox.querySelectorAll("[data-export-id]")];
+        all.checked=boxes.length>0&&boxes.every(box=>box.checked);
+        all.indeterminate=!all.checked&&boxes.some(box=>box.checked);
+        count.textContent=String(boxes.filter(box=>box.checked).length)+"/"+boxes.length;
+      }));
+    };
+    dialog.querySelectorAll("[data-export-section]").forEach(input=>input.addEventListener("change",renderItems));
     all.addEventListener("change",()=>{
-      dialog.querySelectorAll("[data-export-id]").forEach(input=>{input.checked=all.checked;});
+      itemBox.querySelectorAll("[data-export-id]").forEach(input=>{input.checked=all.checked;});
+      const boxes=[...itemBox.querySelectorAll("[data-export-id]")];
+      count.textContent=String(boxes.filter(box=>box.checked).length)+"/"+boxes.length;
     });
-    dialog.querySelectorAll("[data-export-id]").forEach(input=>input.addEventListener("change",()=>{
-      const boxes=[...dialog.querySelectorAll("[data-export-id]")];
-      all.checked=boxes.length>0 && boxes.every(box=>box.checked);
-      all.indeterminate=!all.checked && boxes.some(box=>box.checked);
-    }));
+    renderItems();
     dialog.querySelector(".gle-export-go").addEventListener("click",async()=>{
-      const selectedIds=new Set([...dialog.querySelectorAll("[data-export-id]:checked")].map(input=>input.dataset.exportId));
-      const selected=items.filter(item=>selectedIds.has(item.id));
-      if(!selected.length) return;
+      const selectedIds=new Set([...itemBox.querySelectorAll("[data-export-id]:checked")].map(input=>input.dataset.exportId));
+      const selected=visibleItems().filter(item=>selectedIds.has(item.id));
+      if(!selected.length)return;
+      const sectionIds=[...new Set(selected.map(item=>item.sectionId).filter(Boolean))];
+      const sectionOverride=state.panel.tab==="words"
+        ? (sectionIds.length===1
+          ? ({overview:"Kelimeler",alphabetical:"Kelimeler_A-Z",frequency:"Kelimeler_Siklik",groups:"Kelime_Gruplari",senses:"Anlamlar"})[sectionIds[0]]
+          : "Kelimeler_Coklu")
+        : "";
       const button=dialog.querySelector(".gle-export-go");
       button.disabled=true;
       try{
         await performExport(
           selected,
           dialog.querySelector('[name="format"]').value,
-          dialog.querySelector('[name="sentenceMode"]')?.value || "bilingual"
+          dialog.querySelector('[name="sentenceMode"]')?.value||"bilingual",
+          sectionOverride
         );
         close();
       }catch(error){
@@ -3692,11 +3907,13 @@
 
     loadVideoUnknownLemmas().catch(()=>{});
     loadVideoUnknownExpressions().catch(()=>{});
+    installWebTextInteraction();
     if(segments.length){
-      analyzeWholeYouTubeTranscript();
-      analyzeWholeYouTubeExpressionGroups();
+      Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
+        .finally(()=>scheduleWebLearningAnnotations());
     }
     renderSharedPanel();
+    scheduleWebLearningAnnotations();
   }
 
   function scan(){
