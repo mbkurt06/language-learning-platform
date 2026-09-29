@@ -823,3 +823,59 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
   top:28%!important
 }
+
+
+/* Settings controls: visible neutral tracks with blue draggable thumbs. */
+.gle-settings-section input[type="range"]{
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  width:100%!important;
+  height:6px!important;
+  border-radius:999px!important;
+  background:#cbd5e1!important;
+  outline:none!important;
+  cursor:pointer!important
+}
+.gle-settings-section input[type="range"]::-webkit-slider-runnable-track{
+  height:6px!important;
+  border-radius:999px!important;
+  background:#cbd5e1!important
+}
+.gle-settings-section input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none!important;
+  width:18px!important;
+  height:18px!important;
+  margin-top:-6px!important;
+  border:0!important;
+  border-radius:50%!important;
+  background:#1683ff!important;
+  box-shadow:0 0 0 2px rgba(22,131,255,.18)!important
+}
+.gle-settings-section input[type="range"]::-moz-range-track{
+  height:6px!important;
+  border-radius:999px!important;
+  background:#cbd5e1!important
+}
+.gle-settings-section input[type="range"]::-moz-range-thumb{
+  width:18px!important;
+  height:18px!important;
+  border:0!important;
+  border-radius:50%!important;
+  background:#1683ff!important
+}
+.gle-settings-select{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:14px!important;
+  align-items:center!important
+}
+.gle-settings-select select{
+  min-width:150px;
+  padding:8px 32px 8px 10px;
+  border:1px solid #52525b;
+  border-radius:8px;
+  background:#18181d;
+  color:#f4f4f5;
+  font:600 13px/1.2 system-ui;
+  cursor:pointer
+}
