@@ -44,7 +44,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"system",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"dark",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -2389,8 +2389,10 @@
       prefetchYouTubeAnalyses(currentCue?.index ?? 0);
       renderTimedCue();
     }catch(_error){
-      state.youtube.timedAvailable=false;
-      state.youtube.cues=null;
+      if(!state.youtube.cues?.length){
+        state.youtube.timedAvailable=false;
+        state.youtube.cues=null;
+      }
     }
   }
 
@@ -2754,7 +2756,7 @@
     showPanelTranslation:null,
     followActiveSubtitle:true,
     interfaceLanguage:"tr",
-    theme:"system",
+    theme:"dark",
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
