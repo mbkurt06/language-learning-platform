@@ -135,8 +135,87 @@
   const debug = document.createElement("pre");
   debug.id = "debug";
 
-  shadow.append(shadowStyle, overlay, debug);
+  const controls = document.createElement("div");
+  controls.id = "controls";
+  const exportButton = document.createElement("button");
+  exportButton.type = "button";
+  exportButton.textContent = "Export Debug";
+  controls.appendChild(exportButton);
+
+  shadow.append(shadowStyle, overlay, debug, controls);
   (document.documentElement || document.body).appendChild(host);
+
+  function safeNumber(value) {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function buildDiagnosticPayload() {
+    const video = state.video;
+    let seekableEnd = null;
+    try {
+      if (video?.seekable?.length) seekableEnd = video.seekable.end(video.seekable.length - 1);
+    } catch {}
+    return {
+      format: "zdf-subtitle-lab-debug-v1",
+      exportedAt: new Date().toISOString(),
+      sessionId: state.debugSessionId,
+      page: { href: location.href, title: document.title },
+      state: {
+        mode: state.mode,
+        sourceUrl: state.sourceUrl,
+        activePlaylistUrl: state.activePlaylistUrl,
+        directUrls: [...state.directUrls],
+        playlistUrls: [...state.playlistUrls],
+        cueCount: state.cues.length,
+        lastRefreshAt: state.lastRefreshAt || null,
+        latestSubtitleEpoch: safeNumber(state.latestSubtitleEpoch),
+        videoAnchorTime: safeNumber(state.videoAnchorTime),
+        programAnchorEpoch: safeNumber(state.programAnchorEpoch),
+        seekableEnd: safeNumber(seekableEnd),
+        videoCurrentTime: safeNumber(Number(video?.currentTime)),
+        refreshFailures: state.consecutiveRefreshFailures,
+        cooldownReason: state.cooldownReason,
+        nextAllowedRefreshAt: state.nextAllowedRefreshAt || null,
+        lastError: state.lastError
+      },
+      cues: state.cues.slice(-120),
+      events: [...state.debugEvents]
+    };
+  }
+
+  function persistDebugSoon() {
+    window.clearTimeout(state.debugPersistTimer);
+    state.debugPersistTimer = window.setTimeout(() => {
+      chrome.storage.local.set({ [DEBUG_STORAGE_KEY]: buildDiagnosticPayload() }).catch(() => {});
+    }, 750);
+  }
+
+  function logEvent(type, details = {}) {
+    state.debugEvents.push({ at: new Date().toISOString(), epochMs: Date.now(), type, ...details });
+    if (state.debugEvents.length > DEBUG_EVENT_LIMIT) {
+      state.debugEvents.splice(0, state.debugEvents.length - DEBUG_EVENT_LIMIT);
+    }
+    persistDebugSoon();
+  }
+
+  function downloadDebugExport() {
+    const payload = buildDiagnosticPayload();
+    chrome.storage.local.set({ [DEBUG_STORAGE_KEY]: payload }).catch(() => {});
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "zdf-subtitle-lab-debug-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+    anchor.style.display = "none";
+    document.documentElement.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    logEvent("debug-exported", { eventCount: state.debugEvents.length, cueCount: state.cues.length });
+  }
+
+  exportButton.addEventListener("click", downloadDebugExport);
+  logEvent("session-start", { href: location.href });
 
   function normalizeText(value) {
     return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
