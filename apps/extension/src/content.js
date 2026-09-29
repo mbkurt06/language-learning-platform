@@ -1236,6 +1236,7 @@
       player.style.setProperty("--gle-panel-width",panelWidth+"px");
       player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed");
       player.classList.add("gle-panel-player-fullscreen");
+      player.classList.toggle("gle-panel-fullscreen-open",!state.panel.collapsed);
       requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
@@ -1246,7 +1247,7 @@
     state.panel.docked=false;
     panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
     panel.classList.add("gle-youtube-external-panel");
-    player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen");
+    player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen","gle-panel-fullscreen-open");
     player.style.removeProperty("--gle-panel-width");
     player.style.removeProperty("--gle-video-scale");
 
