@@ -1085,6 +1085,15 @@
     });
   }
 
+  function syncPanelHandleGeometry(panel){
+    const handle=state.panel.handle;
+    if(!panel || !handle || state.panel.collapsed) return;
+    const rect=panel.getBoundingClientRect();
+    if(!rect.height) return;
+    const centerY=Math.max(52,Math.min(innerHeight-52,rect.top+Math.min(120,rect.height*0.22)));
+    document.documentElement.style.setProperty("--gle-panel-handle-top",centerY+"px");
+  }
+
   function syncSharedPanelHost(){
     const panel=state.panel.element;
     if(adapter.id==="zdf"){
@@ -1129,6 +1138,7 @@
         fullscreenRoot.classList.add("gle-zdf-fullscreen-panel-collapsed");
       }
       state.panel.docked=Boolean(fullscreenRoot);
+      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
     const player=document.querySelector(".html5-video-player");
@@ -1165,6 +1175,7 @@
       player.style.removeProperty("--gle-video-scale");
       player.style.removeProperty("--gle-panel-width");
     }
+    requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
   }
 
   function ensureSharedPanel(){
