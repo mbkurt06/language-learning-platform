@@ -566,6 +566,8 @@
       "Cue end: " + formatTime(cue?.end) + "\n" +
       "Cue delta: " + formatTime(cueDelta) + "\n" +
       "Source: " + (state.sourceUrl || "-") + "\n" +
+      "Active playlist: " + (state.activePlaylistUrl || "-") + "\n" +
+      "Debug events: " + state.debugEvents.length + "\n" +
       "Current cue: " + (text || "-") + "\n" +
       "Error: " + (state.lastError || "-");
 
@@ -577,8 +579,22 @@
 
     state.sourceDetectedAt = Date.now();
     state.sourceUrl = String(data.sourceUrl || state.sourceUrl || "");
+    const beforeDirect = new Set(state.directUrls);
+    const beforePlaylists = new Set(state.playlistUrls);
     state.directUrls = [...new Set([...(data.subtitleUrls || []), ...state.directUrls].filter(Boolean))];
     state.playlistUrls = [...new Set([...(data.subtitlePlaylistUrls || []), ...state.playlistUrls].filter(Boolean))];
+
+    const addedDirect = state.directUrls.filter(url => !beforeDirect.has(url));
+    const addedPlaylists = state.playlistUrls.filter(url => !beforePlaylists.has(url));
+    if (addedDirect.length || addedPlaylists.length) {
+      logEvent("candidates-added", {
+        sourceUrl: state.sourceUrl,
+        addedDirect,
+        addedPlaylists,
+        totalDirect: state.directUrls.length,
+        totalPlaylists: state.playlistUrls.length
+      });
+    }
 
     if (state.playlistUrls.length) {
       if (!state.candidateRefreshTimer) {
