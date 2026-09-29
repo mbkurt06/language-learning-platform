@@ -98,6 +98,35 @@
       overflow-wrap: anywhere;
       pointer-events: none;
     }
+
+    #controls {
+      all: initial;
+      position: fixed;
+      top: 12px;
+      right: 404px;
+      z-index: 2147483647;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #controls button {
+      all: initial;
+      display: inline-block;
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: rgba(12, 16, 24, .96);
+      color: #dbeafe;
+      border: 1px solid rgba(147, 197, 253, .35);
+      font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    #controls button:hover {
+      background: rgba(30, 41, 59, .98);
+    }
   `;
 
   const overlay = document.createElement("div");
