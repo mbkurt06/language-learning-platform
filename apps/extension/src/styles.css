@@ -112,11 +112,17 @@
 
 #gle-shared-panel.docked{
   position:absolute!important;right:0!important;top:0!important;bottom:0!important;height:auto!important;
-  width:min(420px,35vw);border-radius:0!important;border-top:0;border-right:0;border-bottom:0;z-index:2147483500
+  width:var(--gle-panel-width,min(420px,35vw))!important;
+  border-radius:0!important;border-top:0;border-right:0;border-bottom:0;z-index:2147483500
 }
 .html5-video-player.gle-panel-docked .html5-main-video{
-  transform:scale(var(--gle-video-scale,1))!important;
-  transform-origin:left center!important
+  left:0!important;
+  width:calc(100% - var(--gle-panel-width))!important;
+  max-width:calc(100% - var(--gle-panel-width))!important;
+  height:100%!important;
+  transform:none!important;
+  object-fit:contain!important;
+  object-position:center center!important
 }
 .html5-video-player.gle-panel-docked .ytp-chrome-bottom{
   width:calc(100% - var(--gle-panel-width) - 24px)!important;
@@ -878,4 +884,20 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
   color:#f4f4f5;
   font:600 13px/1.2 system-ui;
   cursor:pointer
+}
+
+
+/* YouTube: the shared panel occupies a real right-side lane inside the player.
+   The video and native controls stay in the remaining left-side lane. */
+.html5-video-player.gle-panel-docked{
+  overflow:hidden!important;
+  background:#000!important
+}
+.html5-video-player.gle-panel-docked .ytp-caption-window-container,
+.html5-video-player.gle-panel-docked .ytp-player-content{
+  right:var(--gle-panel-width)!important
+}
+.html5-video-player.gle-panel-docked .ytp-chrome-top,
+.html5-video-player.gle-panel-docked .ytp-chrome-bottom{
+  right:var(--gle-panel-width)!important
 }
