@@ -1468,21 +1468,22 @@
       state.panel.docked=false;
       panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
       panel.classList.add("gle-youtube-external-panel","gle-web-page-panel");
-
       const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
       const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
       const basePanelWidth=Math.min(408,Math.max(320,viewportWidth*0.30));
       const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
       const panelWidth=Math.min(viewportWidth*0.45,Math.max(220,basePanelWidth*factor));
+      const open=!state.panel.collapsed;
       const left=Math.max(0,viewportWidth-panelWidth);
-
       document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-top","0px");
       document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
       document.documentElement.style.setProperty("--gle-youtube-panel-height",viewportHeight+"px");
       document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
-      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+      document.documentElement.style.setProperty("--gle-web-panel-space",open?panelWidth+"px":"0px");
+      document.documentElement.classList.toggle("gle-web-panel-open",open);
+      requestAnimationFrame(()=>{syncPanelHandleGeometry(panel);scheduleWebLearningAnnotations();});
       return;
     }
 
@@ -1591,7 +1592,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-reset" aria-label="Paneli varsayılana döndür" title="Paneli varsayılana döndür">↺</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -1612,6 +1613,12 @@
       renderPlayerControls();
     });
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
+    panel.querySelector(".gle-header-reset").addEventListener("click",async()=>{
+      state.settings.panelWidthFactor=1;
+      await chrome.storage.sync.set({panelWidthFactor:1});
+      setSharedPanelCollapsed(false);
+      syncSharedPanelHost();
+    });
     panel.querySelector(".gle-header-settings").addEventListener("click",()=>ensureSettingsDialog());
 
     panel.querySelectorAll("[data-tab]").forEach(button=>{
@@ -1827,6 +1834,7 @@
           state.youtube.transcriptAnalysis=cached[cacheKey];
           analyzeWholeYouTubeExpressionGroups();
           if(state.panel.element) renderSharedPanel();
+          if(adapter.id==="web") scheduleWebLearningAnnotations();
           return;
         }
       }catch(_error){}
@@ -1883,6 +1891,7 @@
         chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
         analyzeWholeYouTubeExpressionGroups();
         if(state.panel.element) renderSharedPanel();
+        if(adapter.id==="web") scheduleWebLearningAnnotations();
       }catch(error){
         console.warn("Video word analysis failed",error);
         if(state.panel.element && state.panel.tab==="words"){
@@ -2539,47 +2548,276 @@
     ])].sort((a,b)=>a-b);
   }
 
+  function webTextNodes(element){
+    const nodes=[];
+    if(!element) return nodes;
+    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT,{
+      acceptNode(node){
+        const parent=node.parentElement;
+        if(!parent || parent.closest("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    while(walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+
+  function webRangeFromOffsets(element,start,end){
+    if(!element || end<=start) return null;
+    const nodes=webTextNodes(element);
+    let cursor=0,startNode=null,endNode=null,startOffset=0,endOffset=0;
+    for(const node of nodes){
+      const length=String(node.nodeValue||"").length;
+      if(!startNode && start>=cursor && start<=cursor+length){
+        startNode=node;
+        startOffset=Math.min(length,Math.max(0,start-cursor));
+      }
+      if(!endNode && end>=cursor && end<=cursor+length){
+        endNode=node;
+        endOffset=Math.min(length,Math.max(0,end-cursor));
+        break;
+      }
+      cursor+=length;
+    }
+    if(!startNode || !endNode) return null;
+    const range=document.createRange();
+    try{ range.setStart(startNode,startOffset); range.setEnd(endNode,endOffset); return range; }
+    catch(_error){ return null; }
+  }
+
+  function tokenOffsetsInText(text,tokens){
+    const offsets=new Map();
+    let cursor=0;
+    for(const token of tokens||[]){
+      const surface=String(token.text||"");
+      if(!surface) continue;
+      let at=text.indexOf(surface,cursor);
+      if(at<0) at=text.toLocaleLowerCase("de-DE").indexOf(surface.toLocaleLowerCase("de-DE"),cursor);
+      if(at<0) continue;
+      offsets.set(token.i,{start:at,end:at+surface.length});
+      cursor=at+surface.length;
+    }
+    return offsets;
+  }
+
+  async function webRangesForLearningItem(item,cueIndex){
+    if(adapter.id!=="web") return {ranges:[],meaning:item?.meaning_tr||""};
+    const segment=state.web.segments?.[cueIndex];
+    const element=segment?.sourceElement;
+    if(!segment?.text || !element?.isConnected) return {ranges:[],meaning:item?.meaning_tr||""};
+    const fullText=String(element.textContent||"");
+    let sentenceStart=fullText.indexOf(segment.text);
+    if(sentenceStart<0) sentenceStart=fullText.toLocaleLowerCase("de-DE").indexOf(segment.text.toLocaleLowerCase("de-DE"));
+    if(sentenceStart<0) return {ranges:[],meaning:item?.meaning_tr||""};
+
+    let data=null;
+    try{ data=await analyze(segment.text); }catch(_error){}
+    const tokens=data?.tokens||[];
+    const offsets=tokenOffsetsInText(segment.text,tokens);
+    const ranges=[];
+    let meaning=item?.meaning_tr||"";
+
+    if(item?.kind==="expression"){
+      const wanted=[item.key,item.label].map(v=>String(v||"").toLocaleLowerCase("de-DE"));
+      const match=(data?.expressions||[]).find(expr=>
+        wanted.includes(String(expr.pattern_id||"").toLocaleLowerCase("de-DE")) ||
+        wanted.includes(String(expr.canonical||"").toLocaleLowerCase("de-DE"))
+      );
+      if(match){
+        meaning=match.contextual_meaning_tr||(match.meaning_tr||[])[0]||meaning;
+        for(const tokenIndex of match.token_indices||[]){
+          const off=offsets.get(tokenIndex);
+          if(!off) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+          if(range) ranges.push(range);
+        }
+      }
+    }else{
+      const wanted=String(item?.key||item?.label||"").toLocaleLowerCase("de-DE");
+      for(const token of tokens){
+        if(String(token.lemma||token.text||"").toLocaleLowerCase("de-DE")!==wanted) continue;
+        const off=offsets.get(token.i);
+        if(!off) continue;
+        const hover=data?.hover?.[String(token.i)]||data?.hover?.[token.i]||{};
+        meaning=hover.contextual_word_meaning_tr||(hover.dictionary_meanings_tr||[])[0]||meaning;
+        const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+        if(range) ranges.push(range);
+      }
+      if(!ranges.length){
+        const forms=(state.youtube.transcriptAnalysis||[]).find(entry=>String(entry.lemma||"").toLocaleLowerCase("de-DE")===wanted)?.forms||[];
+        for(const form of [item?.label,item?.key,...forms].filter(Boolean).sort((a,b)=>String(b).length-String(a).length)){
+          const needle=String(form);
+          const at=segment.text.toLocaleLowerCase("de-DE").indexOf(needle.toLocaleLowerCase("de-DE"));
+          if(at<0) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+at,sentenceStart+at+needle.length);
+          if(range) ranges.push(range);
+        }
+      }
+    }
+    return {ranges,meaning:cleanTranslationText(meaning)};
+  }
+
+  async function highlightWebLearningItem(item,cueIndex,highlightName="gle-saved-target"){
+    if(!CSS?.highlights || typeof Highlight==="undefined") return;
+    const result=await webRangesForLearningItem(item,cueIndex);
+    CSS.highlights.delete(highlightName);
+    if(result.ranges.length) CSS.highlights.set(highlightName,new Highlight(...result.ranges));
+  }
+
   function focusSavedOccurrence(item,cueIndex){
     playYouTubeCue(cueIndex);
-    if(adapter.id==="web"){
-      const word=(state.youtube.transcriptAnalysis||[]).find(entry=>
-        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.key||item?.label||"").toLocaleLowerCase("de-DE") ||
-        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.label||"").toLocaleLowerCase("de-DE")
-      );
-      const forms=word?.forms?.length ? word.forms : [item?.label,item?.key].filter(Boolean);
-      requestAnimationFrame(()=>highlightWebTarget(cueIndex,forms));
-    }
+    if(adapter.id==="web") requestAnimationFrame(()=>highlightWebLearningItem(item,cueIndex,"gle-saved-target"));
   }
 
   function highlightWebTarget(cueIndex,forms){
-    if(adapter.id!=="web") return;
+    if(adapter.id!=="web" || !CSS?.highlights || typeof Highlight==="undefined") return;
     const segment=state.web.segments?.[cueIndex];
     const element=segment?.sourceElement;
     if(!element?.isConnected) return;
-    if(!CSS?.highlights || typeof Highlight==="undefined") return;
-    const candidates=(forms||[]).map(value=>String(value||"").trim()).filter(Boolean).sort((a,b)=>b.length-a.length);
-    if(!candidates.length) return;
-    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);
+    const fullText=String(element.textContent||"");
     const ranges=[];
-    while(walker.nextNode()){
-      const node=walker.currentNode;
-      const text=String(node.nodeValue||"");
-      const lower=text.toLocaleLowerCase("de-DE");
-      for(const form of candidates){
-        const needle=form.toLocaleLowerCase("de-DE");
-        let start=0;
-        while(needle && (start=lower.indexOf(needle,start))!==-1){
-          const range=document.createRange();
-          range.setStart(node,start);
-          range.setEnd(node,start+form.length);
-          ranges.push(range);
-          start+=Math.max(1,form.length);
-        }
-        if(ranges.length) break;
+    for(const form of (forms||[]).map(v=>String(v||"").trim()).filter(Boolean)){
+      const lower=fullText.toLocaleLowerCase("de-DE");
+      const needle=form.toLocaleLowerCase("de-DE");
+      let start=0;
+      while(needle && (start=lower.indexOf(needle,start))!==-1){
+        const range=webRangeFromOffsets(element,start,start+form.length);
+        if(range) ranges.push(range);
+        start+=Math.max(1,form.length);
       }
     }
     CSS.highlights.delete("gle-saved-target");
     if(ranges.length) CSS.highlights.set("gle-saved-target",new Highlight(...ranges));
+  }
+
+  function ensureWebAnnotationLayer(){
+    if(state.web.annotationLayer?.isConnected) return state.web.annotationLayer;
+    const layer=document.createElement("div");
+    layer.className="gle-web-learning-layer";
+    document.documentElement.appendChild(layer);
+    state.web.annotationLayer=layer;
+    return layer;
+  }
+
+  function positionWebAnnotationLabel(label,range){
+    const rect=range.getBoundingClientRect();
+    if(!rect.width || !rect.height) return false;
+    label.style.left=Math.max(4,rect.left)+"px";
+    label.style.top=Math.max(2,rect.top-22)+"px";
+    return true;
+  }
+
+  async function refreshWebLearningAnnotations(){
+    if(adapter.id!=="web") return;
+    const run=++state.web.annotationRun;
+    const layer=ensureWebAnnotationLayer();
+    layer.textContent="";
+    if(CSS?.highlights) CSS.highlights.delete("gle-learning-web");
+    const learningItems=state.learningItems.filter(item=>itemStatus(item)==="learning");
+    if(!learningItems.length) return;
+    const allRanges=[];
+    const labels=[];
+    for(const item of learningItems){
+      const occurrences=contentOccurrencesForLearningItem(item);
+      for(const cueIndex of occurrences){
+        if(run!==state.web.annotationRun) return;
+        const result=await webRangesForLearningItem(item,cueIndex);
+        if(run!==state.web.annotationRun) return;
+        if(!result.ranges.length) continue;
+        allRanges.push(...result.ranges);
+        const label=document.createElement("span");
+        label.className="gle-web-learning-label";
+        label.textContent=result.meaning||item.meaning_tr||"";
+        if(label.textContent && positionWebAnnotationLabel(label,result.ranges[0])){
+          layer.appendChild(label);
+          labels.push({label,range:result.ranges[0]});
+        }
+      }
+    }
+    if(run!==state.web.annotationRun) return;
+    if(allRanges.length && CSS?.highlights && typeof Highlight!=="undefined") CSS.highlights.set("gle-learning-web",new Highlight(...allRanges));
+    state.web.annotationLabels=labels;
+  }
+
+  function scheduleWebLearningAnnotations(){
+    if(adapter.id!=="web") return;
+    clearTimeout(state.web.annotationTimer);
+    state.web.annotationTimer=setTimeout(()=>refreshWebLearningAnnotations().catch(()=>{}),80);
+  }
+
+  function webCaretAtPoint(x,y){
+    if(document.caretPositionFromPoint){
+      const pos=document.caretPositionFromPoint(x,y);
+      return pos ? {node:pos.offsetNode,offset:pos.offset} : null;
+    }
+    if(document.caretRangeFromPoint){
+      const range=document.caretRangeFromPoint(x,y);
+      return range ? {node:range.startContainer,offset:range.startOffset} : null;
+    }
+    return null;
+  }
+
+  function webWordHitAtPoint(x,y){
+    const caret=webCaretAtPoint(x,y);
+    const node=caret?.node;
+    if(!node || node.nodeType!==Node.TEXT_NODE) return null;
+    const parent=node.parentElement;
+    if(!parent || parent.closest("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer,a,button,input,textarea,select,[contenteditable=true]")) return null;
+    const segmentIndex=state.web.segments.findIndex(segment=>segment.sourceElement?.contains(node));
+    if(segmentIndex<0) return null;
+    const text=String(node.nodeValue||"");
+    const isWord=ch=>/[\p{L}\p{M}ßÄÖÜäöü]/u.test(ch||"");
+    let start=Math.min(caret.offset,text.length),end=start;
+    if(start===text.length || !isWord(text[start])){
+      if(start>0 && isWord(text[start-1])) start-=1;
+      else return null;
+    }
+    end=start+1;
+    while(start>0 && isWord(text[start-1])) start--;
+    while(end<text.length && isWord(text[end])) end++;
+    const word=text.slice(start,end);
+    if(!word) return null;
+    const range=document.createRange();
+    range.setStart(node,start);
+    range.setEnd(node,end);
+    return {word,segmentIndex,range,rect:range.getBoundingClientRect(),start};
+  }
+
+  async function showWebWordTooltip(hit){
+    if(adapter.id!=="web" || !hit) return;
+    const segment=state.web.segments[hit.segmentIndex];
+    if(!segment?.text) return;
+    state.youtube.cueIndex=hit.segmentIndex;
+    try{
+      const data=await analyze(segment.text);
+      const wanted=hit.word.toLocaleLowerCase("de-DE");
+      const token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+        (data.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+      if(!token) return;
+      renderCard(data,token.i,{getBoundingClientRect:()=>hit.rect,contains:()=>false});
+    }catch(_error){}
+  }
+
+  function installWebTextInteraction(){
+    if(adapter.id!=="web" || state.web.interactionReady) return;
+    state.web.interactionReady=true;
+    document.addEventListener("mousemove",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const hit=webWordHitAtPoint(event.clientX,event.clientY);
+      const key=hit ? hit.segmentIndex+":"+hit.word+":"+hit.start : "";
+      if(!hit){ state.web.hoverKey=""; clearTimeout(state.web.hoverTimer); return; }
+      if(key===state.web.hoverKey) return;
+      state.web.hoverKey=key;
+      clearTimeout(state.web.hoverTimer);
+      state.web.hoverTimer=setTimeout(()=>showWebWordTooltip(hit),260);
+    },true);
+    document.addEventListener("click",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const hit=webWordHitAtPoint(event.clientX,event.clientY);
+      if(hit) showWebWordTooltip(hit);
+    },true);
+    window.addEventListener("scroll",()=>{ for(const entry of state.web.annotationLabels||[]) positionWebAnnotationLabel(entry.label,entry.range); },{passive:true});
+    window.addEventListener("resize",()=>{ syncSharedPanelHost(); scheduleWebLearningAnnotations(); },{passive:true});
   }
 
   function navigateSavedItem(item,direction=0){
@@ -3621,11 +3859,13 @@
 
     loadVideoUnknownLemmas().catch(()=>{});
     loadVideoUnknownExpressions().catch(()=>{});
+    installWebTextInteraction();
     if(segments.length){
-      analyzeWholeYouTubeTranscript();
-      analyzeWholeYouTubeExpressionGroups();
+      Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
+        .finally(()=>scheduleWebLearningAnnotations());
     }
     renderSharedPanel();
+    scheduleWebLearningAnnotations();
   }
 
   function scan(){
