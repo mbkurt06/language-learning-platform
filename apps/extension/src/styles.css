@@ -1192,7 +1192,7 @@ html[data-gle-theme="light"] .gle-settings-track{
 /* Final handle offset: keep the shared handle visibly outside the panel edge
    on every provider, including ZDF layouts with their own panel inset. */
 #gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
-  left:calc(var(--gle-panel-handle-left,40px) - 40px)!important;
+  left:calc(var(--gle-panel-handle-left,30px) - 30px)!important;
   right:auto!important
 }
 
