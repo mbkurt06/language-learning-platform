@@ -10,6 +10,8 @@
   const LIVE_LOOKBACK_SECONDS = 30;
   const LIVE_MAX_SEGMENTS = 8;
   const SEGMENT_CACHE_LIMIT = 48;
+  const DEBUG_EVENT_LIMIT = 600;
+  const DEBUG_STORAGE_KEY = "zdfSubtitleLabDebugSession";
 
   const state = {
     video: null,
@@ -32,7 +34,11 @@
     nextAllowedRefreshAt: 0,
     consecutiveRefreshFailures: 0,
     candidateRefreshTimer: null,
-    cooldownReason: ""
+    cooldownReason: "",
+    activePlaylistUrl: "",
+    debugEvents: [],
+    debugSessionId: new Date().toISOString(),
+    debugPersistTimer: null
   };
 
   const host = document.createElement("div");
