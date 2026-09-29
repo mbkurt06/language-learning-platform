@@ -1333,3 +1333,99 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
   background:rgba(124,58,237,.2);
   border-color:rgba(124,58,237,.55);
 }
+
+
+/* Saved / learning UX */
+.gle-saved-filters{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#0f0f12;
+  box-shadow:0 1px 0 rgba(148,163,184,.16);
+}
+.gle-saved-word{
+  align-items:flex-start;
+}
+.gle-saved-main{
+  appearance:none;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  padding:0;
+  min-width:0;
+  flex:1;
+  cursor:pointer;
+}
+.gle-saved-main strong,.gle-saved-main small,.gle-saved-main em{display:block}
+.gle-saved-main small{margin-top:3px;color:#a1a1aa}
+.gle-saved-main em{margin-top:3px;font-size:11px;color:#94a3b8;font-style:normal}
+.gle-saved-row-actions{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex:0 0 auto;
+}
+.gle-saved-row-actions button,
+.gle-word-status,
+.gle-expression-status{
+  appearance:none;
+  border:1px solid #34343b;
+  background:#17171b;
+  color:#a1a1aa;
+  border-radius:7px;
+  min-width:28px;
+  height:28px;
+  padding:0 6px;
+  font:800 12px/1 system-ui,-apple-system,sans-serif;
+  cursor:pointer;
+}
+.gle-saved-row-actions button:hover,
+.gle-word-status:hover,
+.gle-expression-status:hover{
+  border-color:#8b5cf6;
+  color:#fff;
+}
+.gle-saved-star.active{
+  color:#fbbf24;
+  border-color:#a16207;
+  background:rgba(251,191,36,.12);
+}
+.gle-saved-status.active,
+.gle-word-status.active,
+.gle-expression-status.active{
+  color:#fff;
+  border-color:#8b5cf6;
+  background:rgba(124,58,237,.24);
+}
+.gle-saved-nav{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  margin-right:2px;
+}
+.gle-saved-nav span{
+  min-width:34px;
+  text-align:center;
+  color:#cbd5e1;
+  font:700 10px/1 system-ui,-apple-system,sans-serif;
+}
+.gle-word-chip-wrap,.gle-expression-chip-wrap{
+  overflow:visible;
+}
+.gle-word-status,.gle-expression-status{
+  border-radius:0;
+  border-left:0;
+}
+.gle-word-chip-wrap .gle-word-status:last-of-type,
+.gle-expression-chip-wrap .gle-expression-status:last-of-type{
+  border-radius:0;
+}
+.gle-word-chip-wrap .gle-word-mark,
+.gle-expression-chip-wrap .gle-expression-learn{
+  border-radius:0 9px 9px 0;
+}
+::highlight(gle-saved-target){
+  background:#facc15;
+  color:#111827;
+}
