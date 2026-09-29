@@ -809,3 +809,17 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 :fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
   right:0!important
 }
+
+
+/* Shared panel geometry: open panels use the same viewport inset on every
+   provider, and the external collapse handle follows the panel itself. */
+#gle-shared-panel:not(.docked):not(.collapsed){
+  top:12px!important;
+  bottom:12px!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  top:var(--gle-panel-handle-top,132px)!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  top:28%!important
+}

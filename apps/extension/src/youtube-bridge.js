@@ -140,39 +140,52 @@
   }
 
   async function fetchTrack(videoId, track) {
-    let url;
+    let baseUrl;
     try {
-      url = new URL(track.baseUrl, location.href);
+      baseUrl = new URL(track.baseUrl, location.href);
     } catch (_error) {
       post({type:"track-error", videoId, reason:"invalid-url"});
       return;
     }
 
-    const pot = potByVideoId.get(videoId) || await waitForPot(videoId);
-    if (!pot) {
-      const missingKey = `${videoId}|${track.vssId || track.languageCode || ""}`;
-      if (missingKey !== lastMissingPotKey) {
-        lastMissingPotKey = missingKey;
-        post({type:"track-error", videoId, reason:"missing-pot"});
-      }
-      return;
-    }
-
-    url.searchParams.set("fmt", "json3");
-    url.searchParams.set("c", "WEB");
-    url.searchParams.set("pot", pot);
-
-    const key = `${videoId}|${track.vssId || track.languageCode || ""}|${url.href}`;
+    const key = `${videoId}|${track.vssId || track.languageCode || ""}`;
     if (key === lastTrackKey || key === inflightKey) return;
 
-    inflightKey = key;
-    try {
-      const response = await fetch(url.href, {
+    const request = async pot => {
+      const url = new URL(baseUrl.href);
+      url.searchParams.set("fmt", "json3");
+      url.searchParams.set("c", "WEB");
+      if (pot) url.searchParams.set("pot", pot);
+      return fetch(url.href, {
         credentials: "include",
         cache: "no-store",
         redirect: "follow",
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    };
+
+    inflightKey = key;
+    try {
+      let pot = potByVideoId.get(videoId) || null;
+      let response = await request(pot);
+
+      // Most caption tracks are immediately fetchable. If YouTube requires a
+      // proof-of-origin token, retry once after the token appears instead of
+      // always delaying the first request by up to 3.5 seconds.
+      if (!response.ok && !pot) {
+        pot = await waitForPot(videoId);
+        if (pot) response = await request(pot);
+      }
+
+      if (!response.ok) {
+        if (!pot) {
+          const missingKey = `${videoId}|${track.vssId || track.languageCode || ""}`;
+          if (missingKey !== lastMissingPotKey) {
+            lastMissingPotKey = missingKey;
+            post({type:"track-error", videoId, reason:"missing-pot"});
+          }
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const raw = (await response.text()).replace(/^\)\]\}'\s*/, "");
       if (!raw.trim()) throw new Error("empty-caption-response");
