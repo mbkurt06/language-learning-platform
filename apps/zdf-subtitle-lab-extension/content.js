@@ -286,14 +286,30 @@
   }
 
   async function fetchText(url) {
+    const startedAt = performance.now();
+    logEvent("fetch-start", { url });
     const response = await chrome.runtime.sendMessage({ type: "zdf-lab-fetch-text", url });
     if (!response?.ok) {
       const error = new Error(response?.error || "Fetch failed");
       error.status = Number(response?.status) || 0;
       error.retryAfterMs = Number(response?.retryAfterMs) || 0;
+      logEvent("fetch-error", {
+        url,
+        status: error.status,
+        retryAfterMs: error.retryAfterMs,
+        durationMs: Math.round(performance.now() - startedAt),
+        message: error.message
+      });
       throw error;
     }
-    return response.text || "";
+    const text = response.text || "";
+    logEvent("fetch-success", {
+      url,
+      status: Number(response?.status) || 200,
+      durationMs: Math.round(performance.now() - startedAt),
+      bytes: text.length
+    });
+    return text;
   }
 
   function registerRefreshFailure(error) {
@@ -410,10 +426,20 @@
 
     state.lastAttemptAt = now;
     state.refreshBusy = true;
+    logEvent("refresh-start", {
+      playlistCount: state.playlistUrls.length,
+      playlists: [...state.playlistUrls]
+    });
     try {
       for (const playlistUrl of state.playlistUrls) {
         const playlistText = await fetchText(playlistUrl);
         const segments = parseHlsSegments(playlistText, playlistUrl);
+        logEvent("playlist-parsed", {
+          playlistUrl,
+          segmentCount: segments.length,
+          firstSegmentEpoch: segments.length ? segments[0].startEpoch : null,
+          lastSegmentEpoch: segments.length ? segments[segments.length - 1].startEpoch : null
+        });
         if (!segments.length) continue;
 
         const latestEnd = segments.reduce((max, item) => Math.max(max, item.startEpoch + item.duration), 0);
@@ -462,6 +488,7 @@
         const cues = dedupeCues(merged);
         if (cues.length) {
           state.mode = "live-hls-webvtt";
+          state.activePlaylistUrl = playlistUrl;
           state.cues = cues;
           state.lastRefreshAt = Date.now();
           state.latestSubtitleEpoch = latestEnd;
@@ -469,6 +496,15 @@
           state.videoAnchorTime = current;
           state.programAnchorEpoch = playbackEpoch;
           registerRefreshSuccess();
+          logEvent("refresh-success", {
+            activePlaylistUrl: playlistUrl,
+            cueCount: cues.length,
+            latestSubtitleEpoch: latestEnd,
+            videoCurrentTime: safeNumber(current),
+            seekableEnd: safeNumber(seekableEnd),
+            playbackEpoch: safeNumber(playbackEpoch),
+            selectedSegmentCount: selected.length
+          });
           return;
         }
       }
