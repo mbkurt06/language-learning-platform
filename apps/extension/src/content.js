@@ -1100,7 +1100,7 @@
       if(panel.parentElement!==host) host.appendChild(panel);
       const handle=state.panel.handle;
       if(handle && handle.parentElement!==host) host.appendChild(handle);
-      panel.classList.add("gle-shared-panel");
+      panel.classList.add("gle-provider-panel-layout");
       panel.classList.toggle("docked",Boolean(fullscreenRoot));
 
       if(open){
@@ -1108,7 +1108,7 @@
         const panelWidth=fullscreenRoot
           ? Math.min(420,Math.max(320,viewportWidth*0.30))
           : Math.min(408,Math.max(320,viewportWidth*0.30));
-        panel.style.setProperty("--gle-zdf-current-panel-width",panelWidth+"px");
+        document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
         video?.classList.add("gle-zdf-video-panel-open");
         video?.style.removeProperty("--gle-zdf-video-scale");
         video?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
@@ -1146,7 +1146,12 @@
     }
 
     state.panel.docked=shouldDock;
+    panel.classList.remove("gle-provider-panel-layout");
     panel.classList.toggle("docked",shouldDock);
+    const currentPanelWidth=shouldDock
+      ? Math.min(420,(player.getBoundingClientRect().width||1)*0.35)
+      : Math.min(420,Math.max(320,panel.getBoundingClientRect().width||420));
+    document.documentElement.style.setProperty("--gle-panel-current-width",currentPanelWidth+"px");
     player.classList.toggle("gle-panel-docked",shouldDock && !state.panel.collapsed);
     player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.panel.collapsed);
 
