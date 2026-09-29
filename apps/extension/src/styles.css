@@ -1662,3 +1662,14 @@ html:not(.gle-web-panel-open) body{
 /* Persistent Turkish labels were removed: they covered text and jittered on scroll.
    The yellow marker stays persistent; contextual meaning is available in the word popup. */
 .gle-web-learning-label{display:none!important}
+
+
+::highlight(gle-benchmark-word){
+  background:rgba(59,130,246,.20);
+  color:inherit;
+}
+
+::highlight(gle-benchmark-expression){
+  background:rgba(168,85,247,.24);
+  color:inherit;
+}
