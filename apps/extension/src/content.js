@@ -659,7 +659,15 @@
   function renderCard(data, tokenIndex, anchor){
     cancelTooltipHide();
     const h=data.hover?.[String(tokenIndex)]||data.hover?.[tokenIndex]||{};
-    const expressions=h.primary_expressions||[];
+    const expressions=[...(h.primary_expressions||[])].sort((a,b)=>{
+      const aTokens=(a.token_indices||[]).length;
+      const bTokens=(b.token_indices||[]).length;
+      if(aTokens!==bTokens) return bTokens-aTokens;
+      const aSpecific=(String(a.canonical||"").match(/\betwas\b/gu)||[]).length;
+      const bSpecific=(String(b.canonical||"").match(/\betwas\b/gu)||[]).length;
+      if(aSpecific!==bSpecific) return bSpecific-aSpecific;
+      return String(b.canonical||"").length-String(a.canonical||"").length;
+    });
     const expr=expressions[0];
     const lexical=h.lexical_form;
     const notes=h.usage_notes||[];
@@ -863,7 +871,13 @@
     for(const token of tokens){
       const normalized=preparedNormalize(token.text);
       const word=words.find(item=>(item.forms||[]).some(form=>preparedNormalize(form)===normalized) || preparedNormalize(item.lemma)===preparedNormalize(token.lemma));
-      const related=foundExpressions.filter(expr=>(expr.token_indices||[]).includes(token.i));
+      const related=foundExpressions
+        .filter(expr=>(expr.token_indices||[]).includes(token.i))
+        .sort((a,b)=>{
+          const tokenDiff=(b.token_indices||[]).length-(a.token_indices||[]).length;
+          if(tokenDiff) return tokenDiff;
+          return String(b.canonical||"").length-String(a.canonical||"").length;
+        });
       if(word || related.length){
         hover[String(token.i)]={
           contextual_word_meaning_tr:word?.meaningTr||"",
