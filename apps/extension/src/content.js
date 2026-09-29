@@ -1237,7 +1237,15 @@
       player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed");
       player.classList.add("gle-panel-player-fullscreen");
       player.classList.toggle("gle-panel-fullscreen-open",!state.panel.collapsed);
-      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+
+      const videoContainer=player.querySelector(".html5-video-container");
+      if(videoContainer){
+        videoContainer.style.setProperty("--gle-video-content-width",state.panel.collapsed?"100%":"calc(100% - "+panelWidth+"px)");
+      }
+      requestAnimationFrame(()=>{
+        window.dispatchEvent(new Event("resize"));
+        syncPanelHandleGeometry(panel);
+      });
       return;
     }
 
@@ -1250,6 +1258,7 @@
     player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen","gle-panel-fullscreen-open");
     player.style.removeProperty("--gle-panel-width");
     player.style.removeProperty("--gle-video-scale");
+    player.querySelector(".html5-video-container")?.style.removeProperty("--gle-video-content-width");
 
     const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
     const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
