@@ -7,7 +7,7 @@
 
   const UI_STRINGS = {
     tr:{
-      settings:"Ayarlar",close:"Kapat",general:"Genel",interfaceLanguage:"Arayüz dili",
+      settings:"Ayarlar",close:"Kapat",general:"Genel",interfaceLanguage:"Arayüz dili",theme:"Tema",themeSystem:"Sistem",themeLight:"Açık",themeDark:"Koyu",
       languageLearningActive:"Language Learning aktif",languageLearningActiveHelp:"Video ve panel özelliklerini birlikte açar veya kapatır.",
       translationView:"Çeviri görünümü",videoTranslation:"Video çevirisi",videoTranslationHelp:"Videoda kaynak altyazının altında çeviriyi gösterir.",
       panelTranslation:"Panel çevirisi",panelTranslationHelp:"Altyazılar sekmesindeki satırlarda çeviriyi gösterir.",
@@ -17,7 +17,7 @@
       translation:"Çeviri",waitingSubtitles:"Altyazı bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült"
     },
     en:{
-      settings:"Settings",close:"Close",general:"General",interfaceLanguage:"Interface language",
+      settings:"Settings",close:"Close",general:"General",interfaceLanguage:"Interface language",theme:"Theme",themeSystem:"System",themeLight:"Light",themeDark:"Dark",
       languageLearningActive:"Language Learning active",languageLearningActiveHelp:"Turns the video and panel features on or off together.",
       translationView:"Translation display",videoTranslation:"Video translation",videoTranslationHelp:"Shows the translation below the source subtitle on the video.",
       panelTranslation:"Panel translation",panelTranslationHelp:"Shows translations in subtitle rows inside the panel.",
@@ -27,7 +27,7 @@
       translation:"Translation",waitingSubtitles:"Waiting for subtitles…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel"
     },
     de:{
-      settings:"Einstellungen",close:"Schließen",general:"Allgemein",interfaceLanguage:"Oberflächensprache",
+      settings:"Einstellungen",close:"Schließen",general:"Allgemein",interfaceLanguage:"Oberflächensprache",theme:"Design",themeSystem:"System",themeLight:"Hell",themeDark:"Dunkel",
       languageLearningActive:"Language Learning aktiv",languageLearningActiveHelp:"Schaltet Video- und Panel-Funktionen gemeinsam ein oder aus.",
       translationView:"Übersetzungsanzeige",videoTranslation:"Videoübersetzung",videoTranslationHelp:"Zeigt die Übersetzung unter dem Quelluntertitel im Video.",
       panelTranslation:"Panelübersetzung",panelTranslationHelp:"Zeigt Übersetzungen in den Untertitelzeilen des Panels.",
@@ -44,7 +44,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"system",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -124,6 +124,8 @@
   }
 
   function applySharedAppearance(){
+    const theme=state.settings.theme||"system";
+    document.documentElement.dataset.gleTheme=theme;
     document.documentElement.style.setProperty("--gle-german-font-scale",(Number(state.settings.germanFontSize||100)/100).toFixed(2));
     document.documentElement.style.setProperty("--gle-translation-font-scale",(Number(state.settings.translationFontSize||100)/100).toFixed(2));
     document.documentElement.classList.toggle("gle-extension-disabled",state.settings.extensionEnabled===false);
@@ -154,7 +156,7 @@
     if(dialog){ dialog.hidden=false; return dialog; }
     dialog=document.createElement("div");
     dialog.id="gle-settings-dialog";
-    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · '+esc(uiText("settings"))+'</strong><button type="button" class="gle-settings-close" aria-label="'+escAttr(uiText("close"))+'">×</button></header><div class="gle-settings-body"><section class="gle-settings-section"><h3>'+esc(uiText("general"))+'</h3><label class="gle-settings-select"><span>'+esc(uiText("interfaceLanguage"))+'</span><select name="interfaceLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option></select></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("languageLearningActive"))+'</b><small>'+esc(uiText("languageLearningActiveHelp"))+'</small></span><input name="extensionEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("translationView"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("videoTranslation"))+'</b><small>'+esc(uiText("videoTranslationHelp"))+'</small></span><input name="showVideoTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("panelTranslation"))+'</b><small>'+esc(uiText("panelTranslationHelp"))+'</small></span><input name="showPanelTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("followActiveSubtitle"))+'</b><small>'+esc(uiText("followActiveSubtitleHelp"))+'</small></span><input name="followActiveSubtitle" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("textSize"))+'</h3><label>'+esc(uiText("sourceSubtitle"))+' <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>'+esc(uiText("translationSubtitle"))+' <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label></section></div></div>';
+    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · '+esc(uiText("settings"))+'</strong><button type="button" class="gle-settings-close" aria-label="'+escAttr(uiText("close"))+'">×</button></header><div class="gle-settings-body"><section class="gle-settings-section"><h3>'+esc(uiText("general"))+'</h3><label class="gle-settings-select"><span>'+esc(uiText("interfaceLanguage"))+'</span><select name="interfaceLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option></select></label><label class="gle-settings-select"><span>'+esc(uiText("theme"))+'</span><select name="theme"><option value="system">'+esc(uiText("themeSystem"))+'</option><option value="light">'+esc(uiText("themeLight"))+'</option><option value="dark">'+esc(uiText("themeDark"))+'</option></select></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("languageLearningActive"))+'</b><small>'+esc(uiText("languageLearningActiveHelp"))+'</small></span><input name="extensionEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("translationView"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("videoTranslation"))+'</b><small>'+esc(uiText("videoTranslationHelp"))+'</small></span><input name="showVideoTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("panelTranslation"))+'</b><small>'+esc(uiText("panelTranslationHelp"))+'</small></span><input name="showPanelTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("followActiveSubtitle"))+'</b><small>'+esc(uiText("followActiveSubtitleHelp"))+'</small></span><input name="followActiveSubtitle" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("textSize"))+'</h3><label>'+esc(uiText("sourceSubtitle"))+' <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>'+esc(uiText("translationSubtitle"))+' <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label></section></div></div>';
     document.documentElement.appendChild(dialog);
     const sync=()=>{
       for(const name of ["germanFontSize","translationFontSize"]){
@@ -163,6 +165,7 @@
         dialog.querySelector('[data-for="'+name+'"]').textContent=state.settings[name]+"%";
       }
       dialog.querySelector('[name="interfaceLanguage"]').value=state.settings.interfaceLanguage||"tr";
+      dialog.querySelector('[name="theme"]').value=state.settings.theme||"system";
       for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle"]){
         dialog.querySelector('[name="'+name+'"]').checked=state.settings[name]!==false;
       }
@@ -185,6 +188,11 @@
       renderSharedPanel();
       dialog.remove();
       ensureSettingsDialog();
+    });
+    dialog.querySelector('[name="theme"]').addEventListener("change",async event=>{
+      state.settings.theme=event.target.value;
+      await chrome.storage.sync.set({theme:state.settings.theme});
+      applySharedAppearance();
     });
     for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle"]){
       dialog.querySelector('[name="'+name+'"]').addEventListener("change",async event=>{
@@ -1216,24 +1224,27 @@
     const rect=player.getBoundingClientRect();
 
     if(fullscreen){
-      const width=rect.width || 1;
-      const panelWidth=Math.min(420,Math.max(260,width*0.32));
+      const remembered=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gle-youtube-panel-width"))||420;
+      const panelWidth=Math.min(520,Math.max(320,remembered));
       if(panel.parentElement!==player) player.appendChild(panel);
+      const handle=state.panel.handle;
+      if(handle && handle.parentElement!==player) player.appendChild(handle);
       state.panel.docked=true;
       panel.classList.remove("gle-youtube-external-panel");
-      panel.classList.add("docked");
+      panel.classList.add("docked","gle-youtube-fullscreen-panel");
       document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
       player.style.setProperty("--gle-panel-width",panelWidth+"px");
-      player.classList.toggle("gle-panel-docked",!state.panel.collapsed);
-      player.classList.toggle("gle-panel-docked-collapsed",state.panel.collapsed);
+      player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed");
       player.classList.add("gle-panel-player-fullscreen");
       requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
 
     if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
+    const handle=state.panel.handle;
+    if(handle && handle.parentElement!==document.documentElement) document.documentElement.appendChild(handle);
     state.panel.docked=false;
-    panel.classList.remove("docked","gle-provider-panel-layout");
+    panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
     panel.classList.add("gle-youtube-external-panel");
     player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen");
     player.style.removeProperty("--gle-panel-width");
@@ -1241,7 +1252,8 @@
 
     const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
     const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
-    const left=Math.max(0,rect.right);
+    const gap=6;
+    const left=Math.max(0,rect.right+gap);
     const panelWidth=Math.max(220,viewportWidth-left);
 
     document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
@@ -2742,6 +2754,7 @@
     showPanelTranslation:null,
     followActiveSubtitle:true,
     interfaceLanguage:"tr",
+    theme:"system",
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
@@ -2784,6 +2797,9 @@
       updateSharedPanelUi();
       if(state.panel.element) renderSharedPanel();
       document.getElementById("gle-settings-dialog")?.remove();
+    }
+    if(changes.theme){
+      state.settings.theme=changes.theme.newValue||"system";
     }
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
