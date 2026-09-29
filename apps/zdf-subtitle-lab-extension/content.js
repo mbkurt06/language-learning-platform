@@ -28,13 +28,73 @@
     sourceDetectedAt: 0
   };
 
-  const overlay = document.createElement("div");
-  overlay.id = "zdf-subtitle-lab-overlay";
-  document.documentElement.appendChild(overlay);
+  const host = document.createElement("div");
+  host.id = "zdf-subtitle-lab-host";
+  host.style.setProperty("all", "initial", "important");
+  host.style.setProperty("position", "fixed", "important");
+  host.style.setProperty("inset", "0", "important");
+  host.style.setProperty("z-index", "2147483647", "important");
+  host.style.setProperty("pointer-events", "none", "important");
 
-  const debug = document.createElement("div");
-  debug.id = "zdf-subtitle-lab-debug";
-  document.documentElement.appendChild(debug);
+  const shadow = host.attachShadow({ mode: "open" });
+  const shadowStyle = document.createElement("style");
+  shadowStyle.textContent = `
+    :host {
+      all: initial;
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 2147483647 !important;
+      pointer-events: none !important;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    #overlay {
+      all: initial;
+      position: fixed;
+      left: 50%;
+      bottom: 13%;
+      transform: translateX(-50%);
+      z-index: 2147483646;
+      max-width: min(82vw, 1100px);
+      padding: 9px 15px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, .82);
+      color: #fff;
+      font: 600 clamp(18px, 2vw, 30px)/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-align: center;
+      white-space: normal;
+      pointer-events: none;
+      display: none;
+    }
+
+    #debug {
+      all: initial;
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 2147483647;
+      width: min(380px, calc(100vw - 24px));
+      padding: 12px;
+      border-radius: 10px;
+      background: rgba(12, 16, 24, .96);
+      color: #dbeafe;
+      box-shadow: 0 12px 30px rgba(0,0,0,.32);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      pointer-events: none;
+    }
+  `;
+
+  const overlay = document.createElement("div");
+  overlay.id = "overlay";
+
+  const debug = document.createElement("pre");
+  debug.id = "debug";
+
+  shadow.append(shadowStyle, overlay, debug);
+  (document.documentElement || document.body).appendChild(host);
 
   function normalizeText(value) {
     return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -263,19 +323,26 @@
     }
   }
 
-  function currentCue() {
+  function currentPlaybackTime() {
     const video = findVideo();
-    if (!video || !state.cues.length) return null;
-
-    const time = state.mode === "live-hls-webvtt"
+    if (!video) return NaN;
+    return state.mode === "live-hls-webvtt"
       ? livePlaybackEpoch()
       : Number(video.currentTime);
+  }
 
-    if (!Number.isFinite(time)) return null;
+  function currentCue() {
+    const time = currentPlaybackTime();
+    if (!Number.isFinite(time) || !state.cues.length) return null;
     return state.cues.find(cue => time >= cue.start && time < cue.end) || null;
   }
 
+  function formatTime(value) {
+    return Number.isFinite(value) ? value.toFixed(3) : "-";
+  }
+
   function render() {
+    const playbackTime = currentPlaybackTime();
     const cue = currentCue();
     const text = cue?.text || "";
     if (text !== state.lastCue) {
@@ -286,14 +353,20 @@
 
     const now = Date.now();
     const refreshAge = state.lastRefreshAt ? ((now - state.lastRefreshAt) / 1000).toFixed(1) + "s" : "-";
-    debug.innerHTML =
-      "<strong>ZDF Subtitle Lab</strong>\n" +
+    const cueDelta = cue && Number.isFinite(playbackTime) ? playbackTime - cue.start : NaN;
+
+    debug.textContent =
+      "ZDF Subtitle Lab\n" +
       "Mode: " + state.mode + "\n" +
       "Video: " + (state.video ? "found" : "waiting") + "\n" +
       "Direct VTT: " + state.directUrls.length + "\n" +
       "HLS subtitle playlists: " + state.playlistUrls.length + "\n" +
       "Cues: " + state.cues.length + "\n" +
       "Last refresh: " + refreshAge + "\n" +
+      "Playback time: " + formatTime(playbackTime) + "\n" +
+      "Cue start: " + formatTime(cue?.start) + "\n" +
+      "Cue end: " + formatTime(cue?.end) + "\n" +
+      "Cue delta: " + formatTime(cueDelta) + "\n" +
       "Source: " + (state.sourceUrl || "-") + "\n" +
       "Current cue: " + (text || "-") + "\n" +
       "Error: " + (state.lastError || "-");
