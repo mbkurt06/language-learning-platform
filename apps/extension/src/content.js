@@ -44,7 +44,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"dark",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -70,6 +70,7 @@
       videoListeners:null,
       videoId:"",
       cues:null,
+      cueCache:new Map(),
       cueIndex:-1,
       timedAvailable:false,
       domPending:"",
@@ -1008,10 +1009,15 @@
     clearTimeout(state.youtube.hideTimer);
     state.youtube.domTimer=null;
     state.youtube.hideTimer=null;
+    const previousVideoId=state.youtube.videoId;
+    if(previousVideoId && state.youtube.cues?.length){
+      state.youtube.cueCache.set(previousVideoId,state.youtube.cues);
+    }
     state.youtube.videoId=videoId;
-    state.youtube.cues=null;
+    const cachedCues=videoId ? state.youtube.cueCache.get(videoId) : null;
+    state.youtube.cues=cachedCues||null;
     state.youtube.cueIndex=-1;
-    state.youtube.timedAvailable=false;
+    state.youtube.timedAvailable=Boolean(cachedCues?.length);
     state.youtube.domPending="";
     state.youtube.domStable="";
     state.youtube.domLastChange=0;
@@ -1108,6 +1114,15 @@
 
   function setSharedPanelCollapsed(collapsed){
     state.panel.collapsed=Boolean(collapsed);
+    if(!state.panel.collapsed && adapter.id==="youtube" && !state.youtube.cues?.length){
+      const videoId=currentYouTubeVideoId()||state.youtube.videoId;
+      const cached=videoId ? state.youtube.cueCache.get(videoId) : null;
+      if(cached?.length){
+        state.youtube.videoId=videoId;
+        state.youtube.cues=cached;
+        state.youtube.timedAvailable=true;
+      }
+    }
     const panel=state.panel.element;
     if(!panel) return;
     panel.classList.toggle("collapsed",state.panel.collapsed);
@@ -1224,8 +1239,10 @@
     const rect=player.getBoundingClientRect();
 
     if(fullscreen){
-      const remembered=parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gle-youtube-panel-width"))||420;
-      const panelWidth=Math.min(520,Math.max(320,remembered));
+      const width=rect.width||1;
+      const basePanelWidth=Math.min(420,width*0.35);
+      const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
+      const panelWidth=Math.min(width*0.45,Math.max(220,basePanelWidth*factor));
       if(panel.parentElement!==player) player.appendChild(panel);
       const handle=state.panel.handle;
       if(handle && handle.parentElement!==player) player.appendChild(handle);
@@ -1233,19 +1250,19 @@
       panel.classList.remove("gle-youtube-external-panel");
       panel.classList.add("docked","gle-youtube-fullscreen-panel");
       document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
+      document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
       player.style.setProperty("--gle-panel-width",panelWidth+"px");
-      player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed");
       player.classList.add("gle-panel-player-fullscreen");
       player.classList.toggle("gle-panel-fullscreen-open",!state.panel.collapsed);
 
-      const videoContainer=player.querySelector(".html5-video-container");
-      if(videoContainer){
-        videoContainer.style.setProperty("--gle-video-content-width",state.panel.collapsed?"100%":"calc(100% - "+panelWidth+"px)");
+      if(!state.panel.collapsed){
+        const scale=Math.max(0.55,(width-panelWidth)/width);
+        player.style.setProperty("--gle-video-scale",String(scale));
+      }else{
+        player.style.removeProperty("--gle-video-scale");
       }
-      requestAnimationFrame(()=>{
-        window.dispatchEvent(new Event("resize"));
-        syncPanelHandleGeometry(panel);
-      });
+      player.querySelector(".html5-video-container")?.style.removeProperty("--gle-video-content-width");
+      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
 
@@ -1263,9 +1280,13 @@
     const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
     const viewportHeight=window.innerHeight || document.documentElement.clientHeight || 1;
     const gap=6;
-    const left=Math.max(0,rect.right+gap);
-    const panelWidth=Math.max(220,viewportWidth-left);
+    const naturalLeft=Math.max(0,rect.right+gap);
+    const basePanelWidth=Math.max(220,viewportWidth-naturalLeft);
+    const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
+    const panelWidth=Math.min(viewportWidth-12,Math.max(220,basePanelWidth*factor));
+    const left=Math.max(0,viewportWidth-panelWidth);
 
+    document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
     document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
     document.documentElement.style.setProperty("--gle-youtube-panel-top","0px");
     document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
@@ -1273,6 +1294,37 @@
     document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
     document.documentElement.style.setProperty("--gle-panel-handle-right",Math.max(0,viewportWidth-left)+"px");
     requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+  }
+
+  function installPanelResizeHandle(panel){
+    const resizer=panel.querySelector(".gle-panel-resizer");
+    if(!resizer || resizer.dataset.ready==="1") return;
+    resizer.dataset.ready="1";
+    resizer.addEventListener("pointerdown",event=>{
+      if(event.button!==0 || state.panel.collapsed) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const startX=event.clientX;
+      const startFactor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
+      const baseWidth=Math.max(1,parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gle-panel-base-width"))||panel.getBoundingClientRect().width);
+      resizer.setPointerCapture?.(event.pointerId);
+      panel.classList.add("gle-panel-resizing");
+      const move=moveEvent=>{
+        const factor=clamp(startFactor+(startX-moveEvent.clientX)/baseWidth,0.6,1.1);
+        state.settings.panelWidthFactor=factor;
+        syncSharedPanelHost();
+      };
+      const finish=()=>{
+        resizer.removeEventListener("pointermove",move);
+        resizer.removeEventListener("pointerup",finish);
+        resizer.removeEventListener("pointercancel",finish);
+        panel.classList.remove("gle-panel-resizing");
+        chrome.storage.sync.set({panelWidthFactor:state.settings.panelWidthFactor});
+      };
+      resizer.addEventListener("pointermove",move);
+      resizer.addEventListener("pointerup",finish);
+      resizer.addEventListener("pointercancel",finish);
+    });
   }
 
   function ensureSharedPanel(){
@@ -1285,7 +1337,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -1318,6 +1370,7 @@
 
     document.documentElement.appendChild(panel);
     state.panel.element=panel;
+    installPanelResizeHandle(panel);
 
     const active=state.settings.extensionEnabled!==false;
     const mainToggle=panel.querySelector(".gle-header-main-toggle");
@@ -2383,6 +2436,7 @@
       clearTimeout(state.youtube.domTimer);
       state.youtube.domTimer=null;
       state.youtube.cues=cues;
+      if(state.youtube.videoId) state.youtube.cueCache.set(state.youtube.videoId,cues);
       state.youtube.cueIndex=-1;
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
@@ -2767,6 +2821,7 @@
     followActiveSubtitle:true,
     interfaceLanguage:"tr",
     theme:"dark",
+    panelWidthFactor:1,
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
@@ -2811,7 +2866,11 @@
       document.getElementById("gle-settings-dialog")?.remove();
     }
     if(changes.theme){
-      state.settings.theme=changes.theme.newValue||"system";
+      state.settings.theme=changes.theme.newValue||"dark";
+    }
+    if(changes.panelWidthFactor){
+      state.settings.panelWidthFactor=clamp(Number(changes.panelWidthFactor.newValue)||1,0.6,1.1);
+      syncSharedPanelHost();
     }
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
