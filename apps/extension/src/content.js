@@ -2971,13 +2971,29 @@
     return wantedTerms.length && bestScore>=Math.min(2,wantedTerms.length)?best:null;
   }
 
+  function daPronounRepresentsPreposition(value,preposition){
+    const token=normalizeLearningIdentity(value);
+    const prep=normalizeLearningIdentity(preposition);
+    const map={
+      an:["daran"],auf:["darauf"],aus:["daraus"],bei:["dabei"],für:["dafür"],
+      gegen:["dagegen"],hinter:["dahinter"],in:["darin"],mit:["damit"],nach:["danach"],
+      neben:["daneben"],über:["darüber"],um:["darum"],unter:["darunter"],von:["davon"],
+      vor:["davor"],zu:["dazu"],zwischen:["dazwischen"]
+    };
+    return (map[prep]||[]).includes(token);
+  }
+
   function supplementalExpressionTokenIndices(tokens,canonical,existingIndices=[]){
     const indices=new Set(existingIndices||[]);
     const terms=fixedExpressionTerms(canonical);
     for(const term of terms){
       const represented=[...indices].some(index=>{
         const token=(tokens||[]).find(t=>t.i===index);
-        return normalizeLearningIdentity(token?.text)===term || normalizeLearningIdentity(token?.lemma)===term;
+        const text=normalizeLearningIdentity(token?.text);
+        const lemma=normalizeLearningIdentity(token?.lemma);
+        return text===term || lemma===term ||
+          daPronounRepresentsPreposition(text,term) ||
+          daPronounRepresentsPreposition(lemma,term);
       });
       if(represented) continue;
       const token=(tokens||[]).find(t=>normalizeLearningIdentity(t.text)===term || normalizeLearningIdentity(t.lemma)===term);
@@ -3648,8 +3664,14 @@
   async function highlightedWebExportRows(){
     if(adapter.id!=="web") return [];
     const preparedFixture=activePreparedBenchmark();
-    const preparedWordSet=new Set((preparedFixture?.words||[]).map(item=>preparedNormalize(item.lemma)));
-    const transcriptWordSet=new Set((state.youtube.transcriptAnalysis||[]).map(item=>preparedNormalize(item.lemma)));
+    const preparedWordSet=new Set((preparedFixture?.words||[]).flatMap(item=>[
+      preparedNormalize(item.lemma),
+      ...(item.forms||[]).map(preparedNormalize)
+    ]).filter(Boolean));
+    const transcriptWordSet=new Set((state.youtube.transcriptAnalysis||[]).flatMap(item=>[
+      preparedNormalize(item.lemma),
+      ...(item.forms||[]).map(preparedNormalize)
+    ]).filter(Boolean));
     const rows=[];
     for(let index=0;index<(state.web.segments||[]).length;index++){
       const segment=state.web.segments[index];
@@ -3672,7 +3694,9 @@
         const learningExpr=expr && exportLearningExpression(expr);
         const learningWord=exportLearningWord(token);
         const lemma=preparedNormalize(token.lemma||token.text||"");
-        const isWord=(preparedFixture ? preparedWordSet : transcriptWordSet).has(lemma);
+        const surface=preparedNormalize(token.text||"");
+        const wordSet=preparedFixture ? preparedWordSet : transcriptWordSet;
+        const isWord=wordSet.has(lemma) || wordSet.has(surface);
         let cls="";
         let title="";
         if(learningExpr || learningWord){
@@ -3718,8 +3742,8 @@
     doc.open();
     doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+
       '@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;margin:0;font-size:13px;line-height:1.65}'+
-      'h1{font-size:20px;line-height:1.2;margin:0 0 4px}.meta{font-size:10px;color:#64748b;margin-bottom:14px;overflow-wrap:anywhere}.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;font-size:10px}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.lw{background:rgba(59,130,246,.28)}.le{background:rgba(168,85,247,.30)}.ll{background:rgba(250,204,21,.55)}'+
-      'p{margin:0 0 9px;break-inside:avoid}.index{display:inline-block;color:#94a3b8;font-size:9px;width:24px;vertical-align:2px}mark{color:inherit;padding:1px 2px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}mark.word{background:rgba(59,130,246,.28)}mark.expression{background:rgba(168,85,247,.30)}mark.learning{background:rgba(250,204,21,.55)}'+
+      'h1{font-size:20px;line-height:1.2;margin:0 0 4px}.meta{font-size:10px;color:#64748b;margin-bottom:14px;overflow-wrap:anywhere}.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;font-size:10px}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.lw{background:rgba(37,99,235,.42)}.le{background:rgba(168,85,247,.30)}.ll{background:rgba(250,204,21,.55)}'+
+      'p{margin:0 0 9px;break-inside:avoid}.index{display:inline-block;color:#94a3b8;font-size:9px;width:24px;vertical-align:2px}mark{color:inherit;padding:1px 2px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}mark.word{background:rgba(37,99,235,.42)}mark.expression{background:rgba(168,85,247,.30)}mark.learning{background:rgba(250,204,21,.55)}'+
       '</style></head><body><h1>'+esc(document.title||"Web Highlight Export")+'</h1><div class="meta">'+esc(location.href)+'</div>'+
       '<div class="legend"><span><i class="lw"></i>Kelime</span><span><i class="le"></i>Kelime grubu / yapı</span><span><i class="ll"></i>Öğreniyorum</span></div>'+body+'</body></html>');
     doc.close();
