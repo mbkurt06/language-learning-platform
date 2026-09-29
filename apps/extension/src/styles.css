@@ -932,3 +932,134 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
   max-height:none!important;
   border-radius:0!important
 }
+
+
+/* Keep custom YouTube subtitles inside the actual player width. */
+.gle-youtube-overlay{
+  width:min(92%,calc(100% - 24px))!important;
+  max-width:min(92%,calc(100% - 24px))!important
+}
+.gle-youtube-german,
+.gle-youtube-german .gle-subtitle-translation{
+  width:auto!important;
+  max-width:100%!important;
+  overflow-wrap:anywhere!important
+}
+
+/* Keep the panel edge handle at one vertical position whether open or closed. */
+#gle-panel-edge-handle.gle-panel-edge-handle,
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed,
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  top:var(--gle-panel-handle-top,132px)!important
+}
+
+/* YouTube fullscreen: panel is rendered inside the fullscreen player, but the
+   native video is left untouched so it cannot disappear. */
+.html5-video-player.gle-panel-player-fullscreen .html5-main-video{
+  left:auto!important;
+  width:auto!important;
+  max-width:none!important;
+  height:auto!important;
+  transform:none!important
+}
+#gle-shared-panel.gle-youtube-fullscreen-panel:not(.collapsed){
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  height:100%!important;
+  width:var(--gle-panel-width,420px)!important;
+  max-height:none!important;
+  border-radius:0!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle,
+.html5-video-player.gle-panel-player-fullscreen #gle-panel-edge-handle.gle-panel-edge-handle{
+  right:var(--gle-panel-current-width,420px)!important;
+  top:var(--gle-panel-handle-top,132px)!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed,
+.html5-video-player.gle-panel-player-fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  right:0!important;
+  top:var(--gle-panel-handle-top,132px)!important
+}
+
+/* Explicit light theme and system-light theme. Dark remains the native/default
+   palette already defined above. */
+html[data-gle-theme="light"] #gle-shared-panel,
+html[data-gle-theme="light"] .gle-settings-card,
+html[data-gle-theme="light"] .gle-panel-head,
+html[data-gle-theme="light"] .gle-panel-productbar,
+html[data-gle-theme="light"] .gle-panel-body,
+html[data-gle-theme="light"] .gle-transcript-controls,
+html[data-gle-theme="light"] .gle-transcript-row,
+html[data-gle-theme="light"] .gle-saved-word,
+html[data-gle-theme="light"] .gle-word-detail-head{
+  background:#f8fafc!important;
+  color:#111827!important;
+  border-color:#cbd5e1!important
+}
+html[data-gle-theme="light"] .gle-panel-tabs button,
+html[data-gle-theme="light"] .gle-settings-copy small,
+html[data-gle-theme="light"] .gle-row-time,
+html[data-gle-theme="light"] .gle-row-translation{
+  color:#475569!important
+}
+html[data-gle-theme="light"] .gle-panel-tabs button.active,
+html[data-gle-theme="light"] .gle-transcript-row.active{
+  background:#ede9fe!important;
+  color:#111827!important
+}
+html[data-gle-theme="light"] .gle-settings-section h3{
+  color:#6d28d9!important
+}
+html[data-gle-theme="light"] .gle-settings-copy b,
+html[data-gle-theme="light"] .gle-settings-card header,
+html[data-gle-theme="light"] .gle-row-source{
+  color:#111827!important
+}
+html[data-gle-theme="light"] .gle-settings-select select,
+html[data-gle-theme="light"] .gle-header-settings{
+  background:#fff!important;
+  color:#111827!important;
+  border-color:#cbd5e1!important
+}
+html[data-gle-theme="light"] .gle-settings-track{
+  background:#cbd5e1!important
+}
+
+@media (prefers-color-scheme: light){
+  html[data-gle-theme="system"] #gle-shared-panel,
+  html[data-gle-theme="system"] .gle-settings-card,
+  html[data-gle-theme="system"] .gle-panel-head,
+  html[data-gle-theme="system"] .gle-panel-productbar,
+  html[data-gle-theme="system"] .gle-panel-body,
+  html[data-gle-theme="system"] .gle-transcript-controls,
+  html[data-gle-theme="system"] .gle-transcript-row,
+  html[data-gle-theme="system"] .gle-saved-word,
+  html[data-gle-theme="system"] .gle-word-detail-head{
+    background:#f8fafc!important;
+    color:#111827!important;
+    border-color:#cbd5e1!important
+  }
+  html[data-gle-theme="system"] .gle-panel-tabs button,
+  html[data-gle-theme="system"] .gle-settings-copy small,
+  html[data-gle-theme="system"] .gle-row-time,
+  html[data-gle-theme="system"] .gle-row-translation{
+    color:#475569!important
+  }
+  html[data-gle-theme="system"] .gle-panel-tabs button.active,
+  html[data-gle-theme="system"] .gle-transcript-row.active{
+    background:#ede9fe!important;
+    color:#111827!important
+  }
+  html[data-gle-theme="system"] .gle-settings-section h3{color:#6d28d9!important}
+  html[data-gle-theme="system"] .gle-settings-copy b,
+  html[data-gle-theme="system"] .gle-settings-card header,
+  html[data-gle-theme="system"] .gle-row-source{color:#111827!important}
+  html[data-gle-theme="system"] .gle-settings-select select,
+  html[data-gle-theme="system"] .gle-header-settings{
+    background:#fff!important;
+    color:#111827!important;
+    border-color:#cbd5e1!important
+  }
+  html[data-gle-theme="system"] .gle-settings-track{background:#cbd5e1!important}
+}
