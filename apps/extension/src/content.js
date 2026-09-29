@@ -11,7 +11,7 @@
       languageLearningActive:"Language Learning aktif",languageLearningActiveHelp:"Video ve panel özelliklerini birlikte açar veya kapatır.",
       translationView:"Çeviri görünümü",videoTranslation:"Video çevirisi",videoTranslationHelp:"Videoda kaynak altyazının altında çeviriyi gösterir.",
       panelTranslation:"Panel çevirisi",panelTranslationHelp:"Altyazılar sekmesindeki satırlarda çeviriyi gösterir.",
-      followActiveSubtitle:"Aktif altyazıyı otomatik takip et",followActiveSubtitleHelp:"Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.",playbackBehavior:"Video davranışı",pauseOnWordHover:"Kelime üzerine gelince videoyu durdur",pauseOnWordHoverHelp:"Video altyazısındaki bir kelimenin üzerine gelince videoyu durdurur; kelimeden çıkınca daha önce oynuyorsa devam eder.",autoPauseAfterSentence:"Her altyazı cümlesinden sonra durdur",autoPauseAfterSentenceHelp:"Her zamanlı altyazı bölümünün sonunda videoyu otomatik durdurur.",
+      followActiveSubtitle:"Aktif altyazıyı otomatik takip et",followActiveSubtitleHelp:"Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.",playbackBehavior:"Video davranışı",pauseOnWordHover:"Altyazı alanına gelince videoyu durdur",pauseOnWordHoverHelp:"Mouse Almanca/Türkçe altyazı alanındayken videoyu durdurur. Kelime açıklama penceresine geçildiğinde de video durmaya devam eder; ikisinden de çıkınca daha önce oynuyorsa devam eder.",autoPauseAfterSentence:"Her altyazı cümlesinden sonra durdur",autoPauseAfterSentenceHelp:"Her zamanlı altyazı bölümünün sonunda videoyu otomatik durdurur.",
       textSize:"Yazı boyutu",sourceSubtitle:"Kaynak altyazı",translationSubtitle:"Çeviri altyazısı",
       subtitles:"Altyazılar",words:"Kelimeler",saved:"Kaydedilenler",active:"Aktif",inactive:"Pasif",
       translation:"Çeviri",waitingSubtitles:"Altyazı bekleniyor…",openPanel:"Language Learning panelini aç",collapsePanel:"Paneli küçült"
@@ -21,7 +21,7 @@
       languageLearningActive:"Language Learning active",languageLearningActiveHelp:"Turns the video and panel features on or off together.",
       translationView:"Translation display",videoTranslation:"Video translation",videoTranslationHelp:"Shows the translation below the source subtitle on the video.",
       panelTranslation:"Panel translation",panelTranslationHelp:"Shows translations in subtitle rows inside the panel.",
-      followActiveSubtitle:"Follow active subtitle",followActiveSubtitleHelp:"Scrolls the panel to the currently playing subtitle.",playbackBehavior:"Playback behavior",pauseOnWordHover:"Pause video on word hover",pauseOnWordHoverHelp:"Pauses the video while hovering a word in the video subtitle and resumes if it was playing before.",autoPauseAfterSentence:"Pause after every subtitle sentence",autoPauseAfterSentenceHelp:"Automatically pauses at the end of each timed subtitle cue.",
+      followActiveSubtitle:"Follow active subtitle",followActiveSubtitleHelp:"Scrolls the panel to the currently playing subtitle.",playbackBehavior:"Playback behavior",pauseOnWordHover:"Pause video while hovering subtitles",pauseOnWordHoverHelp:"Pauses while the pointer is over the source/translation subtitle card. It stays paused when moving into the word tooltip and resumes after leaving both if it was playing before.",autoPauseAfterSentence:"Pause after every subtitle sentence",autoPauseAfterSentenceHelp:"Automatically pauses at the end of each timed subtitle cue.",
       textSize:"Text size",sourceSubtitle:"Source subtitle",translationSubtitle:"Translation subtitle",
       subtitles:"Subtitles",words:"Words",saved:"Saved",active:"Active",inactive:"Inactive",
       translation:"Translation",waitingSubtitles:"Waiting for subtitles…",openPanel:"Open Language Learning panel",collapsePanel:"Collapse panel"
@@ -31,7 +31,7 @@
       languageLearningActive:"Language Learning aktiv",languageLearningActiveHelp:"Schaltet Video- und Panel-Funktionen gemeinsam ein oder aus.",
       translationView:"Übersetzungsanzeige",videoTranslation:"Videoübersetzung",videoTranslationHelp:"Zeigt die Übersetzung unter dem Quelluntertitel im Video.",
       panelTranslation:"Panelübersetzung",panelTranslationHelp:"Zeigt Übersetzungen in den Untertitelzeilen des Panels.",
-      followActiveSubtitle:"Aktiven Untertitel automatisch verfolgen",followActiveSubtitleHelp:"Scrollt das Panel zum aktuell abgespielten Untertitel.",playbackBehavior:"Videowiedergabe",pauseOnWordHover:"Video beim Überfahren eines Wortes pausieren",pauseOnWordHoverHelp:"Pausiert das Video, solange der Mauszeiger auf einem Wort im Video-Untertitel liegt, und setzt es fort, wenn es vorher lief.",autoPauseAfterSentence:"Nach jedem Untertitelsatz pausieren",autoPauseAfterSentenceHelp:"Pausiert das Video automatisch am Ende jedes zeitgesteuerten Untertitels.",
+      followActiveSubtitle:"Aktiven Untertitel automatisch verfolgen",followActiveSubtitleHelp:"Scrollt das Panel zum aktuell abgespielten Untertitel.",playbackBehavior:"Videowiedergabe",pauseOnWordHover:"Video beim Überfahren des Untertitelbereichs pausieren",pauseOnWordHoverHelp:"Pausiert, solange der Mauszeiger über dem Quell-/Übersetzungsbereich liegt. Beim Wechsel in das Wort-Popup bleibt das Video pausiert und läuft erst nach Verlassen beider Bereiche weiter, wenn es vorher lief.",autoPauseAfterSentence:"Nach jedem Untertitelsatz pausieren",autoPauseAfterSentenceHelp:"Pausiert das Video automatisch am Ende jedes zeitgesteuerten Untertitels.",
       textSize:"Textgröße",sourceSubtitle:"Quelluntertitel",translationSubtitle:"Übersetzungsuntertitel",
       subtitles:"Untertitel",words:"Wörter",saved:"Gespeichert",active:"Aktiv",inactive:"Inaktiv",
       translation:"Übersetzung",waitingSubtitles:"Untertitel werden geladen…",openPanel:"Language-Learning-Panel öffnen",collapsePanel:"Panel einklappen"
@@ -45,7 +45,7 @@
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
-    playback:{hoverVideo:null,hoverResume:false,autoPausedCueKey:""},
+    playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:""},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -203,6 +203,7 @@
         if(name==="extensionEnabled") renderPlayerControls();
         if(name==="showVideoTranslation") refreshVideoTranslations();
         if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
+        if(name==="pauseOnWordHover" && !event.target.checked) finishSubtitleHoverPause();
       });
     }
     return dialog;
@@ -229,8 +230,16 @@
     const el=document.createElement("div");
     el.id="gle-tooltip";
     el.hidden=true;
-    el.addEventListener("mouseenter",cancelTooltipHide);
-    el.addEventListener("mouseleave",()=>scheduleTooltipHide(350));
+    el.addEventListener("mouseenter",()=>{
+      cancelTooltipHide();
+      cancelSubtitleHoverResume();
+    });
+    el.addEventListener("mouseleave",event=>{
+      scheduleTooltipHide(350);
+      const next=event.relatedTarget;
+      if(next && state.playback.hoverAnchor?.contains?.(next)) return;
+      scheduleSubtitleHoverResume();
+    });
     document.documentElement.appendChild(el);
     return el;
   }
@@ -655,7 +664,7 @@
     document.querySelectorAll("[data-gle-text]").forEach(node=>{
       let translationText=node.dataset.gleText;
       if(adapter.id==="youtube" && node===state.youtube.germanLine && state.youtube.cues && state.youtube.cueIndex>=0){
-        translationText=globalThis.GLEYoutubeCues.translationTextForCue(state.youtube.cues,state.youtube.cueIndex);
+        translationText=state.youtube.cues[state.youtube.cueIndex]?.text || node.dataset.gleText;
       }
       renderSentenceTranslation(node,node.dataset.gleText,translationText);
     });
@@ -690,21 +699,54 @@
     return null;
   }
 
-  function pauseForWordHover(node){
-    if(state.settings.pauseOnWordHover!==true) return;
-    const video=mediaForSubtitleNode(node);
-    if(!video || video.paused) return;
-    state.playback.hoverVideo=video;
-    state.playback.hoverResume=true;
-    video.pause();
+  function cancelSubtitleHoverResume(){
+    clearTimeout(state.playback.hoverResumeTimer);
+    state.playback.hoverResumeTimer=null;
   }
 
-  function resumeAfterWordHover(node){
+  function beginSubtitleHoverPause(node){
+    if(state.settings.pauseOnWordHover!==true) return;
     const video=mediaForSubtitleNode(node);
-    if(!video || state.playback.hoverVideo!==video || !state.playback.hoverResume) return;
+    if(!video) return;
+    cancelSubtitleHoverResume();
+    state.playback.hoverAnchor=node;
+    if(state.playback.hoverVideo===video) return;
+    state.playback.hoverVideo=video;
+    state.playback.hoverResume=!video.paused;
+    if(!video.paused) video.pause();
+  }
+
+  function finishSubtitleHoverPause(){
+    cancelSubtitleHoverResume();
+    const video=state.playback.hoverVideo;
+    const shouldResume=Boolean(video && state.playback.hoverResume);
     state.playback.hoverVideo=null;
+    state.playback.hoverAnchor=null;
     state.playback.hoverResume=false;
-    if(video.paused) video.play().catch(()=>{});
+    if(shouldResume && video.paused) video.play().catch(()=>{});
+  }
+
+  function scheduleSubtitleHoverResume(delay=180){
+    if(!state.playback.hoverVideo) return;
+    cancelSubtitleHoverResume();
+    state.playback.hoverResumeTimer=setTimeout(()=>{
+      state.playback.hoverResumeTimer=null;
+      const anchor=state.playback.hoverAnchor;
+      const tooltip=state.tooltip;
+      if(anchor?.matches?.(":hover") || tooltip?.matches?.(":hover")) return;
+      finishSubtitleHoverPause();
+    },delay);
+  }
+
+  function installSubtitleHoverPause(node){
+    if(!node || node.dataset.glePauseHoverBound==="1") return;
+    node.dataset.glePauseHoverBound="1";
+    node.addEventListener("mouseenter",()=>beginSubtitleHoverPause(node));
+    node.addEventListener("mouseleave",event=>{
+      const next=event.relatedTarget;
+      if(next && state.tooltip?.contains(next)) return;
+      scheduleSubtitleHoverResume();
+    });
   }
 
   function maybeAutoPauseCue(video,cue,provider){
@@ -877,14 +919,13 @@
         const mappedToken=mappedTokens[i]||token;
         span.addEventListener("mouseenter",()=>{
           cancelTooltipHide();
-          pauseForWordHover(node);
           renderCard(
             hoverOffset>=0 ? hoverData : data,
             mappedToken?.i ?? token.i,
             span
           );
         });
-        span.addEventListener("mouseleave",()=>{ resumeAfterWordHover(node); scheduleTooltipHide(260); });
+        span.addEventListener("mouseleave",()=>scheduleTooltipHide(260));
       }
       node.appendChild(span);
       if(shouldInsertSpace(token,tokens[i+1])) node.append(" ");
@@ -1010,12 +1051,14 @@
       const germanLine=document.createElement("div");
       germanLine.className="gle-youtube-german";
       overlay.appendChild(germanLine);
+      installSubtitleHoverPause(germanLine);
       player.appendChild(overlay);
       installYouTubeDragHandle(player,overlay,handle);
     }
 
     state.youtube.overlay=overlay;
     state.youtube.germanLine=overlay.querySelector(".gle-youtube-german");
+    installSubtitleHoverPause(state.youtube.germanLine);
     applyYouTubeAppearance();
     return {player,overlay,germanLine:state.youtube.germanLine};
   }
@@ -2378,12 +2421,9 @@
       const text=cues[i]?.text;
       if(text && !state.cache.has(text)) analyze(text).catch(()=>{});
 
-      // Sentence translation is latency-sensitive. Prefetch translation
-      // context for the visible cue and a small number of upcoming cues so
-      // playback can stay ahead of the subtitle clock. Wide hover context
-      // remains lazy to avoid flooding the engine.
-      const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,i);
-      if(translationText && !state.cache.has(translationText)) analyze(translationText).catch(()=>{});
+      // The visible translation is intentionally scoped to the current cue.
+      // Hover analysis may still use wider context, but neighboring cue text
+      // must not leak into the Turkish subtitle shown on the video.
     }
   }
 
@@ -2410,7 +2450,7 @@
     if(state.youtube.cueIndex!==cue.index){
       state.youtube.cueIndex=cue.index;
       if(!state.playback.autoPausedCueKey.endsWith(":"+String(cue.index))) state.playback.autoPausedCueKey="";
-      const translationText=globalThis.GLEYoutubeCues.translationTextForCue(cues,cue.index);
+      const translationText=cue.text;
       const hoverContextText=globalThis.GLEYoutubeCues.hoverTextForCue(cues,cue.index);
       showYouTubeText(cue.text,translationText,hoverContextText);
       updatePanelActiveCue();
@@ -2682,6 +2722,7 @@
     }
     state.zdf.overlay=overlay;
     state.zdf.germanLine=overlay.querySelector(".gle-youtube-german");
+    installSubtitleHoverPause(state.zdf.germanLine);
     const videoRect=video.getBoundingClientRect();
     const hostRect=host.getBoundingClientRect();
     const overlayLeft=(videoRect.left-hostRect.left+videoRect.width/2)+"px";
@@ -2908,7 +2949,10 @@
     if(changes.showVideoTranslation) state.settings.showVideoTranslation=changes.showVideoTranslation.newValue;
     if(changes.showPanelTranslation) state.settings.showPanelTranslation=changes.showPanelTranslation.newValue;
     if(changes.followActiveSubtitle) state.settings.followActiveSubtitle=changes.followActiveSubtitle.newValue;
-    if(changes.pauseOnWordHover) state.settings.pauseOnWordHover=changes.pauseOnWordHover.newValue;
+    if(changes.pauseOnWordHover){
+      state.settings.pauseOnWordHover=changes.pauseOnWordHover.newValue;
+      if(changes.pauseOnWordHover.newValue!==true) finishSubtitleHoverPause();
+    }
     if(changes.autoPauseAfterSentence){ state.settings.autoPauseAfterSentence=changes.autoPauseAfterSentence.newValue; state.playback.autoPausedCueKey=""; }
     if(changes.interfaceLanguage){
       state.settings.interfaceLanguage=changes.interfaceLanguage.newValue||"tr";
