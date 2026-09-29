@@ -939,12 +939,7 @@
     if(expressionRanges.length) CSS.highlights.set("gle-benchmark-expression",new Highlight(...expressionRanges));
   }
 
-  async function analyze(text){
-    const preparedFixture=activePreparedBenchmark();
-    if(preparedFixture){
-      const prepared=buildPreparedSentenceAnalysis(preparedFixture,text);
-      if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
-    }
+  async function analyzePlatform(text){
     if(state.cache.has(text)) return state.cache.get(text);
     if(state.analysisInflight.has(text)) return state.analysisInflight.get(text);
 
@@ -973,6 +968,15 @@
     }finally{
       if(state.analysisInflight.get(text)===request) state.analysisInflight.delete(text);
     }
+  }
+
+  async function analyze(text){
+    const preparedFixture=activePreparedBenchmark();
+    if(preparedFixture){
+      const prepared=buildPreparedSentenceAnalysis(preparedFixture,text);
+      if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
+    }
+    return analyzePlatform(text);
   }
 
   function cleanTranslationText(text){
@@ -3280,11 +3284,32 @@
     if(!segment?.text) return;
     state.youtube.cueIndex=hit.segmentIndex;
     try{
-      const data=await analyze(segment.text);
+      let data=await analyze(segment.text);
       const wanted=hit.word.toLocaleLowerCase("de-DE");
-      const token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+      let token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
         (data.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
       if(!token) return;
+
+      const hover=data.hover?.[String(token.i)]||data.hover?.[token.i]||{};
+      const hasMeaning=Boolean(
+        hover.contextual_word_meaning_tr ||
+        (hover.dictionary_meanings_tr||[]).length ||
+        (hover.primary_expressions||[]).some(expr=>expr.contextual_meaning_tr || (expr.meaning_tr||[]).length)
+      );
+
+      // The prepared benchmark intentionally overrides only curated items.
+      // For any clicked word without prepared lexical meaning, fall back to
+      // the normal platform analyzer so the popup never becomes an empty shell.
+      if(activePreparedBenchmark() && !hasMeaning){
+        const fallback=await analyzePlatform(segment.text);
+        const fallbackToken=(fallback.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+          (fallback.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+        if(fallbackToken){
+          data=fallback;
+          token=fallbackToken;
+        }
+      }
+
       renderCard(data,token.i,{getBoundingClientRect:()=>hit.rect,contains:()=>false});
     }catch(_error){}
   }
