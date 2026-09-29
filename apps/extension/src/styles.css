@@ -42,7 +42,7 @@
 .gle-hover-head{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}.gle-hover-head b{font-size:17px}.gle-hover-head span{color:#93c5fd;font-size:12px;font-weight:600}.gle-role{margin-top:6px;color:#e5e7eb}
 
 
-#gle-youtube-panel{
+#gle-shared-panel{
   position:fixed;right:12px;top:72px;bottom:12px;z-index:2147482400;width:min(420px,calc(100vw - 24px));
   display:flex;flex-direction:column;background:#0b0b0d;color:#f4f4f5;border:1px solid #2b2b31;border-radius:14px;
   box-shadow:0 16px 50px rgba(0,0,0,.48);overflow:hidden;overscroll-behavior:contain;font:14px/1.4 system-ui,-apple-system,sans-serif
@@ -92,25 +92,25 @@
 }
 .gle-saved-word:hover{background:#19191e}.gle-saved-word span{display:flex;flex-direction:column;gap:3px}.gle-saved-word small{color:#a1a1aa}.gle-saved-word>b{color:#fbbf24}
 @media(max-width:900px){
-  #gle-youtube-panel{right:8px;top:64px;bottom:8px;width:min(380px,calc(100vw - 16px))}
+  #gle-shared-panel{right:8px;top:64px;bottom:8px;width:min(380px,calc(100vw - 16px))}
 }
 
 
-#gle-youtube-panel.collapsed{
+#gle-shared-panel.collapsed{
   width:44px!important;min-width:44px!important;right:0!important;border-radius:12px 0 0 12px
 }
-#gle-youtube-panel.collapsed .gle-panel-tabs,
-#gle-youtube-panel.collapsed .gle-panel-body{
+#gle-shared-panel.collapsed .gle-panel-tabs,
+#gle-shared-panel.collapsed .gle-panel-body{
   display:none!important
 }
-#gle-youtube-panel.collapsed .gle-panel-head{
+#gle-shared-panel.collapsed .gle-panel-head{
   min-height:100%;height:100%;border-bottom:0;justify-content:center;background:#17171b
 }
-#gle-youtube-panel.collapsed .gle-panel-toggle{
+#gle-shared-panel.collapsed .gle-panel-toggle{
   width:44px;height:100%;font-size:30px;color:#c084fc
 }
 
-#gle-youtube-panel.docked{
+#gle-shared-panel.docked{
   position:absolute!important;right:0!important;top:0!important;bottom:0!important;height:auto!important;
   width:min(420px,35vw);border-radius:0!important;border-top:0;border-right:0;border-bottom:0;z-index:2147483500
 }
@@ -152,18 +152,18 @@
 .gle-word-mark:hover{background:#21182b;color:#d8b4fe}.gle-word-mark.active{background:#3b1d50;color:#fff;border-color:#8b5cf6}
 .gle-word-chip-wrap.unknown .gle-word-chip{border-color:#8b5cf6;background:#21182b}
 
-#gle-youtube-panel.collapsed{
+#gle-shared-panel.collapsed{
   top:42%!important;bottom:auto!important;height:54px!important;min-height:54px!important;
   width:46px!important;min-width:46px!important;right:0!important;
   transform:translateY(-50%);border-radius:12px 0 0 12px!important;overflow:hidden!important
 }
-#gle-youtube-panel.collapsed .gle-panel-head{
+#gle-shared-panel.collapsed .gle-panel-head{
   min-height:54px!important;height:54px!important;background:#17171b!important
 }
-#gle-youtube-panel.collapsed .gle-panel-toggle{
+#gle-shared-panel.collapsed .gle-panel-toggle{
   width:46px!important;height:54px!important;font-size:30px!important
 }
-#gle-youtube-panel.docked.collapsed{
+#gle-shared-panel.docked.collapsed{
   top:42%!important;bottom:auto!important;height:54px!important;transform:translateY(-50%)!important;
   width:46px!important;min-width:46px!important
 }
@@ -255,10 +255,10 @@ html.gle-zdf-panel-open body{
   max-width:calc(100vw - 432px)!important;
   transition:width .18s ease,max-width .18s ease;
 }
-#gle-youtube-panel.gle-zdf-shared-panel{
+#gle-shared-panel.gle-provider-panel-layout{
   right:12px;top:12px;bottom:12px;width:408px;
 }
-#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed){
+#gle-shared-panel.gle-provider-panel-layout:not(.collapsed){
   position:fixed;
 }
 html.gle-zdf-panel-open #gle-player-controls{
@@ -290,10 +290,10 @@ html.gle-zdf-panel-open #gle-player-controls{
 .gle-panel-actions .gle-panel-toggle{width:38px!important;flex:0 0 38px!important}
 
 /* When collapsed, the panel itself becomes the persistent G launcher. */
-#gle-youtube-panel.collapsed .gle-panel-actions{display:flex!important;width:46px;height:54px}
-#gle-youtube-panel.collapsed .gle-header-main-toggle,
-#gle-youtube-panel.collapsed .gle-header-settings{display:none!important}
-#gle-youtube-panel.collapsed .gle-panel-toggle{
+#gle-shared-panel.collapsed .gle-panel-actions{display:flex!important;width:46px;height:54px}
+#gle-shared-panel.collapsed .gle-header-main-toggle,
+#gle-shared-panel.collapsed .gle-header-settings{display:none!important}
+#gle-shared-panel.collapsed .gle-panel-toggle{
   display:block!important;width:46px!important;height:54px!important;
   color:#fff!important;background:#6d28d9!important;font:800 16px/1 system-ui!important
 }
@@ -332,8 +332,8 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
   object-fit:contain!important;
   object-position:left center!important;
 }
-:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel,
-.gle-zdf-fullscreen-panel-open > #gle-youtube-panel.gle-zdf-shared-panel{
+:fullscreen > #gle-shared-panel.gle-provider-panel-layout,
+.gle-zdf-fullscreen-panel-open > #gle-shared-panel.gle-provider-panel-layout{
   position:absolute!important;
   top:0!important;right:0!important;bottom:0!important;
   width:var(--gle-zdf-fullscreen-panel-width,420px)!important;
@@ -431,12 +431,12 @@ html.gle-zdf-panel-open body{
   transform-origin:left center!important;
   object-position:left center!important;
 }
-#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed){
+#gle-shared-panel.gle-provider-panel-layout:not(.collapsed){
   position:fixed!important;
   right:12px!important;
   top:12px!important;
   bottom:12px!important;
-  width:var(--gle-zdf-current-panel-width,408px)!important;
+  width:var(--gle-panel-current-width,408px)!important;
   height:auto!important;
   max-height:none!important;
   z-index:2147483647!important;
@@ -444,7 +444,7 @@ html.gle-zdf-panel-open body{
 
 /* Collapsed means one persistent launcher. Remove the obsolete empty tab row
    so it cannot sit above the actual toggle and intercept clicks. */
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+#gle-shared-panel.gle-provider-panel-layout.collapsed{
   position:fixed!important;
   right:0!important;
   top:42%!important;
@@ -459,7 +459,7 @@ html.gle-zdf-panel-open body{
   pointer-events:auto!important;
   z-index:2147483647!important;
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-productbar{
   display:flex!important;
   width:48px!important;
   height:58px!important;
@@ -470,17 +470,17 @@ html.gle-zdf-panel-open body{
   overflow:hidden!important;
   pointer-events:auto!important;
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar>strong,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-master-switch,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-header-settings,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-head,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-body{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-productbar>strong,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-master-switch,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-header-settings,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-head,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-body{
   display:none!important;
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-actions{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-actions{
   display:flex!important;width:48px!important;height:58px!important;pointer-events:auto!important
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-toggle{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-toggle{
   display:block!important;width:48px!important;height:58px!important;
   flex:0 0 48px!important;pointer-events:auto!important;cursor:pointer!important;
   border-radius:12px 0 0 12px!important;background:#6d28d9!important;color:#fff!important;
@@ -503,8 +503,8 @@ html.gle-zdf-panel-open body{
   transform-origin:left center!important;
   object-position:left center!important;
 }
-:fullscreen.gle-zdf-fullscreen-panel-open > #gle-youtube-panel.gle-zdf-shared-panel,
-.gle-zdf-fullscreen-panel-open:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel{
+:fullscreen.gle-zdf-fullscreen-panel-open > #gle-shared-panel.gle-provider-panel-layout,
+.gle-zdf-fullscreen-panel-open:fullscreen > #gle-shared-panel.gle-provider-panel-layout{
   position:absolute!important;
   top:0!important;right:0!important;bottom:0!important;
   width:var(--gle-zdf-fullscreen-panel-width,420px)!important;
@@ -512,8 +512,8 @@ html.gle-zdf-panel-open body{
   transform:none!important;border-radius:0!important;
   z-index:2147483647!important;
 }
-:fullscreen.gle-zdf-fullscreen-panel-collapsed > #gle-youtube-panel.gle-zdf-shared-panel.collapsed,
-.gle-zdf-fullscreen-panel-collapsed:fullscreen > #gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+:fullscreen.gle-zdf-fullscreen-panel-collapsed > #gle-shared-panel.gle-provider-panel-layout.collapsed,
+.gle-zdf-fullscreen-panel-collapsed:fullscreen > #gle-shared-panel.gle-provider-panel-layout.collapsed{
   position:absolute!important;right:0!important;top:42%!important;
 }
 
@@ -541,7 +541,7 @@ html.gle-zdf-panel-open body{
 }
 
 /* Make the header collapse control unmistakable. */
-#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-toggle{
+#gle-shared-panel.gle-provider-panel-layout:not(.collapsed) .gle-panel-toggle{
   display:flex!important;align-items:center!important;justify-content:center!important;
   width:34px!important;height:34px!important;min-width:34px!important;
   border-radius:9px!important;border:1px solid #52525b!important;
@@ -550,7 +550,7 @@ html.gle-zdf-panel-open body{
 }
 
 /* Second collapse handle on the panel's left edge, vertically centered. */
-#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-edge-toggle{
+#gle-shared-panel.gle-provider-panel-layout:not(.collapsed) .gle-panel-edge-toggle{
   display:flex!important;align-items:center!important;justify-content:center!important;
   position:absolute!important;left:-18px!important;top:50%!important;
   width:18px!important;height:64px!important;transform:translateY(-50%)!important;
@@ -559,7 +559,7 @@ html.gle-zdf-panel-open body{
   box-shadow:-3px 0 10px rgba(0,0,0,.3)!important;
   font:800 20px/1 system-ui!important;cursor:pointer!important;z-index:4!important
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-edge-toggle{display:none!important}
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-edge-toggle{display:none!important}
 
 /* Fullscreen: keep full height and reserve only horizontal width. */
 :fullscreen.gle-zdf-fullscreen-panel-open .gle-zdf-media-host-panel-open,
@@ -614,8 +614,8 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
 /* Single persistent panel handle.
    Open: protrudes from the panel's left edge.
    Closed: the same control stays at the viewport's right edge. */
-#gle-youtube-panel.gle-zdf-shared-panel .gle-panel-toggle{display:none!important}
-#gle-youtube-panel.gle-zdf-shared-panel:not(.collapsed) .gle-panel-edge-toggle{
+#gle-shared-panel.gle-provider-panel-layout .gle-panel-toggle{display:none!important}
+#gle-shared-panel.gle-provider-panel-layout:not(.collapsed) .gle-panel-edge-toggle{
   display:flex!important;
   position:absolute!important;
   left:-24px!important;
@@ -637,7 +637,7 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
   pointer-events:auto!important;
   z-index:10!important
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed{
+#gle-shared-panel.gle-provider-panel-layout.collapsed{
   top:0!important;
   right:0!important;
   bottom:0!important;
@@ -652,12 +652,12 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
   box-shadow:none!important;
   pointer-events:none!important
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-productbar,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-head,
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-body{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-productbar,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-head,
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-body{
   display:none!important
 }
-#gle-youtube-panel.gle-zdf-shared-panel.collapsed .gle-panel-edge-toggle{
+#gle-shared-panel.gle-provider-panel-layout.collapsed .gle-panel-edge-toggle{
   display:flex!important;
   position:absolute!important;
   right:0!important;
@@ -687,7 +687,7 @@ html.gle-zdf-panel-open .gle-zdf-player-shell-panel-open video{
   display:flex!important;
   position:fixed!important;
   top:28%!important;
-  right:var(--gle-zdf-current-panel-width,420px)!important;
+  right:var(--gle-panel-current-width,420px)!important;
   width:30px!important;
   height:76px!important;
   transform:translateY(-50%)!important;
@@ -769,3 +769,43 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .gle-sense-actions button:disabled{opacity:.55;cursor:wait}
 
 .gle-sense-type{color:#a1a1aa;font-size:11px;line-height:1.25}
+
+
+/* Platform-independent shared panel collapse behavior.
+   Provider-specific CSS may position the open panel/video, but collapsed UI is
+   always one external handle on every platform. */
+#gle-shared-panel.collapsed{
+  position:fixed!important;
+  top:0!important;
+  right:0!important;
+  bottom:0!important;
+  width:0!important;
+  min-width:0!important;
+  height:100%!important;
+  min-height:0!important;
+  transform:none!important;
+  overflow:visible!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  pointer-events:none!important
+}
+#gle-shared-panel.collapsed .gle-panel-productbar,
+#gle-shared-panel.collapsed .gle-panel-head,
+#gle-shared-panel.collapsed .gle-panel-body,
+#gle-shared-panel.collapsed .gle-panel-toggle,
+#gle-shared-panel.collapsed .gle-panel-edge-toggle{
+  display:none!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle{
+  right:var(--gle-panel-current-width,420px)!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  right:0!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle{
+  right:var(--gle-panel-current-width,420px)!important
+}
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  right:0!important
+}

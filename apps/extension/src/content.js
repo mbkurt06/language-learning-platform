@@ -15,6 +15,20 @@
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
+    panel:{
+      element:null,
+      handle:null,
+      tab:"subtitles",
+      selectedLemma:"",
+      selectedGroupKey:"",
+      collapsed:false,
+      docked:false,
+      wordsView:"overview",
+      wordsSearch:"",
+      senseRows:null,
+      senseRowsVideoId:"",
+      senseRowsPromise:null,
+    },
     youtube:{
       overlay:null,
       germanLine:null,
@@ -32,30 +46,18 @@
       domTimer:null,
       hideTimer:null,
       corpusIndexing:new Set(),
-      panel:null,
-      panelHandle:null,
-      panelTab:"subtitles",
       transcriptAnalysis:null,
       transcriptAnalysisVideoId:"",
       transcriptAnalysisRun:0,
       previewTimer:null,
-      panelSelectedLemma:"",
-      panelCollapsed:false,
-      panelDocked:false,
       videoUnknownLemmas:new Set(),
       videoUnknownExpressions:new Set(),
       transcriptAnalysisPromise:null,
       expressionGroupsAnalysis:null,
       expressionGroupsVideoId:"",
       expressionGroupsPromise:null,
-      panelSelectedGroupKey:"",
-      wordsView:"overview",
-      wordsSearch:"",
-      senseRows:null,
-      senseRowsVideoId:"",
-      senseRowsPromise:null,
     },
-    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null,panel:null}
+    zdf:{videoId:"",video:null,cues:null,cueIndex:-1,overlay:null,germanLine:null,loading:false,loaded:false,error:"",frameId:null,videoListeners:null}
   };
 
   const adapter=ADAPTERS.find(a=>a.host.test(location.hostname));
@@ -70,12 +72,12 @@
   }
 
   function ensurePlayerControls(){
-    // Player controls are integrated into the shared side-panel header.
-    return ensureYouTubeSidePanel();
+    // Player controls are integrated into the platform-independent shared panel header.
+    return ensureSharedPanel();
   }
 
   function renderPlayerControls(){
-    const panel=state.youtube.panel;
+    const panel=state.panel.element;
     if(!panel) return;
     const toggle=panel.querySelector(".gle-header-main-toggle");
     if(toggle){
@@ -122,7 +124,7 @@
         await chrome.storage.sync.set({[name]:event.target.checked});
         if(name==="extensionEnabled") renderPlayerControls();
         if(name==="showVideoTranslation") refreshVideoTranslations();
-        if(name==="showPanelTranslation" && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
+        if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
       });
     }
     return dialog;
@@ -301,8 +303,8 @@
     const payload=await response.json();
     state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
     refreshLearningHighlights();
-    if(adapter.id==="youtube" && state.youtube.panel && !state.youtube.panel.hidden){
-      renderYouTubeSidePanel();
+    if(adapter.id==="youtube" && state.panel.element && !state.panel.element.hidden){
+      renderSharedPanel();
     }
   }
 
@@ -945,15 +947,15 @@
     state.youtube.expressionGroupsAnalysis=null;
     state.youtube.expressionGroupsVideoId="";
     state.youtube.expressionGroupsPromise=null;
-    state.youtube.panelSelectedLemma="";
-    state.youtube.panelSelectedGroupKey="";
-    state.youtube.wordsView="overview";
-    state.youtube.wordsSearch="";
+    state.panel.selectedLemma="";
+    state.panel.selectedGroupKey="";
+    state.panel.wordsView="overview";
+    state.panel.wordsSearch="";
     state.youtube.videoUnknownLemmas=new Set();
     state.youtube.videoUnknownExpressions=new Set();
     stopYouTubePreview();
     hideYouTubeOverlay();
-    if(state.youtube.panel) renderYouTubeSidePanel();
+    if(state.panel.element) renderSharedPanel();
   }
 
   function currentYouTubeVideoId(){
@@ -1028,19 +1030,19 @@
     },80);
   }
 
-  function setYouTubePanelCollapsed(collapsed){
-    state.youtube.panelCollapsed=Boolean(collapsed);
-    const panel=state.youtube.panel;
+  function setSharedPanelCollapsed(collapsed){
+    state.panel.collapsed=Boolean(collapsed);
+    const panel=state.panel.element;
     if(!panel) return;
-    panel.classList.toggle("collapsed",state.youtube.panelCollapsed);
-    const handle=state.youtube.panelHandle;
+    panel.classList.toggle("collapsed",state.panel.collapsed);
+    const handle=state.panel.handle;
     if(handle){
-      handle.textContent=state.youtube.panelCollapsed?"‹":"›";
-      handle.title=state.youtube.panelCollapsed?"Language Learning panelini aç":"Paneli küçült";
+      handle.textContent=state.panel.collapsed?"‹":"›";
+      handle.title=state.panel.collapsed?"Language Learning panelini aç":"Paneli küçült";
       handle.setAttribute("aria-label",handle.title);
-      handle.classList.toggle("collapsed",state.youtube.panelCollapsed);
+      handle.classList.toggle("collapsed",state.panel.collapsed);
     }
-    syncYouTubePanelHost();
+    syncSharedPanelHost();
   }
 
   function zdfPlayerShell(video){
@@ -1083,22 +1085,22 @@
     });
   }
 
-  function syncYouTubePanelHost(){
-    const panel=state.youtube.panel;
+  function syncSharedPanelHost(){
+    const panel=state.panel.element;
     if(adapter.id==="zdf"){
       if(!panel) return;
       const fullscreenRoot=document.fullscreenElement;
       const video=bindZdfVideo() || state.zdf.video;
       const mediaHost=video?.parentElement;
       const playerShell=zdfPlayerShell(video);
-      const open=!state.youtube.panelCollapsed;
+      const open=!state.panel.collapsed;
       const host=fullscreenRoot || document.documentElement;
 
       clearZdfPanelLayout();
       if(panel.parentElement!==host) host.appendChild(panel);
-      const handle=state.youtube.panelHandle;
+      const handle=state.panel.handle;
       if(handle && handle.parentElement!==host) host.appendChild(handle);
-      panel.classList.add("gle-zdf-shared-panel");
+      panel.classList.add("gle-provider-panel-layout");
       panel.classList.toggle("docked",Boolean(fullscreenRoot));
 
       if(open){
@@ -1106,7 +1108,7 @@
         const panelWidth=fullscreenRoot
           ? Math.min(420,Math.max(320,viewportWidth*0.30))
           : Math.min(408,Math.max(320,viewportWidth*0.30));
-        panel.style.setProperty("--gle-zdf-current-panel-width",panelWidth+"px");
+        document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
         video?.classList.add("gle-zdf-video-panel-open");
         video?.style.removeProperty("--gle-zdf-video-scale");
         video?.style.setProperty("--gle-zdf-panel-width",panelWidth+"px");
@@ -1126,7 +1128,7 @@
       }else if(fullscreenRoot){
         fullscreenRoot.classList.add("gle-zdf-fullscreen-panel-collapsed");
       }
-      state.youtube.panelDocked=Boolean(fullscreenRoot);
+      state.panel.docked=Boolean(fullscreenRoot);
       return;
     }
     const player=document.querySelector(".html5-video-player");
@@ -1143,12 +1145,17 @@
       document.documentElement.appendChild(panel);
     }
 
-    state.youtube.panelDocked=shouldDock;
+    state.panel.docked=shouldDock;
+    panel.classList.remove("gle-provider-panel-layout");
     panel.classList.toggle("docked",shouldDock);
-    player.classList.toggle("gle-panel-docked",shouldDock && !state.youtube.panelCollapsed);
-    player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.youtube.panelCollapsed);
+    const currentPanelWidth=shouldDock
+      ? Math.min(420,(player.getBoundingClientRect().width||1)*0.35)
+      : Math.min(420,Math.max(320,panel.getBoundingClientRect().width||420));
+    document.documentElement.style.setProperty("--gle-panel-current-width",currentPanelWidth+"px");
+    player.classList.toggle("gle-panel-docked",shouldDock && !state.panel.collapsed);
+    player.classList.toggle("gle-panel-docked-collapsed",shouldDock && state.panel.collapsed);
 
-    if(shouldDock && !state.youtube.panelCollapsed){
+    if(shouldDock && !state.panel.collapsed){
       const width=player.getBoundingClientRect().width || 1;
       const panelWidth=Math.min(420,width*0.35);
       const scale=Math.max(0.55,(width-panelWidth)/width);
@@ -1160,18 +1167,19 @@
     }
   }
 
-  function ensureYouTubeSidePanel(){
+  function ensureSharedPanel(){
     if(!["youtube","zdf"].includes(adapter.id)) return null;
-    if(state.youtube.panel?.isConnected){
-      syncYouTubePanelHost();
-      return state.youtube.panel;
+    if(state.panel.element?.isConnected){
+      syncSharedPanelHost();
+      return state.panel.element;
     }
 
     const panel=document.createElement("aside");
-    panel.id="gle-youtube-panel";
+    panel.id="gle-shared-panel";
+    panel.className="gle-shared-panel";
     panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
 
-    let handle=state.youtube.panelHandle;
+    let handle=state.panel.handle;
     if(!handle?.isConnected){
       handle=document.createElement("button");
       handle.type="button";
@@ -1179,10 +1187,10 @@
       handle.className="gle-panel-edge-handle";
       handle.addEventListener("click",event=>{
         event.stopPropagation();
-        setYouTubePanelCollapsed(!state.youtube.panelCollapsed);
+        setSharedPanelCollapsed(!state.panel.collapsed);
       });
       document.documentElement.appendChild(handle);
-      state.youtube.panelHandle=handle;
+      state.panel.handle=handle;
     }
     panel.querySelector(".gle-header-main-toggle").addEventListener("change",async event=>{
       state.settings.extensionEnabled=event.target.checked;
@@ -1193,15 +1201,15 @@
 
     panel.querySelectorAll("[data-tab]").forEach(button=>{
       button.addEventListener("click",()=>{
-        state.youtube.panelTab=button.dataset.tab;
-        state.youtube.panelSelectedLemma="";
-        state.youtube.panelSelectedGroupKey="";
-        renderYouTubeSidePanel();
+        state.panel.tab=button.dataset.tab;
+        state.panel.selectedLemma="";
+        state.panel.selectedGroupKey="";
+        renderSharedPanel();
       });
     });
 
     document.documentElement.appendChild(panel);
-    state.youtube.panel=panel;
+    state.panel.element=panel;
 
     const active=state.settings.extensionEnabled!==false;
     const mainToggle=panel.querySelector(".gle-header-main-toggle");
@@ -1209,14 +1217,14 @@
     const mainLabel=panel.querySelector(".gle-master-switch em");
     if(mainLabel) mainLabel.textContent=active?"Aktif":"Pasif";
 
-    setYouTubePanelCollapsed(state.youtube.panelCollapsed);
-    syncYouTubePanelHost();
+    setSharedPanelCollapsed(state.panel.collapsed);
+    syncSharedPanelHost();
     return panel;
   }
 
   function updatePanelActiveCue(){
-    const panel=state.youtube.panel;
-    if(!panel || state.youtube.panelCollapsed || state.youtube.panelTab!=="subtitles") return;
+    const panel=state.panel.element;
+    if(!panel || state.panel.collapsed || state.panel.tab!=="subtitles") return;
     panel.querySelectorAll(".gle-transcript-row.active").forEach(row=>row.classList.remove("active"));
     const active=panel.querySelector('[data-cue-index="'+state.youtube.cueIndex+'"]');
     if(active){
@@ -1253,7 +1261,7 @@
     else state.youtube.videoUnknownLemmas.add(normalized);
     await chrome.storage.local.set({[videoUnknownStorageKey()]:[...state.youtube.videoUnknownLemmas]});
     refreshLearningHighlights();
-    renderYouTubeSidePanel();
+    renderSharedPanel();
   }
 
   function videoUnknownExpressionStorageKey(videoId=state.youtube.videoId){
@@ -1277,7 +1285,7 @@
     else state.youtube.videoUnknownExpressions.add(key);
     await chrome.storage.local.set({[videoUnknownExpressionStorageKey()]:[...state.youtube.videoUnknownExpressions]});
     refreshLearningHighlights();
-    renderYouTubeSidePanel();
+    renderSharedPanel();
   }
 
   function expressionGroupsCacheKey(){
@@ -1301,7 +1309,7 @@
         const cached=await chrome.storage.local.get(cacheKey);
         if(Array.isArray(cached[cacheKey])){
           state.youtube.expressionGroupsAnalysis=cached[cacheKey];
-          if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+          if(state.panel.tab==="words") renderSharedPanel();
           return;
         }
       }catch(_error){}
@@ -1352,11 +1360,11 @@
           .sort((a,b)=>b.count-a.count || a.canonical.localeCompare(b.canonical,"de"));
         state.youtube.expressionGroupsAnalysis=analysis;
         chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
-        if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+        if(state.panel.tab==="words") renderSharedPanel();
       }catch(error){
         console.warn("Video expression group analysis failed",error);
         state.youtube.expressionGroupsAnalysis=[];
-        if(state.youtube.panelTab==="words") renderYouTubeSidePanel();
+        if(state.panel.tab==="words") renderSharedPanel();
       }finally{
         state.youtube.expressionGroupsPromise=null;
       }
@@ -1394,7 +1402,7 @@
         if(Array.isArray(cached[cacheKey])){
           state.youtube.transcriptAnalysis=cached[cacheKey];
           analyzeWholeYouTubeExpressionGroups();
-          if(state.youtube.panel) renderYouTubeSidePanel();
+          if(state.panel.element) renderSharedPanel();
           return;
         }
       }catch(_error){}
@@ -1450,11 +1458,11 @@
         state.youtube.transcriptAnalysis=analysis;
         chrome.storage.local.set({[cacheKey]:analysis}).catch(()=>{});
         analyzeWholeYouTubeExpressionGroups();
-        if(state.youtube.panel) renderYouTubeSidePanel();
+        if(state.panel.element) renderSharedPanel();
       }catch(error){
         console.warn("Video word analysis failed",error);
-        if(state.youtube.panel && state.youtube.panelTab==="words"){
-          const body=state.youtube.panel.querySelector(".gle-panel-body");
+        if(state.panel.element && state.panel.tab==="words"){
+          const body=state.panel.element.querySelector(".gle-panel-body");
           if(body) body.innerHTML='<div class="gle-panel-empty"><b>Kelime analizi başarısız.</b><span>'+esc(String(error?.message||error))+'</span></div>';
         }
       }finally{
@@ -1480,7 +1488,7 @@
       state.settings[name]=event.target.checked;
       await chrome.storage.sync.set({[name]:event.target.checked});
       if(name==="showVideoTranslation") refreshVideoTranslations();
-      if(name==="showPanelTranslation") renderYouTubeSidePanel();
+      if(name==="showPanelTranslation") renderSharedPanel();
     }));
     const list=document.createElement("div");
     list.className="gle-transcript-list";
@@ -1550,8 +1558,8 @@
     }).join("");
     body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(entry.lemma)+'</strong><span>'+entry.count+' kez'+(learning?" · ★ Öğreniyorum":"")+'</span></div></div><div class="gle-word-forms">Videodaki biçimler: '+esc(entry.forms.join(", "))+'</div><div class="gle-word-occurrences">'+rows+'</div>';
     body.querySelector(".gle-word-back").addEventListener("click",()=>{
-      state.youtube.panelSelectedLemma="";
-      renderYouTubeSidePanel();
+      state.panel.selectedLemma="";
+      renderSharedPanel();
     });
     body.querySelectorAll(".gle-word-occurrence").forEach(button=>{
       button.addEventListener("click",()=>playYouTubeCue(Number(button.dataset.cueIndex)));
@@ -1631,8 +1639,8 @@
       '<div class="gle-word-occurrences">'+rows+'</div>';
 
     body.querySelector(".gle-word-back").addEventListener("click",()=>{
-      state.youtube.panelSelectedGroupKey="";
-      renderYouTubeSidePanel();
+      state.panel.selectedGroupKey="";
+      renderSharedPanel();
     });
     body.querySelectorAll(".gle-word-occurrence").forEach(button=>{
       button.addEventListener("click",()=>playYouTubeCue(Number(button.dataset.cueIndex)));
@@ -1640,7 +1648,7 @@
   }
 
   function wordsToolbar(analysis){
-    const q=state.youtube.wordsSearch||"";
+    const q=state.panel.wordsSearch||"";
     const views=[
       ["overview","Genel"],
       ["alphabetical","A-Z"],
@@ -1650,14 +1658,14 @@
     ];
     return '<div class="gle-words-tools">'+
       '<div class="gle-words-subtabs">'+views.map(([id,label])=>
-        '<button type="button" data-words-view="'+id+'" class="'+(state.youtube.wordsView===id?"active":"")+'">'+label+'</button>'
+        '<button type="button" data-words-view="'+id+'" class="'+(state.panel.wordsView===id?"active":"")+'">'+label+'</button>'
       ).join("")+'</div>'+
       '<label class="gle-word-search"><span>⌕</span><input type="search" placeholder="Bu videoda kelime ara…" value="'+escAttr(q)+'" aria-label="Bu videoda kelime ara"></label>'+
     '</div>';
   }
 
   function filterPanelWords(entries){
-    const q=String(state.youtube.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
+    const q=String(state.panel.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
     if(!q) return entries;
     return entries.filter(entry=>
       String(entry.lemma||"").toLocaleLowerCase("de-DE").includes(q) ||
@@ -1730,7 +1738,7 @@
             surface:entry.forms?.[0]||entry.canonical,
           });
         }
-        renderYouTubeSidePanel();
+        renderSharedPanel();
         state.tooltip.hidden=true;
       }finally{
         learnButton.disabled=false;
@@ -1771,7 +1779,7 @@
         surface:entry.forms?.[0]||entry.canonical,
       },encounterSnapshot);
     }
-    renderYouTubeSidePanel();
+    renderSharedPanel();
   }
 
   function learningItemForSense(row){
@@ -1782,10 +1790,10 @@
     const videoId=state.youtube.videoId;
     const cues=state.youtube.cues||[];
     if(!videoId || !cues.length) return;
-    if(state.youtube.senseRowsVideoId===videoId && state.youtube.senseRows) return;
-    if(state.youtube.senseRowsVideoId===videoId && state.youtube.senseRowsPromise) return state.youtube.senseRowsPromise;
-    state.youtube.senseRowsVideoId=videoId;
-    state.youtube.senseRows=null;
+    if(state.panel.senseRowsVideoId===videoId && state.panel.senseRows) return;
+    if(state.panel.senseRowsVideoId===videoId && state.panel.senseRowsPromise) return state.panel.senseRowsPromise;
+    state.panel.senseRowsVideoId=videoId;
+    state.panel.senseRows=null;
     const task=(async()=>{
       try{
         const apiBase=await platformApiBase();
@@ -1825,16 +1833,16 @@
             }
           });
         }
-        state.youtube.senseRows=[...rows.values()].sort((a,b)=>a.canonical.localeCompare(b.canonical,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
+        state.panel.senseRows=[...rows.values()].sort((a,b)=>a.canonical.localeCompare(b.canonical,"de") || a.meaningTr.localeCompare(b.meaningTr,"tr"));
       }catch(error){
         console.warn("Learning unit table analysis failed",error);
-        state.youtube.senseRows=[];
+        state.panel.senseRows=[];
       }finally{
-        state.youtube.senseRowsPromise=null;
-        if(state.youtube.panelTab==="words" && state.youtube.wordsView==="senses") renderYouTubeSidePanel();
+        state.panel.senseRowsPromise=null;
+        if(state.panel.tab==="words" && state.panel.wordsView==="senses") renderSharedPanel();
       }
     })();
-    state.youtube.senseRowsPromise=task;
+    state.panel.senseRowsPromise=task;
     return task;
   }
 
@@ -1865,14 +1873,14 @@
   }
 
   function renderWordSenseTable(body){
-    if(state.youtube.senseRowsVideoId!==state.youtube.videoId || !state.youtube.senseRows){
+    if(state.panel.senseRowsVideoId!==state.youtube.videoId || !state.panel.senseRows){
       body.innerHTML='<div class="gle-panel-summary"><strong>'+(state.youtube.transcriptAnalysis?.length||0)+'</strong><span>farklı lemma</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+'<div class="gle-panel-empty"><b>Anlamlar hazırlanıyor…</b><span>Her kullanım cümle bağlamında analiz ediliyor.</span></div>';
       bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
       analyzePanelWordSenses();
       return;
     }
-    const q=String(state.youtube.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
-    const rows=state.youtube.senseRows.filter(row=>!q || row.lemma.includes(q) || row.meaningTr.toLocaleLowerCase("tr-TR").includes(q));
+    const q=String(state.panel.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
+    const rows=state.panel.senseRows.filter(row=>!q || row.lemma.includes(q) || row.meaningTr.toLocaleLowerCase("tr-TR").includes(q));
     const table='<div class="gle-sense-table"><div class="gle-sense-head"><span>Öğrenme birimi</span><span>Bu kullanımdaki anlam</span><span>Tür</span><span>Durum</span></div>'+rows.map(row=>{
       const item=learningItemForSense(row);
       const learning=item?.status==="learning";
@@ -1882,15 +1890,15 @@
     body.innerHTML='<div class="gle-panel-summary"><strong>'+rows.length+'</strong><span>anlam/kullanım</span><strong>'+(state.youtube.cues||[]).length+'</strong><span>altyazı bölümü</span></div>'+wordsToolbar(state.youtube.transcriptAnalysis||[])+(rows.length?table:'<div class="gle-panel-empty">Sonuç bulunamadı.</div>');
     bindPanelWordControls(body,state.youtube.transcriptAnalysis||[]);
     body.querySelectorAll("[data-sense-jump]").forEach(button=>button.addEventListener("click",()=>{
-      const row=state.youtube.senseRows.find(item=>item.key===button.dataset.senseJump);
+      const row=state.panel.senseRows.find(item=>item.key===button.dataset.senseJump);
       if(row) playYouTubeCue(row.cueIndex);
     }));
     const bindStatus=(selector,status)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
       const key=button.dataset.senseLearn||button.dataset.senseKnown;
-      const row=state.youtube.senseRows.find(item=>item.key===key);
+      const row=state.panel.senseRows.find(item=>item.key===key);
       if(!row) return;
       button.disabled=true;
-      try{ await setSenseStatus(row,status); renderYouTubeSidePanel(); }
+      try{ await setSenseStatus(row,status); renderSharedPanel(); }
       catch(error){ console.warn("Word sense status failed",error); button.disabled=false; }
     }));
     bindStatus("[data-sense-learn]","learning");
@@ -1900,21 +1908,21 @@
   function bindPanelWordControls(body,analysis){
     body.querySelectorAll("[data-words-view]").forEach(button=>{
       button.addEventListener("click",()=>{
-        state.youtube.wordsView=button.dataset.wordsView||"overview";
-        state.youtube.panelSelectedLemma="";
-        state.youtube.panelSelectedGroupKey="";
-        renderYouTubeSidePanel();
+        state.panel.wordsView=button.dataset.wordsView||"overview";
+        state.panel.selectedLemma="";
+        state.panel.selectedGroupKey="";
+        renderSharedPanel();
       });
     });
 
     const search=body.querySelector(".gle-word-search input");
     if(search){
       search.addEventListener("input",()=>{
-        state.youtube.wordsSearch=search.value;
+        state.panel.wordsSearch=search.value;
         const cursor=search.selectionStart;
-        renderYouTubeSidePanel();
+        renderSharedPanel();
         requestAnimationFrame(()=>{
-          const next=state.youtube.panel?.querySelector(".gle-word-search input");
+          const next=state.panel.element?.querySelector(".gle-word-search input");
           if(next){
             next.focus();
             try{ next.setSelectionRange(cursor,cursor); }catch(_error){}
@@ -1936,8 +1944,8 @@
         scheduleTooltipHide(850);
       });
       button.addEventListener("click",()=>{
-        state.youtube.panelSelectedLemma=button.dataset.lemma;
-        renderYouTubeSidePanel();
+        state.panel.selectedLemma=button.dataset.lemma;
+        renderSharedPanel();
       });
     });
 
@@ -1954,9 +1962,9 @@
         scheduleTooltipHide(850);
       });
       button.addEventListener("click",()=>{
-        state.youtube.panelSelectedGroupKey=button.dataset.groupKey;
-        state.youtube.panelSelectedLemma="";
-        renderYouTubeSidePanel();
+        state.panel.selectedGroupKey=button.dataset.groupKey;
+        state.panel.selectedLemma="";
+        renderSharedPanel();
       });
     });
 
@@ -1991,27 +1999,27 @@
       return;
     }
 
-    if(state.youtube.wordsView==="senses"){
+    if(state.panel.wordsView==="senses"){
       renderWordSenseTable(body);
       return;
     }
 
-    if(state.youtube.panelSelectedGroupKey){
-      const group=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===state.youtube.panelSelectedGroupKey);
+    if(state.panel.selectedGroupKey){
+      const group=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===state.panel.selectedGroupKey);
       if(group){
         renderExpressionGroupDetail(body,group);
         return;
       }
-      state.youtube.panelSelectedGroupKey="";
+      state.panel.selectedGroupKey="";
     }
 
-    if(state.youtube.panelSelectedLemma){
-      const entry=analysis.find(item=>item.lemma===state.youtube.panelSelectedLemma);
+    if(state.panel.selectedLemma){
+      const entry=analysis.find(item=>item.lemma===state.panel.selectedLemma);
       if(entry){
         renderWordDetail(body,entry);
         return;
       }
-      state.youtube.panelSelectedLemma="";
+      state.panel.selectedLemma="";
     }
 
     const visible=filterPanelWords(analysis);
@@ -2023,11 +2031,11 @@
 
     const groups=state.youtube.expressionGroupsAnalysis;
     let content="";
-    if(state.youtube.wordsView==="alphabetical"){
+    if(state.panel.wordsView==="alphabetical"){
       content=alphabeticalWordList(visible);
-    }else if(state.youtube.wordsView==="frequency"){
+    }else if(state.panel.wordsView==="frequency"){
       content=frequencyWordList(visible);
-    }else if(state.youtube.wordsView==="groups"){
+    }else if(state.panel.wordsView==="groups"){
       content=expressionGroupsSection(groups);
     }else{
       content=
@@ -2061,20 +2069,20 @@
     body.innerHTML='<div class="gle-saved-list">'+present.map(({entry,item})=>'<button type="button" class="gle-saved-word" data-lemma="'+escAttr(entry.lemma)+'"><span><strong>★ '+esc(item.label||entry.lemma)+'</strong><small>'+esc(item.meaning_tr||"")+'</small></span><b>'+entry.count+'×</b></button>').join("")+'</div>';
     body.querySelectorAll(".gle-saved-word").forEach(button=>{
       button.addEventListener("click",()=>{
-        state.youtube.panelTab="words";
-        state.youtube.panelSelectedLemma=button.dataset.lemma;
-        renderYouTubeSidePanel();
+        state.panel.tab="words";
+        state.panel.selectedLemma=button.dataset.lemma;
+        renderSharedPanel();
       });
     });
   }
 
-  function renderYouTubeSidePanel(){
-    const panel=ensureYouTubeSidePanel();
+  function renderSharedPanel(){
+    const panel=ensureSharedPanel();
     if(!panel) return;
-    panel.querySelectorAll("[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.youtube.panelTab));
+    panel.querySelectorAll("[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.panel.tab));
     const body=panel.querySelector(".gle-panel-body");
-    if(state.youtube.panelTab==="words") renderPanelWords(body);
-    else if(state.youtube.panelTab==="saved") renderPanelSaved(body);
+    if(state.panel.tab==="words") renderPanelWords(body);
+    else if(state.panel.tab==="saved") renderPanelSaved(body);
     else renderPanelSubtitles(body);
   }
 
@@ -2264,12 +2272,12 @@
       state.youtube.cueIndex=-1;
       state.youtube.timedAvailable=true;
       indexPreparedCorpusFromYouTube(cues);
-      ensureYouTubeSidePanel();
+      ensureSharedPanel();
       Promise.all([loadVideoUnknownLemmas(),loadVideoUnknownExpressions()]).then(()=>{
-        renderYouTubeSidePanel();
+        renderSharedPanel();
         refreshLearningHighlights();
       });
-      renderYouTubeSidePanel();
+      renderSharedPanel();
       analyzeWholeYouTubeTranscript();
       bindYouTubeVideo();
       const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
@@ -2291,16 +2299,16 @@
     requestAnimationFrame(()=>{
       const videoId=currentYouTubeVideoId();
       if(videoId && videoId!==state.youtube.videoId) resetYouTube(videoId);
-      ensureYouTubeSidePanel();
-      syncYouTubePanelHost();
+      ensureSharedPanel();
+      syncSharedPanelHost();
       window.postMessage({source:"gle-youtube-content",type:"refresh"},location.origin);
       scanYouTube();
     });
   });
 
   window.addEventListener("wheel",event=>{
-    const panel=state.youtube.panel;
-    if(!panel || state.youtube.panelCollapsed || !panel.contains(event.target)) return;
+    const panel=state.panel.element;
+    if(!panel || state.panel.collapsed || !panel.contains(event.target)) return;
     if(Math.abs(event.deltaX)>Math.abs(event.deltaY)) return;
 
     const body=panel.querySelector(".gle-panel-body");
@@ -2315,8 +2323,8 @@
     body.scrollTop+=event.deltaY;
   },{capture:true,passive:false});
 
-  document.addEventListener("fullscreenchange",()=>requestAnimationFrame(syncYouTubePanelHost));
-  window.addEventListener("resize",()=>requestAnimationFrame(syncYouTubePanelHost));
+  document.addEventListener("fullscreenchange",()=>requestAnimationFrame(syncSharedPanelHost));
+  window.addEventListener("resize",()=>requestAnimationFrame(syncSharedPanelHost));
 
   function collectYouTubeDomText(){
     const containers=[...document.querySelectorAll(".ytp-caption-window-bottom")];
@@ -2382,8 +2390,8 @@
     }
 
     ensureYouTubeOverlay();
-    ensureYouTubeSidePanel();
-    syncYouTubePanelHost();
+    ensureSharedPanel();
+    syncSharedPanelHost();
 
     if(state.youtube.timedAvailable){
       bindYouTubeVideo();
@@ -2414,12 +2422,12 @@
 
   function ensureZdfPanel(){
     if(adapter.id!=="zdf") return null;
-    return ensureYouTubeSidePanel();
+    return ensureSharedPanel();
   }
 
   function renderZdfPanel(){
     if(adapter.id!=="zdf") return;
-    renderYouTubeSidePanel();
+    renderSharedPanel();
   }
 
   function adoptZdfMediaForSharedPanel(){
@@ -2594,23 +2602,23 @@
       state.zdf.loaded=true;
       bindZdfVideo();
       adoptZdfMediaForSharedPanel();
-      ensureYouTubeSidePanel();
+      ensureSharedPanel();
       Promise.all([loadVideoUnknownLemmas(),loadVideoUnknownExpressions()]).then(()=>{
-        renderYouTubeSidePanel();
+        renderSharedPanel();
         refreshLearningHighlights();
       });
-      renderYouTubeSidePanel();
+      renderSharedPanel();
       analyzeWholeYouTubeTranscript();
       analyzeWholeYouTubeExpressionGroups();
       renderZdfCue();
     }catch(error){
       state.zdf.error=String(error?.message||error);
       state.zdf.loaded=false;
-      renderYouTubeSidePanel();
+      renderSharedPanel();
       console.warn("ZDF timed subtitles unavailable",error);
     }finally{
       state.zdf.loading=false;
-      renderYouTubeSidePanel();
+      renderSharedPanel();
     }
   }
 
@@ -2682,7 +2690,7 @@
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
     if(changes.youtubeSubtitlePositionY) state.settings.youtubeSubtitlePositionY=changes.youtubeSubtitlePositionY.newValue;
     applySharedAppearance();
-    if(changes.showPanelTranslation && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
+    if(changes.showPanelTranslation && state.panel.tab==="subtitles") renderSharedPanel();
     if(changes.showVideoTranslation) refreshVideoTranslations();
   });
 
