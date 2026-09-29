@@ -1127,3 +1127,33 @@ html[data-gle-theme="light"] .gle-settings-track{
   width:100%!important;
   max-width:100%!important
 }
+
+
+/* Shared external panel handle: identical translucent appearance on every
+   provider (YouTube, ZDF and future adapters). */
+#gle-panel-edge-handle.gle-panel-edge-handle,
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed,
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed),
+:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle,
+.html5-video-player.gle-panel-player-fullscreen #gle-panel-edge-handle.gle-panel-edge-handle{
+  width:30px!important;
+  height:76px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  border:2px solid rgba(124,58,237,.82)!important;
+  border-right:0!important;
+  border-radius:14px 0 0 14px!important;
+  background:rgba(216,180,254,.78)!important;
+  color:#4c1d95!important;
+  box-shadow:-4px 0 14px rgba(0,0,0,.26)!important;
+  font:900 27px/1 system-ui!important;
+  opacity:1!important;
+  backdrop-filter:blur(4px)!important;
+  -webkit-backdrop-filter:blur(4px)!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle:hover{
+  background:rgba(233,213,255,.9)!important;
+  border-color:rgba(124,58,237,.92)!important
+}
