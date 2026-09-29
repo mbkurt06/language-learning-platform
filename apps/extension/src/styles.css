@@ -920,3 +920,15 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 #gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
   right:var(--gle-panel-handle-right,var(--gle-panel-current-width,420px))!important
 }
+
+
+/* YouTube non-fullscreen panel fills the entire viewport lane to the right of
+   the player: no top/right/bottom gaps and no recommendation strip showing. */
+#gle-shared-panel.gle-youtube-external-panel:not(.collapsed){
+  top:0!important;
+  bottom:0!important;
+  right:0!important;
+  height:100vh!important;
+  max-height:none!important;
+  border-radius:0!important
+}
