@@ -1,5 +1,7 @@
 const recentFetches = new Map();
 const MIN_SAME_URL_INTERVAL_MS = 1200;
+const GLOBAL_FETCH_GAP_MS = 500;
+let nextGlobalFetchAt = 0;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== "zdf-lab-fetch-text") return false;
@@ -34,7 +36,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   const now = Date.now();
   const lastFetchAt = recentFetches.get(parsed.href) || 0;
-  const waitMs = Math.max(0, MIN_SAME_URL_INTERVAL_MS - (now - lastFetchAt));
+  const sameUrlReadyAt = lastFetchAt + MIN_SAME_URL_INTERVAL_MS;
+  const scheduledAt = Math.max(now, sameUrlReadyAt, nextGlobalFetchAt);
+  nextGlobalFetchAt = scheduledAt + GLOBAL_FETCH_GAP_MS;
+  const waitMs = Math.max(0, scheduledAt - now);
 
   const runFetch = () => {
     recentFetches.set(parsed.href, Date.now());
