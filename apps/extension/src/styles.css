@@ -1541,3 +1541,124 @@ html:not(.gle-web-panel-open) body{
   font-size:11px;
   color:#a78bfa;
 }
+
+
+/* PR #129: stable searches, target ranges and always-reachable panel sizing */
+#gle-shared-panel{
+  container-type:inline-size;
+}
+#gle-shared-panel .gle-panel-productbar{
+  position:relative;
+  padding-left:42px;
+}
+.gle-panel-size-reset{
+  position:absolute!important;
+  left:8px!important;
+  top:8px!important;
+  z-index:2147483610!important;
+  width:28px!important;
+  height:28px!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+  border:1px solid #52525b!important;
+  border-radius:7px!important;
+  background:#202026!important;
+  color:#e4e4e7!important;
+  cursor:pointer!important;
+}
+.gle-panel-size-reset:hover{
+  background:#2a1738!important;
+  border-color:#a855f7!important;
+}
+.gle-panel-size-reset>span{
+  position:relative;
+  display:block;
+  width:15px;
+  height:11px;
+  border:2px solid currentColor;
+  border-radius:2px;
+  box-sizing:border-box;
+}
+.gle-panel-size-reset>span:before{
+  content:"";
+  position:absolute;
+  left:3px;
+  top:-2px;
+  bottom:-2px;
+  width:2px;
+  background:currentColor;
+  opacity:.75;
+}
+#gle-shared-panel.collapsed .gle-panel-size-reset{
+  display:none!important;
+}
+
+@container (max-width:340px){
+  #gle-shared-panel .gle-panel-productbar>strong{display:none}
+  #gle-shared-panel .gle-master-switch em{display:none}
+  #gle-shared-panel .gle-panel-productbar{justify-content:flex-end}
+  #gle-shared-panel .gle-panel-actions{gap:2px}
+}
+@container (max-width:285px){
+  #gle-shared-panel .gle-header-export{width:28px!important}
+  #gle-shared-panel .gle-header-settings{width:32px!important}
+}
+
+.gle-saved-toolbar{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#0f0f12;
+  border-bottom:1px solid rgba(148,163,184,.18);
+  box-shadow:0 1px 0 rgba(148,163,184,.12);
+}
+.gle-saved-toolbar .gle-saved-filters{
+  position:static;
+  box-shadow:none;
+  border-bottom:0;
+}
+.gle-panel-search{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:0 10px 10px;
+  padding:0 9px;
+  min-width:0;
+  border:1px solid #34343b;
+  border-radius:8px;
+  background:#0d0d10;
+  color:#8f8f9b;
+}
+.gle-panel-search input{
+  width:100%;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#f4f4f5;
+  padding:8px 0;
+  font:12px/1.2 system-ui,-apple-system,sans-serif;
+}
+.gle-panel-search input::placeholder{color:#777782}
+.gle-transcript-controls{
+  flex-wrap:wrap;
+}
+.gle-transcript-controls .gle-sentence-search{
+  flex:1 0 100%;
+  margin:2px 0 0;
+}
+
+/* Active navigation target is deliberately blue, distinct from yellow learning markers. */
+::highlight(gle-saved-target){
+  background:rgba(59,130,246,.58)!important;
+  color:inherit!important;
+}
+::highlight(gle-sentence-target){
+  background:rgba(59,130,246,.34)!important;
+  color:inherit!important;
+}
+
+/* Persistent Turkish labels were removed: they covered text and jittered on scroll.
+   The yellow marker stays persistent; contextual meaning is available in the word popup. */
+.gle-web-learning-label{display:none!important}
