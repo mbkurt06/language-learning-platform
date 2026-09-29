@@ -1667,7 +1667,7 @@ html:not(.gle-web-panel-open) body{
 
 
 ::highlight(gle-benchmark-word){
-  background:rgba(59,130,246,.20);
+  background:rgba(37,99,235,.34);
   color:inherit;
 }
 
