@@ -128,17 +128,19 @@
     window.postMessage(latest, "*");
   }
 
-  function inspectResponse(url, text, contentType = "") {
-    if (!text || text.length > MAX_CAPTURE_BYTES) return;
-
-    const relevant =
+  function shouldInspectResponse(url, contentType = "") {
+    const type = String(contentType || "").toLowerCase();
+    return (
       url.includes("/ptmd/") ||
       url.includes("utstreaming.zdf.de") ||
-      url.includes(".m3u8") ||
-      url.includes("akamaized.net") ||
-      String(contentType).toLowerCase().includes("json");
+      /\.m3u8(?:[?#]|$)/i.test(url) ||
+      (url.includes("api.zdf.de") && type.includes("json"))
+    );
+  }
 
-    if (!relevant) return;
+  function inspectResponse(url, text, contentType = "") {
+    if (!shouldInspectResponse(url, contentType)) return;
+    if (!text || text.length > MAX_CAPTURE_BYTES) return;
 
     const direct = collectDirectUrls(text, url);
     const playlists = collectSubtitlePlaylists(text, url);
@@ -159,7 +161,9 @@
         try {
           const url = absoluteUrl(args[0]?.url || args[0]) || response.url || "";
           const contentType = response.headers?.get("content-type") || "";
-          response.clone().text().then(text => inspectResponse(url, text, contentType)).catch(() => {});
+          if (shouldInspectResponse(url, contentType)) {
+            response.clone().text().then(text => inspectResponse(url, text, contentType)).catch(() => {});
+          }
         } catch {}
         return response;
       });
@@ -180,6 +184,7 @@
         try {
           const url = this.__zdfLabUrl || "";
           const contentType = this.getResponseHeader?.("content-type") || "";
+          if (!shouldInspectResponse(url, contentType)) return;
           let text = "";
           if (!this.responseType || this.responseType === "text") text = this.responseText || "";
           else if (this.responseType === "json") text = JSON.stringify(this.response || null);
