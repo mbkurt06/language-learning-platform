@@ -3211,7 +3211,12 @@
     const ui=ensureZdfOverlay();
     if(!cues?.length || !ui) return false;
     const seconds=Number.isFinite(mediaTime)?mediaTime:ui.video.currentTime;
-    const cue=cueAtTime(cues,seconds*1000);
+    let cue=cueAtTime(cues,seconds*1000);
+    if(!cue && ui.video.paused && state.playback.autoPausedCueKey.startsWith("zdf:")){
+      const heldIndex=Number(state.playback.autoPausedCueKey.slice(4));
+      const heldCue=Number.isInteger(heldIndex) ? cues[heldIndex] : null;
+      if(heldCue) cue=heldCue;
+    }
     if(!cue){
       ui.overlay.hidden=true;
       state.zdf.cueIndex=-1;
