@@ -1235,3 +1235,11 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
   width:100%!important;
   max-width:100%!important
 }
+
+
+/* Final shared subtitle alignment: provider/site CSS must not pull the
+   source or translation text to one side inside the stable subtitle card. */
+.gle-youtube-german,
+.gle-youtube-german .gle-subtitle-translation{
+  text-align:center!important
+}
