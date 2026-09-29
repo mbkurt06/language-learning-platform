@@ -1220,3 +1220,18 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
   left:calc(var(--gle-panel-handle-left,30px) - 30px)!important;
   right:auto!important
 }
+
+
+/* Stable video subtitle card width: subtitle length changes the height/line
+   wrapping, not the overall card width. Shared by YouTube and ZDF. */
+.gle-youtube-german{
+  box-sizing:border-box!important;
+  width:min(780px,86%)!important;
+  max-width:min(780px,86%)!important;
+  margin-inline:auto!important
+}
+.gle-youtube-german .gle-subtitle-translation{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important
+}
