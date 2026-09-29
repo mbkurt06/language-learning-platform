@@ -1213,22 +1213,46 @@
     if(!panel || !player) return;
 
     const fullscreen=Boolean(document.fullscreenElement) || player.classList.contains("ytp-fullscreen");
-    const width=player.getBoundingClientRect().width || 1;
-    const panelWidth=Math.min(420,Math.max(260,width*0.32));
-    const shouldDock=true;
+    const rect=player.getBoundingClientRect();
 
-    if(panel.parentElement!==player) player.appendChild(panel);
+    if(fullscreen){
+      const width=rect.width || 1;
+      const panelWidth=Math.min(420,Math.max(260,width*0.32));
+      if(panel.parentElement!==player) player.appendChild(panel);
+      state.panel.docked=true;
+      panel.classList.remove("gle-youtube-external-panel");
+      panel.classList.add("docked");
+      document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
+      player.style.setProperty("--gle-panel-width",panelWidth+"px");
+      player.classList.toggle("gle-panel-docked",!state.panel.collapsed);
+      player.classList.toggle("gle-panel-docked-collapsed",state.panel.collapsed);
+      player.classList.add("gle-panel-player-fullscreen");
+      requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
+      return;
+    }
 
-    state.panel.docked=true;
-    panel.classList.remove("gle-provider-panel-layout");
-    panel.classList.add("docked");
-    document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
-    player.style.setProperty("--gle-panel-width",panelWidth+"px");
-    player.classList.toggle("gle-panel-docked",!state.panel.collapsed);
-    player.classList.toggle("gle-panel-docked-collapsed",state.panel.collapsed);
-
+    if(panel.parentElement!==document.documentElement) document.documentElement.appendChild(panel);
+    state.panel.docked=false;
+    panel.classList.remove("docked","gle-provider-panel-layout");
+    panel.classList.add("gle-youtube-external-panel");
+    player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen");
+    player.style.removeProperty("--gle-panel-width");
     player.style.removeProperty("--gle-video-scale");
-    player.classList.toggle("gle-panel-player-fullscreen",fullscreen);
+
+    const viewportWidth=window.innerWidth || document.documentElement.clientWidth || 1;
+    const left=Math.max(0,rect.right);
+    const rightInset=12;
+    const available=Math.max(220,viewportWidth-left-rightInset);
+    const panelWidth=Math.min(420,available);
+    const top=Math.max(0,rect.top);
+    const height=Math.max(240,Math.min(rect.height,window.innerHeight-top));
+
+    document.documentElement.style.setProperty("--gle-youtube-panel-left",left+"px");
+    document.documentElement.style.setProperty("--gle-youtube-panel-top",top+"px");
+    document.documentElement.style.setProperty("--gle-youtube-panel-width",panelWidth+"px");
+    document.documentElement.style.setProperty("--gle-youtube-panel-height",height+"px");
+    document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
+    document.documentElement.style.setProperty("--gle-panel-handle-right",Math.max(0,viewportWidth-left)+"px");
     requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
   }
 

@@ -901,3 +901,22 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .html5-video-player.gle-panel-docked .ytp-chrome-bottom{
   right:var(--gle-panel-width)!important
 }
+
+
+/* YouTube non-fullscreen: keep the shared panel outside the player and attach
+   it directly to the live player rectangle. */
+#gle-shared-panel.gle-youtube-external-panel:not(.collapsed){
+  position:fixed!important;
+  left:var(--gle-youtube-panel-left)!important;
+  right:auto!important;
+  top:var(--gle-youtube-panel-top)!important;
+  bottom:auto!important;
+  width:var(--gle-youtube-panel-width)!important;
+  height:var(--gle-youtube-panel-height)!important;
+  max-height:none!important;
+  border-radius:0 12px 12px 0!important;
+  z-index:2147483500!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  right:var(--gle-panel-handle-right,var(--gle-panel-current-width,420px))!important
+}
