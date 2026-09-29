@@ -32,3 +32,35 @@ chrome.runtime.onMessage.addListener((message,_sender,sendResponse)=>{
   })();
   return true;
 });
+
+
+async function allowedPlatformUrl(value){
+  try{
+    const requested=new URL(value);
+    const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
+    const configured=new URL(platformApiUrl);
+    return requested.origin===configured.origin && requested.pathname.startsWith("/api/");
+  }catch(_error){
+    return false;
+  }
+}
+
+chrome.runtime.onMessage.addListener((message,_sender,sendResponse)=>{
+  if(message?.type!=="gle-platform-fetch") return;
+  (async()=>{
+    if(!(await allowedPlatformUrl(message.url))){
+      let origin="invalid-url";
+      try{ origin=new URL(message.url).origin; }catch(_error){}
+      sendResponse({ok:false,status:0,error:"blocked-platform-fetch-origin: "+origin});
+      return;
+    }
+    try{
+      const response=await fetch(message.url,message.options||{});
+      const body=await response.text();
+      sendResponse({ok:response.ok,status:response.status,statusText:response.statusText,body});
+    }catch(error){
+      sendResponse({ok:false,status:0,error:String(error?.message||error)});
+    }
+  })();
+  return true;
+});

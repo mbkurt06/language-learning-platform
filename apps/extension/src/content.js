@@ -306,6 +306,19 @@
     return platformApiUrl.replace(/\/$/,"");
   }
 
+  async function platformFetch(url,options={}){
+    const result=await chrome.runtime.sendMessage({type:"gle-platform-fetch",url,options});
+    if(!result) throw new Error("platform-fetch-no-response");
+    if(result.error && !result.status) throw new Error(result.error);
+    return {
+      ok:Boolean(result.ok),
+      status:Number(result.status||0),
+      statusText:result.statusText||"",
+      text:async()=>result.body||"",
+      json:async()=>JSON.parse(result.body||"null"),
+    };
+  }
+
   function normalizeApiLearningItem(item){
     const translation=(item.translations||[]).find(entry=>entry.language==="tr") || item.translations?.[0];
     return {
@@ -350,7 +363,7 @@
     }
 
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/profiles/ensure",{
+    const response=await platformFetch(apiBase+"/api/v1/profiles/ensure",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -366,7 +379,7 @@
 
     if(!stored.learningItemsMigratedToApi && Array.isArray(stored.learningItems) && stored.learningItems.length){
       for(const legacy of stored.learningItems){
-        await fetch(apiBase+"/api/v1/learning-items",{
+        await platformFetch(apiBase+"/api/v1/learning-items",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
@@ -390,7 +403,7 @@
   async function loadLearningItems(){
     const profileId=state.learningProfileId || await ensureLearningProfile();
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
+    const response=await platformFetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
     if(!response.ok) throw new Error("Platform API learning items "+response.status);
     const payload=await response.json();
     state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
@@ -406,7 +419,7 @@
     if(state.learningItems.some(existing=>learningKey(existing.kind,existing.key)===id)) return;
     const profileId=state.learningProfileId || await ensureLearningProfile();
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/learning-items",{
+    const response=await platformFetch(apiBase+"/api/v1/learning-items",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -462,7 +475,7 @@
     const encounter=encounterSnapshot || currentYouTubeEncounter(surfaceForm);
     if(!encounter || !encounter.sentence) return;
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/encounters",{
+    const response=await platformFetch(apiBase+"/api/v1/encounters",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({learning_item_id:learningItemId,...encounter}),
@@ -496,7 +509,7 @@
     const item=state.learningItems.find(existing=>learningKey(existing.kind,existing.key)===wanted);
     if(!item?.id) return;
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/learning-items/"+encodeURIComponent(item.id),{method:"DELETE"});
+    const response=await platformFetch(apiBase+"/api/v1/learning-items/"+encodeURIComponent(item.id),{method:"DELETE"});
     if(!response.ok && response.status!==404) throw new Error("Platform API learning item "+response.status);
     await loadLearningItems();
   }
@@ -608,7 +621,7 @@
 
     const request=(async()=>{
       const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
-      const response=await fetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/analyze",{
+      const response=await platformFetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/analyze",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -1638,7 +1651,7 @@
         const batchSize=120;
         for(let offset=0;offset<cues.length;offset+=batchSize){
           const chunk=cues.slice(offset,offset+batchSize);
-          const response=await fetch(apiBase+"/api/v1/expression-groups-batch",{
+          const response=await platformFetch(apiBase+"/api/v1/expression-groups-batch",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({source_language:"de",texts:chunk.map(cue=>cue.text)}),
@@ -1733,7 +1746,7 @@
         for(let offset=0;offset<cues.length;offset+=batchSize){
           if(run!==state.youtube.transcriptAnalysisRun) return;
           const chunk=cues.slice(offset,offset+batchSize);
-          const response=await fetch(apiBase+"/api/v1/tokens-batch",{
+          const response=await platformFetch(apiBase+"/api/v1/tokens-batch",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({
@@ -2124,7 +2137,7 @@
         const batchSize=120;
         for(let offset=0;offset<cues.length;offset+=batchSize){
           const chunk=cues.slice(offset,offset+batchSize);
-          const response=await fetch(apiBase+"/api/v1/learning-units-batch",{
+          const response=await platformFetch(apiBase+"/api/v1/learning-units-batch",{
             method:"POST",
             headers:{"Content-Type":"application/json"},
             body:JSON.stringify({source_language:"de",texts:chunk.map(cue=>cue.text)}),
@@ -2172,7 +2185,7 @@
   async function setSenseStatus(row,status){
     const profileId=state.learningProfileId || await ensureLearningProfile();
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/learning-items",{
+    const response=await platformFetch(apiBase+"/api/v1/learning-items",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -2416,13 +2429,13 @@
     state.youtube.corpusIndexing.add(videoId);
     try{
       const apiBase=await platformApiBase();
-      const targetsResponse=await fetch(apiBase+"/api/v1/example-corpus/index-targets");
+      const targetsResponse=await platformFetch(apiBase+"/api/v1/example-corpus/index-targets");
       if(!targetsResponse.ok) throw new Error("index targets "+targetsResponse.status);
       const targetsPayload=await targetsResponse.json();
       const targetLemmas=targetsPayload.targets?.[videoId];
       if(!Array.isArray(targetLemmas) || !targetLemmas.length) return;
 
-      const response=await fetch(apiBase+"/api/v1/example-corpus/index-cues",{
+      const response=await platformFetch(apiBase+"/api/v1/example-corpus/index-cues",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -2456,7 +2469,7 @@
     }
 
     const apiBase=await platformApiBase();
-    const response=await fetch(apiBase+"/api/v1/example-corpus/index-video",{
+    const response=await platformFetch(apiBase+"/api/v1/example-corpus/index-video",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -2982,7 +2995,7 @@
   function webElementVisible(element){
     if(!element?.isConnected) return false;
     if(element.closest("#gle-shared-panel,#gle-tooltip,#gle-settings-dialog")) return false;
-    if(element.closest("nav,header,footer,aside,form,script,style,noscript,template,pre,code")) return false;
+    if(element.closest("nav,footer,aside,form,script,style,noscript,template,pre,code")) return false;
     const style=getComputedStyle(element);
     if(style.display==="none" || style.visibility==="hidden") return false;
     const rect=element.getBoundingClientRect();
@@ -2992,7 +3005,7 @@
   function collectWebSegments(){
     const root=document.querySelector("article") || document.querySelector("main") || document.querySelector('[role="main"]') || document.body;
     if(!root) return [];
-    const candidates=[...root.querySelectorAll("h1,h2,h3,h4,p,li,blockquote")];
+    const candidates=[...root.querySelectorAll("h1,h2,h3,h4,p,li,blockquote,article header time,article header [class*=category],article header [class*=kicker]")];
     const segments=[];
     const seen=new Set();
 
