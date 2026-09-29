@@ -1,5 +1,7 @@
 const url=document.querySelector("#url");
-const showTranslation=document.querySelector("#showTranslation");
+const showVideoTranslation=document.querySelector("#showVideoTranslation");
+const showPanelTranslation=document.querySelector("#showPanelTranslation");
+const followActiveSubtitle=document.querySelector("#followActiveSubtitle");
 const germanSize=document.querySelector("#germanSize");
 const germanSizeValue=document.querySelector("#germanSizeValue");
 const translationSize=document.querySelector("#translationSize");
@@ -9,10 +11,12 @@ const learningList=document.querySelector("#learningList");
 let learningItems=[];
 let learningProfileId="";
 
-const defaults={platformApiUrl:"http://127.0.0.1:8000",showSentenceTranslation:true,germanFontSize:100,translationFontSize:100};
+const defaults={platformApiUrl:"http://127.0.0.1:8000",showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100};
 chrome.storage.sync.get(defaults,async x=>{
   url.value=x.platformApiUrl;
-  showTranslation.checked=x.showSentenceTranslation;
+  showVideoTranslation.checked=x.showVideoTranslation;
+  showPanelTranslation.checked=x.showPanelTranslation;
+  followActiveSubtitle.checked=x.followActiveSubtitle;
   germanSize.value=x.germanFontSize;
   germanSizeValue.value=x.germanFontSize+"%";
   translationSize.value=x.translationFontSize;
@@ -29,7 +33,9 @@ germanSize.addEventListener("input",()=>germanSizeValue.value=germanSize.value+"
 translationSize.addEventListener("input",()=>sizeValue.value=translationSize.value+"%");
 document.querySelector("#save").onclick=()=>chrome.storage.sync.set({
   platformApiUrl:url.value.trim(),
-  showSentenceTranslation:showTranslation.checked,
+  showVideoTranslation:showVideoTranslation.checked,
+  showPanelTranslation:showPanelTranslation.checked,
+  followActiveSubtitle:followActiveSubtitle.checked,
   germanFontSize:Number(germanSize.value),
   translationFontSize:Number(translationSize.value)
 },()=>{status.textContent="Kaydedildi.";setTimeout(()=>status.textContent="",1500);});
