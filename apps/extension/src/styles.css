@@ -1082,22 +1082,12 @@ html[data-gle-theme="light"] .gle-settings-track{
 }
 
 
-/* YouTube fullscreen with the panel open: define one real left-side content
-   lane and keep both the native video and our subtitle overlay centered in it. */
-.html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .html5-main-video{
-  left:0!important;
-  top:0!important;
-  width:calc(100% - var(--gle-panel-width,420px))!important;
-  max-width:calc(100% - var(--gle-panel-width,420px))!important;
-  height:100%!important;
-  max-height:100%!important;
-  object-fit:contain!important;
-  object-position:center center!important;
-  transform:none!important
-}
+/* YouTube fullscreen with the panel open: leave the native <video> geometry
+   entirely to YouTube. Only align our overlay and player UI to the visible
+   content lane left of the panel. */
 .html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .gle-youtube-overlay{
   left:calc((100% - var(--gle-panel-width,420px))/2)!important;
-  width:min(92%,calc(100% - var(--gle-panel-width,420px) - 24px))!important;
+  width:calc(100% - var(--gle-panel-width,420px) - 24px)!important;
   max-width:calc(100% - var(--gle-panel-width,420px) - 24px)!important
 }
 .html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-caption-window-container,
