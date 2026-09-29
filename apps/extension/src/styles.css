@@ -1094,3 +1094,12 @@ html[data-gle-theme="light"] .gle-settings-track{
 .html5-video-player.gle-panel-player-fullscreen.gle-panel-fullscreen-open .ytp-player-content{
   right:var(--gle-panel-width,420px)!important
 }
+
+
+/* YouTube fullscreen: resize the video viewport, not the <video> element.
+   YouTube remains responsible for fitting the media inside this container. */
+.html5-video-player.gle-panel-player-fullscreen .html5-video-container{
+  width:var(--gle-video-content-width,100%)!important;
+  max-width:var(--gle-video-content-width,100%)!important;
+  right:auto!important
+}
