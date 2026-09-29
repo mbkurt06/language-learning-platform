@@ -230,10 +230,21 @@
 .gle-settings-card{width:min(620px,calc(100vw - 40px));background:#242426;color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.45);font:15px/1.45 system-ui}
 .gle-settings-card header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.14);font-size:18px}
 .gle-settings-close{border:0;background:transparent;color:#fff;font-size:28px;cursor:pointer}
-.gle-settings-body{display:grid;gap:22px;padding:22px}
-.gle-settings-body label:not(.gle-settings-switch){display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
+.gle-settings-body{display:grid;gap:18px;padding:18px 22px 22px;max-height:min(72vh,680px);overflow:auto}
+.gle-settings-section{display:grid;gap:12px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.gle-settings-section:last-child{border-bottom:0;padding-bottom:0}
+.gle-settings-section h3{margin:0;color:#c4b5fd;font:700 12px/1.2 system-ui;text-transform:uppercase;letter-spacing:.06em}
+.gle-settings-section>label:not(.gle-settings-toggle){display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
 .gle-settings-body input[type="range"]{grid-column:1/-1;width:100%}
-.gle-settings-switch{display:flex;gap:10px;align-items:center}
+.gle-settings-toggle{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;cursor:pointer}
+.gle-settings-toggle input{position:absolute;opacity:0;pointer-events:none}
+.gle-settings-copy{display:grid;gap:3px}
+.gle-settings-copy b{font-size:14px;color:#f4f4f5}
+.gle-settings-copy small{font-size:11px;line-height:1.35;color:#a1a1aa}
+.gle-settings-track{width:36px;height:20px;border-radius:999px;background:#52525b;position:relative;transition:.15s}
+.gle-settings-track:after{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.15s}
+.gle-settings-toggle input:checked+.gle-settings-track{background:#7c3aed}
+.gle-settings-toggle input:checked+.gle-settings-track:after{transform:translateX(16px)}
 .gle-extension-disabled .gle-youtube-overlay,.gle-extension-disabled .gle-zdf-overlay,.gle-extension-disabled #gle-zdf-panel{display:none!important}
 .gle-youtube-overlay,.gle-zdf-overlay{--gle-german-font-scale:var(--gle-german-font-scale,1);--gle-translation-font-scale:var(--gle-translation-font-scale,1)}
 
@@ -354,20 +365,23 @@ html.gle-zdf-panel-open .gle-zdf-overlay{
 .gle-master-switch input:checked+span,.gle-translation-switch input:checked+span{background:#7c3aed}
 .gle-master-switch input:checked+span:after,.gle-translation-switch input:checked+span:after{transform:translateX(13px)}
 .gle-header-settings{
-  width:auto!important;padding:0 8px!important;border:1px solid #3f3f46!important;
-  border-radius:7px!important;background:#232329!important;color:#e4e4e7!important;
-  font:600 10px/1 system-ui!important
+  width:40px!important;height:40px!important;padding:0!important;border:1px solid #4b4b55!important;
+  border-radius:9px!important;background:#232329!important;color:#f4f4f5!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  font:700 21px/1 system-ui!important
 }
+.gle-header-settings:hover{background:#2f2f38!important;border-color:#6d28d9!important;color:#fff!important}
 .gle-panel-productbar+.gle-panel-head{height:42px;min-height:42px}
 .gle-panel-productbar+.gle-panel-head .gle-panel-tabs{height:42px}
 
 /* Subtitle-tab translation control and bilingual rows. */
 .gle-transcript-controls{
-  position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:9px 11px;background:#18181d;border-bottom:1px solid #303038;color:#d4d4d8;
   font:600 11px/1 system-ui
 }
-.gle-translation-switch{display:flex;align-items:center;gap:6px;cursor:pointer;color:#a1a1aa;font:600 10px/1 system-ui}
+.gle-transcript-switches{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.gle-translation-switch{display:flex;align-items:center;gap:5px;cursor:pointer;color:#a1a1aa;font:600 10px/1 system-ui;white-space:nowrap}
 .gle-translation-switch input{position:absolute;opacity:0;pointer-events:none}
 .gle-transcript-list{height:auto;min-height:0;overflow:visible}
 .gle-row-text{display:flex!important;flex-direction:column;gap:3px;align-items:flex-start}
