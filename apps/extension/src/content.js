@@ -11,7 +11,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showSentenceTranslation:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -93,7 +93,7 @@
     if(dialog){ dialog.hidden=false; return dialog; }
     dialog=document.createElement("div");
     dialog.id="gle-settings-dialog";
-    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · Ayarlar</strong><button type="button" class="gle-settings-close" aria-label="Kapat">×</button></header><div class="gle-settings-body"><label>Almanca yazı boyutu <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>Türkçe yazı boyutu <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label><label class="gle-settings-switch"><input name="showSentenceTranslation" type="checkbox"> Türkçe çeviriyi göster</label></div></div>';
+    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · Ayarlar</strong><button type="button" class="gle-settings-close" aria-label="Kapat">×</button></header><div class="gle-settings-body"><section class="gle-settings-section"><h3>Genel</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>Language Learning aktif</b><small>Video ve panel özelliklerini birlikte açar veya kapatır.</small></span><input name="extensionEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>Çeviri görünümü</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>Video üstünde Türkçe altyazı</b><small>Videoda Almanca satırın altında Türkçe çeviriyi gösterir.</small></span><input name="showVideoTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>Panelde Türkçe çeviri</b><small>Altyazılar sekmesindeki satırlarda Türkçe çeviriyi gösterir.</small></span><input name="showPanelTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>Aktif altyazıyı otomatik takip et</b><small>Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.</small></span><input name="followActiveSubtitle" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>Yazı boyutu</h3><label>Almanca altyazı <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>Türkçe altyazı <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label></section></div></div>';
     document.documentElement.appendChild(dialog);
     const sync=()=>{
       for(const name of ["germanFontSize","translationFontSize"]){
@@ -101,7 +101,9 @@
         input.value=state.settings[name];
         dialog.querySelector('[data-for="'+name+'"]').textContent=state.settings[name]+"%";
       }
-      dialog.querySelector('[name="showSentenceTranslation"]').checked=state.settings.showSentenceTranslation!==false;
+      for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle"]){
+        dialog.querySelector('[name="'+name+'"]').checked=state.settings[name]!==false;
+      }
     };
     sync();
     dialog.querySelector(".gle-settings-close").addEventListener("click",()=>{dialog.hidden=true;});
@@ -114,10 +116,15 @@
         await chrome.storage.sync.set({[name]:state.settings[name]});
       });
     }
-    dialog.querySelector('[name="showSentenceTranslation"]').addEventListener("change",async event=>{
-      state.settings.showSentenceTranslation=event.target.checked;
-      await chrome.storage.sync.set({showSentenceTranslation:event.target.checked});
-    });
+    for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle"]){
+      dialog.querySelector('[name="'+name+'"]').addEventListener("change",async event=>{
+        state.settings[name]=event.target.checked;
+        await chrome.storage.sync.set({[name]:event.target.checked});
+        if(name==="extensionEnabled") renderPlayerControls();
+        if(name==="showVideoTranslation") refreshVideoTranslations();
+        if(name==="showPanelTranslation" && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
+      });
+    }
     return dialog;
   }
 
@@ -541,7 +548,7 @@
 
   function applySentenceTranslation(node,text,data){
     node.querySelector(".gle-subtitle-translation")?.remove();
-    if(!state.settings.showSentenceTranslation) return;
+    if(!state.settings.showVideoTranslation) return;
     if(!data?.sentence_meaning_tr || node.dataset.gleText!==text) return;
     const translation=cleanTranslationText(data.sentence_meaning_tr);
     if(!translation) return;
@@ -552,7 +559,7 @@
   }
 
   async function renderSentenceTranslation(node,text,translationText=text){
-    if(!state.settings.showSentenceTranslation) {
+    if(!state.settings.showVideoTranslation) {
       node.querySelector(".gle-subtitle-translation")?.remove();
       return;
     }
@@ -560,6 +567,18 @@
       const data=await analyze(translationText);
       applySentenceTranslation(node,text,data);
     }catch(_error){}
+  }
+
+  function refreshVideoTranslations(){
+    document.querySelectorAll(".gle-subtitle-translation").forEach(el=>el.remove());
+    if(!state.settings.showVideoTranslation) return;
+    document.querySelectorAll("[data-gle-text]").forEach(node=>{
+      let translationText=node.dataset.gleText;
+      if(adapter.id==="youtube" && node===state.youtube.germanLine && state.youtube.cues && state.youtube.cueIndex>=0){
+        translationText=globalThis.GLEYoutubeCues.translationTextForCue(state.youtube.cues,state.youtube.cueIndex);
+      }
+      renderSentenceTranslation(node,node.dataset.gleText,translationText);
+    });
   }
 
   function shouldInsertSpace(token,next){
@@ -775,7 +794,7 @@
     node.dataset.gleText=text;
     renderFallbackTokens(node,text);
 
-    const translationPromise=state.settings.showSentenceTranslation
+    const translationPromise=state.settings.showVideoTranslation
       ? analyze(translationText).catch(()=>null)
       : Promise.resolve(null);
     const localAnalysisPromise=analyze(text);
@@ -1150,7 +1169,7 @@
 
     const panel=document.createElement("aside");
     panel.id="gle-youtube-panel";
-    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙ Ayarlar</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning aç/kapat"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>Aktif</em></label><button type="button" class="gle-header-settings" aria-label="Ayarlar" title="Ayarlar">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">Altyazılar</button><button type="button" data-tab="words">Kelimeler</button><button type="button" data-tab="saved">Kaydedilenler</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.youtube.panelHandle;
     if(!handle?.isConnected){
@@ -1202,7 +1221,7 @@
     const active=panel.querySelector('[data-cue-index="'+state.youtube.cueIndex+'"]');
     if(active){
       active.classList.add("active");
-      active.scrollIntoView({block:"nearest"});
+      if(state.settings.followActiveSubtitle!==false) active.scrollIntoView({block:"nearest"});
     }
   }
 
@@ -1455,19 +1474,14 @@
     }
     const controls=document.createElement("div");
     controls.className="gle-transcript-controls";
-    controls.innerHTML='<span>Türkçe çeviri</span><label class="gle-translation-switch"><input type="checkbox" '+(state.settings.showSentenceTranslation!==false?"checked":"")+'><span></span><em>'+(state.settings.showSentenceTranslation!==false?"Göster":"Gizle")+'</em></label>';
-    controls.querySelector("input").addEventListener("change",async event=>{
-      state.settings.showSentenceTranslation=event.target.checked;
-      await chrome.storage.sync.set({showSentenceTranslation:event.target.checked});
-      renderYouTubeSidePanel();
-      if(adapter.id==="zdf"){
-        state.zdf.germanLine?.querySelector(".gle-subtitle-translation")?.remove();
-        if(event.target.checked && state.zdf.cueIndex>=0){
-          const cue=state.zdf.cues?.[state.zdf.cueIndex];
-          if(cue) renderSentenceTranslation(state.zdf.germanLine,cue.text,cue.text);
-        }
-      }
-    });
+    controls.innerHTML='<span>Çeviri</span><div class="gle-transcript-switches"><label class="gle-translation-switch"><em>Video TR</em><input type="checkbox" data-setting="showVideoTranslation" '+(state.settings.showVideoTranslation!==false?"checked":"")+'><span></span></label><label class="gle-translation-switch"><em>Panel TR</em><input type="checkbox" data-setting="showPanelTranslation" '+(state.settings.showPanelTranslation!==false?"checked":"")+'><span></span></label></div>';
+    controls.querySelectorAll("input[data-setting]").forEach(input=>input.addEventListener("change",async event=>{
+      const name=event.target.dataset.setting;
+      state.settings[name]=event.target.checked;
+      await chrome.storage.sync.set({[name]:event.target.checked});
+      if(name==="showVideoTranslation") refreshVideoTranslations();
+      if(name==="showPanelTranslation") renderYouTubeSidePanel();
+    }));
     const list=document.createElement("div");
     list.className="gle-transcript-list";
     cues.forEach((cue,index)=>{
@@ -1476,12 +1490,12 @@
       row.className="gle-transcript-row"+(index===state.youtube.cueIndex?" active":"");
       row.dataset.cueIndex=String(index);
       const cached=state.panelTranslationCache.get(cue.text)||"";
-      row.innerHTML='<span class="gle-row-time">'+panelClock(cue.startMs)+'</span><span class="gle-row-text"><span class="gle-row-source">'+esc(cue.text)+'</span>'+(state.settings.showSentenceTranslation!==false?'<span class="gle-row-translation" data-translation-index="'+index+'">'+esc(cached)+'</span>':"")+'</span><span class="gle-row-play">▶</span>';
+      row.innerHTML='<span class="gle-row-time">'+panelClock(cue.startMs)+'</span><span class="gle-row-text"><span class="gle-row-source">'+esc(cue.text)+'</span>'+(state.settings.showPanelTranslation!==false?'<span class="gle-row-translation" data-translation-index="'+index+'">'+esc(cached)+'</span>':"")+'</span><span class="gle-row-play">▶</span>';
       row.addEventListener("click",()=>playYouTubeCue(index));
       list.appendChild(row);
     });
     body.replaceChildren(controls,list);
-    if(state.settings.showSentenceTranslation!==false) hydratePanelTranslations(list,cues);
+    if(state.settings.showPanelTranslation!==false) hydratePanelTranslations(list,cues);
     updatePanelActiveCue();
   }
 
@@ -2503,7 +2517,7 @@
       state.zdf.cueIndex=cue.index;
       state.youtube.cueIndex=cue.index;
       decorate(ui.germanLine,cue.text);
-      if(state.settings.showSentenceTranslation!==false){
+      if(state.settings.showVideoTranslation!==false){
         renderSentenceTranslation(ui.germanLine,cue.text,cue.text);
       }
       updatePanelActiveCue();
@@ -2623,12 +2637,27 @@
 
   chrome.storage.sync.get({
     extensionEnabled:true,
-    showSentenceTranslation:true,
+    showSentenceTranslation:null,
+    showVideoTranslation:null,
+    showPanelTranslation:null,
+    followActiveSubtitle:true,
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
     zdfSubtitlePositionY:88
   },settings=>{
+    const legacyTranslation=settings.showSentenceTranslation;
+    const migrated={};
+    if(settings.showVideoTranslation===null){
+      settings.showVideoTranslation=legacyTranslation===null?true:legacyTranslation!==false;
+      migrated.showVideoTranslation=settings.showVideoTranslation;
+    }
+    if(settings.showPanelTranslation===null){
+      settings.showPanelTranslation=legacyTranslation===null?true:legacyTranslation!==false;
+      migrated.showPanelTranslation=settings.showPanelTranslation;
+    }
+    delete settings.showSentenceTranslation;
+    if(Object.keys(migrated).length) chrome.storage.sync.set(migrated);
     state.settings=settings;
     if(adapter.id==="zdf" && Number(state.settings.germanFontSize)===100 && Number(state.settings.translationFontSize)===100){
       state.settings.germanFontSize=115;
@@ -2646,22 +2675,15 @@
   chrome.storage.onChanged.addListener((changes,area)=>{
     if(area!=="sync") return;
     if(changes.extensionEnabled) state.settings.extensionEnabled=changes.extensionEnabled.newValue;
-    if(changes.showSentenceTranslation) state.settings.showSentenceTranslation=changes.showSentenceTranslation.newValue;
+    if(changes.showVideoTranslation) state.settings.showVideoTranslation=changes.showVideoTranslation.newValue;
+    if(changes.showPanelTranslation) state.settings.showPanelTranslation=changes.showPanelTranslation.newValue;
+    if(changes.followActiveSubtitle) state.settings.followActiveSubtitle=changes.followActiveSubtitle.newValue;
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
     if(changes.youtubeSubtitlePositionY) state.settings.youtubeSubtitlePositionY=changes.youtubeSubtitlePositionY.newValue;
     applySharedAppearance();
-    if(changes.showSentenceTranslation && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
-
-    document.querySelectorAll(".gle-subtitle-translation").forEach(el=>el.remove());
-    document.querySelectorAll("[data-gle-text]").forEach(node=>{
-      if(!state.settings.showSentenceTranslation) return;
-      let translationText=node.dataset.gleText;
-      if(adapter.id==="youtube" && node===state.youtube.germanLine && state.youtube.cues && state.youtube.cueIndex>=0){
-        translationText=globalThis.GLEYoutubeCues.translationTextForCue(state.youtube.cues,state.youtube.cueIndex);
-      }
-      renderSentenceTranslation(node,node.dataset.gleText,translationText);
-    });
+    if(changes.showPanelTranslation && state.youtube.panelTab==="subtitles") renderYouTubeSidePanel();
+    if(changes.showVideoTranslation) refreshVideoTranslations();
   });
 
   document.addEventListener("mousemove",event=>{
