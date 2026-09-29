@@ -1206,3 +1206,17 @@ html[data-gle-theme="light"] .gle-settings-track{
     0 0 14px rgba(216,180,254,.58)!important;
   filter:brightness(1.16) saturate(1.18)!important
 }
+
+
+/* ZDF compensation: its provider layout already contributes an extra inset.
+   Keep the shared visual style, but close the remaining ~10px gap so the
+   handle sits flush against the rendered panel edge like YouTube. */
+html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  left:calc(var(--gle-panel-handle-left,30px) - 30px)!important;
+  right:auto!important
+}
+:fullscreen.gle-zdf-fullscreen-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed),
+.gle-zdf-fullscreen-panel-open:fullscreen #gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  left:calc(var(--gle-panel-handle-left,30px) - 30px)!important;
+  right:auto!important
+}
