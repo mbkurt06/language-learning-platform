@@ -1206,9 +1206,12 @@
 
       if(open){
         const viewportWidth=fullscreenRoot?.getBoundingClientRect().width || innerWidth || 1;
-        const panelWidth=fullscreenRoot
+        const basePanelWidth=fullscreenRoot
           ? Math.min(420,Math.max(320,viewportWidth*0.30))
           : Math.min(408,Math.max(320,viewportWidth*0.30));
+        const factor=clamp(Number(state.settings.panelWidthFactor)||1,0.6,1.1);
+        const panelWidth=Math.min(viewportWidth*0.45,Math.max(220,basePanelWidth*factor));
+        document.documentElement.style.setProperty("--gle-panel-base-width",basePanelWidth+"px");
         document.documentElement.style.setProperty("--gle-panel-current-width",panelWidth+"px");
         video?.classList.add("gle-zdf-video-panel-open");
         video?.style.removeProperty("--gle-zdf-video-scale");
