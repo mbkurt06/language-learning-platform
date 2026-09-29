@@ -666,6 +666,16 @@
     const dictionaryMeanings=h.dictionary_meanings_tr||[];
     const sourceToken=(data.tokens||[]).find(token=>token.i===tokenIndex);
     const lemma=sourceToken?.lemma||sourceToken?.text||"";
+    if(!expr && lexical?.article){
+      const entry=(state.youtube.transcriptAnalysis||[]).find(item=>
+        String(item.lemma||"").toLocaleLowerCase("de-DE")===String(lemma||"").toLocaleLowerCase("de-DE")
+      );
+      if(entry){
+        entry.article=sanitizeLearningText(lexical.article||entry.article||"");
+        entry.singular=sanitizeLearningText(lexical.singular||entry.singular||lemma);
+        entry.plural=sanitizeLearningText(lexical.plural||entry.plural||"");
+      }
+    }
 
     const nounLabel=lexical?.article
       ? sanitizeLearningText(lexical.singular||lemma).replace(/^./u,ch=>ch.toLocaleUpperCase("de-DE"))
@@ -2784,8 +2794,13 @@
     const prefixes=["zurück","zusammen","weiter","statt","teil","fest","fort","nach","nieder","vor","weg","ab","an","auf","aus","bei","ein","her","hin","los","mit","zu"];
     const prefix=prefixes.find(value=>joined.startsWith(value) && joined.length>value.length+2);
     if(prefix){
-      const token=(tokens||[]).find(t=>normalizeLearningIdentity(t.text)===prefix || normalizeLearningIdentity(t.lemma)===prefix);
-      if(token) indices.add(token.i);
+      const particle=(tokens||[]).find(t=>normalizeLearningIdentity(t.text)===prefix || normalizeLearningIdentity(t.lemma)===prefix);
+      if(particle) indices.add(particle.i);
+      const mainLemma=joined.slice(prefix.length);
+      if(mainLemma){
+        const main=(tokens||[]).find(t=>normalizeLearningIdentity(t.lemma)===mainLemma || normalizeLearningIdentity(t.text)===mainLemma);
+        if(main) indices.add(main.i);
+      }
     }
     return [...indices];
   }
@@ -2989,6 +3004,26 @@
     return {word,segmentIndex,range,rect:range.getBoundingClientRect(),start,absoluteStart:textNodeOffsetWithinElement(element,node,start)};
   }
 
+  async function showWebSentenceTooltip(text,range){
+    if(adapter.id!=="web" || !text || !range) return;
+    const cleaned=sanitizeLearningText(text);
+    if(!cleaned || cleaned.split(/\s+/).length<2) return;
+    state.web.tooltipPinnedKey="sentence:"+cleaned;
+    cancelTooltipHide();
+    try{
+      const data=await analyze(cleaned);
+      const meaning=cleanTranslationText(data?.sentence_meaning_tr||"");
+      const rect=range.getBoundingClientRect();
+      state.tooltip.innerHTML=
+        '<div class="gle-hover-head"><b>Cümle</b><span>Seçili metin</span></div>'+
+        '<div class="gle-context gle-context-primary"><b>Almanca:</b> '+esc(cleaned)+'</div>'+
+        (meaning?'<div class="gle-context"><b>Türkçe:</b> '+esc(meaning)+'</div>':'<div class="gle-note">Çeviri bulunamadı.</div>');
+      state.tooltip.hidden=false;
+      state.tooltip.style.left=Math.min(window.innerWidth-370,Math.max(8,rect.left))+"px";
+      state.tooltip.style.top=Math.max(8,rect.top-state.tooltip.offsetHeight-10)+"px";
+    }catch(_error){}
+  }
+
   async function showWebWordTooltip(hit,pinned=false){
     if(adapter.id!=="web" || !hit) return;
     const pinKey=hit.segmentIndex+":"+hit.word+":"+hit.absoluteStart;
@@ -3027,12 +3062,27 @@
     },true);
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const selection=window.getSelection();
+      if(selection && !selection.isCollapsed && sanitizeLearningText(selection.toString()).split(/\s+/).length>=2) return;
       const hit=webWordHitAtPoint(event.clientX,event.clientY);
       if(hit){showWebWordTooltip(hit,true);return;}
       state.web.tooltipPinnedKey="";
       state.web.hoverKey="";
       cancelTooltipHide();
       if(state.tooltip) state.tooltip.hidden=true;
+    },true);
+    document.addEventListener("mouseup",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const selection=window.getSelection();
+      if(!selection || selection.isCollapsed || !selection.rangeCount) return;
+      const text=sanitizeLearningText(selection.toString());
+      if(text.split(/\s+/).length<2) return;
+      const range=selection.getRangeAt(0);
+      const common=range.commonAncestorContainer.nodeType===Node.ELEMENT_NODE
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+      if(!common || !state.web.segments.some(segment=>segment.sourceElement?.contains(common) || common.contains?.(segment.sourceElement))) return;
+      showWebSentenceTooltip(text,range);
     },true);
     window.addEventListener("resize",()=>{ syncSharedPanelHost(); scheduleWebLearningAnnotations(); },{passive:true});
   }
