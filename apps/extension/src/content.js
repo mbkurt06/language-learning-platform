@@ -45,7 +45,7 @@
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
-    playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:""},
+    playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:""},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -204,6 +204,7 @@
         if(name==="showVideoTranslation") refreshVideoTranslations();
         if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
         if(name==="pauseOnWordHover" && !event.target.checked) finishSubtitleHoverPause();
+        if(name==="autoPauseAfterSentence" && !event.target.checked){ state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; }
       });
     }
     return dialog;
@@ -749,10 +750,27 @@
     });
   }
 
+  function autoPauseCueKey(provider,cue){
+    return provider+":"+String(cue?.index ?? "");
+  }
+
+  function noteAutoPausePlaybackResume(provider,video,cues){
+    if(state.settings.autoPauseAfterSentence!==true || !video || !state.playback.autoPausedCueKey) return;
+    const cue=cueAtTime(cues,video.currentTime*1000);
+    const key=cue ? autoPauseCueKey(provider,cue) : "";
+    if(key && key===state.playback.autoPausedCueKey){
+      state.playback.autoPauseReleasedCueKey=key;
+    }
+  }
+
   function maybeAutoPauseCue(video,cue,provider){
     if(state.settings.autoPauseAfterSentence!==true || !video || !cue || video.paused) return;
-    const key=provider+":"+String(cue.index);
-    if(state.playback.autoPausedCueKey===key) return;
+    const key=autoPauseCueKey(provider,cue);
+    if(state.playback.autoPausedCueKey===key || state.playback.autoPauseReleasedCueKey===key) return;
+    if(state.playback.autoPauseReleasedCueKey && state.playback.autoPauseReleasedCueKey!==key){
+      state.playback.autoPauseReleasedCueKey="";
+      state.playback.autoPausedCueKey="";
+    }
     const remaining=cue.endMs-(video.currentTime*1000);
     if(remaining<=90 && remaining>=-40){
       state.playback.autoPausedCueKey=key;
@@ -2475,6 +2493,9 @@
 
     state.youtube.video=video;
     state.youtube.videoListeners=event=>{
+      if(event?.type==="play"){
+        noteAutoPausePlaybackResume("youtube",video,state.youtube.cues);
+      }
       const horizon=event?.type==="seeking" || event?.type==="seeked" ? 5 : 2;
       renderTimedCue(undefined,horizon);
     };
@@ -2803,7 +2824,12 @@
       }
     }
     state.zdf.video=video;
-    state.zdf.videoListeners=()=>renderZdfCue();
+    state.zdf.videoListeners=event=>{
+      if(event?.type==="play"){
+        noteAutoPausePlaybackResume("zdf",video,state.zdf.cues);
+      }
+      renderZdfCue();
+    };
     ["timeupdate","seeking","seeked","play","pause","ratechange"].forEach(type=>
       video.addEventListener(type,state.zdf.videoListeners)
     );
@@ -2953,7 +2979,7 @@
       state.settings.pauseOnWordHover=changes.pauseOnWordHover.newValue;
       if(changes.pauseOnWordHover.newValue!==true) finishSubtitleHoverPause();
     }
-    if(changes.autoPauseAfterSentence){ state.settings.autoPauseAfterSentence=changes.autoPauseAfterSentence.newValue; state.playback.autoPausedCueKey=""; }
+    if(changes.autoPauseAfterSentence){ state.settings.autoPauseAfterSentence=changes.autoPauseAfterSentence.newValue; state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; }
     if(changes.interfaceLanguage){
       state.settings.interfaceLanguage=changes.interfaceLanguage.newValue||"tr";
       updateSharedPanelUi();
