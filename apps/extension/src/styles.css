@@ -1429,3 +1429,115 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
   background:#facc15;
   color:#111827;
 }
+
+
+/* PR #128 batch UX: generic web layout, direct learning annotations and export controls */
+html.gle-web-panel-open body{
+  box-sizing:border-box!important;
+  width:calc(100vw - var(--gle-web-panel-space,0px))!important;
+  max-width:calc(100vw - var(--gle-web-panel-space,0px))!important;
+  overflow-x:hidden!important;
+}
+html:not(.gle-web-panel-open) body{
+  max-width:none;
+}
+.gle-header-reset{
+  width:32px;
+  height:32px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:inherit;
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+}
+.gle-header-reset:hover{background:rgba(124,58,237,.16)}
+.gle-learn-actions{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+}
+.gle-learn-button{
+  min-width:34px;
+  height:30px;
+  padding:0 9px;
+  border:1px solid #3f3f46;
+  border-radius:8px;
+  background:#18181b;
+  color:#d4d4d8;
+  cursor:pointer;
+  font:800 15px/1 system-ui,-apple-system,sans-serif;
+}
+.gle-learn-button:hover{
+  border-color:#8b5cf6;
+  color:#fff;
+}
+.gle-learn-star.active{
+  color:#fbbf24;
+  border-color:#a16207;
+  background:rgba(251,191,36,.12);
+}
+.gle-learn-known.active{
+  color:#fff;
+  border-color:#8b5cf6;
+  background:rgba(124,58,237,.24);
+}
+.gle-word-star.active,
+.gle-expression-star.active{
+  color:#fbbf24!important;
+  border-color:#a16207!important;
+  background:rgba(251,191,36,.12)!important;
+}
+.gle-web-learning-layer{
+  position:fixed;
+  inset:0;
+  z-index:2147482500;
+  pointer-events:none;
+  overflow:visible;
+}
+.gle-web-learning-label{
+  position:fixed;
+  transform:translateY(-2px);
+  max-width:220px;
+  padding:2px 5px;
+  border-radius:5px;
+  background:rgba(250,204,21,.96);
+  color:#111827;
+  box-shadow:0 1px 5px rgba(0,0,0,.18);
+  font:700 10px/1.15 system-ui,-apple-system,sans-serif;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  pointer-events:none;
+}
+::highlight(gle-learning-web){
+  background:rgba(250,204,21,.55);
+  color:inherit;
+}
+::highlight(gle-saved-target){
+  background:#facc15;
+  color:#111827;
+}
+.gle-export-sections{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:10px 16px;
+  border-top:1px solid rgba(148,163,184,.14);
+  border-bottom:1px solid rgba(148,163,184,.14);
+}
+.gle-export-sections label{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding:6px 9px;
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:999px;
+  cursor:pointer;
+  font-size:12px;
+}
+.gle-export-items span b{
+  font-size:11px;
+  color:#a78bfa;
+}
