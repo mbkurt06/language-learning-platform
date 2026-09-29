@@ -3199,6 +3199,19 @@
     const range=document.createRange();
     range.setStart(node,start);
     range.setEnd(node,end);
+
+    // caretPositionFromPoint/caretRangeFromPoint may snap an empty-space click
+    // to the nearest text node. Only accept the hit when the pointer is
+    // physically inside the rendered word bounds.
+    const rects=[...range.getClientRects()];
+    const tolerance=2;
+    const insideWord=rects.some(rect=>
+      rect.width>0 && rect.height>0 &&
+      x>=rect.left-tolerance && x<=rect.right+tolerance &&
+      y>=rect.top-tolerance && y<=rect.bottom+tolerance
+    );
+    if(!insideWord) return null;
+
     return {word,segmentIndex,range,rect:range.getBoundingClientRect(),start,absoluteStart:textNodeOffsetWithinElement(element,node,start)};
   }
 
