@@ -44,7 +44,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"system",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,interfaceLanguage:"tr",theme:"dark",germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -1236,6 +1236,7 @@
       player.style.setProperty("--gle-panel-width",panelWidth+"px");
       player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed");
       player.classList.add("gle-panel-player-fullscreen");
+      player.classList.toggle("gle-panel-fullscreen-open",!state.panel.collapsed);
       requestAnimationFrame(()=>syncPanelHandleGeometry(panel));
       return;
     }
@@ -1246,7 +1247,7 @@
     state.panel.docked=false;
     panel.classList.remove("docked","gle-provider-panel-layout","gle-youtube-fullscreen-panel");
     panel.classList.add("gle-youtube-external-panel");
-    player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen");
+    player.classList.remove("gle-panel-docked","gle-panel-docked-collapsed","gle-panel-player-fullscreen","gle-panel-fullscreen-open");
     player.style.removeProperty("--gle-panel-width");
     player.style.removeProperty("--gle-video-scale");
 
@@ -2389,8 +2390,10 @@
       prefetchYouTubeAnalyses(currentCue?.index ?? 0);
       renderTimedCue();
     }catch(_error){
-      state.youtube.timedAvailable=false;
-      state.youtube.cues=null;
+      if(!state.youtube.cues?.length){
+        state.youtube.timedAvailable=false;
+        state.youtube.cues=null;
+      }
     }
   }
 
@@ -2754,7 +2757,7 @@
     showPanelTranslation:null,
     followActiveSubtitle:true,
     interfaceLanguage:"tr",
-    theme:"system",
+    theme:"dark",
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
