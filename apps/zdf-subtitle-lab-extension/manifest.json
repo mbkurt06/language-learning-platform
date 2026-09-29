@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ZDF Subtitle Lab",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Independent lab extension for testing ZDF VOD and Live subtitle acquisition.",
   "permissions": ["storage"],
   "host_permissions": [
@@ -22,7 +22,6 @@
     },
     {
       "matches": ["https://www.zdf.de/*"],
-      "css": ["styles.css"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
