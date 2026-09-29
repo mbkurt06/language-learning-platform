@@ -45,7 +45,7 @@
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
-    playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:""},
+    playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:"",autoPauseTimer:null,autoPauseScheduledKey:""},
     learningItems:[],
     learningProfileId:null,
     encounterCaptureKeys:new Set(),
@@ -204,7 +204,7 @@
         if(name==="showVideoTranslation") refreshVideoTranslations();
         if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
         if(name==="pauseOnWordHover" && !event.target.checked) finishSubtitleHoverPause();
-        if(name==="autoPauseAfterSentence" && !event.target.checked){ state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; }
+        if(name==="autoPauseAfterSentence" && !event.target.checked){ state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; clearAutoPauseTimer(); }
       });
     }
     return dialog;
@@ -763,6 +763,12 @@
     }
   }
 
+  function clearAutoPauseTimer(){
+    clearTimeout(state.playback.autoPauseTimer);
+    state.playback.autoPauseTimer=null;
+    state.playback.autoPauseScheduledKey="";
+  }
+
   function maybeAutoPauseCue(video,cue,provider){
     if(state.settings.autoPauseAfterSentence!==true || !video || !cue || video.paused) return;
     const key=autoPauseCueKey(provider,cue);
@@ -771,11 +777,24 @@
       state.playback.autoPauseReleasedCueKey="";
       state.playback.autoPausedCueKey="";
     }
-    const remaining=cue.endMs-(video.currentTime*1000);
-    if(remaining<=90 && remaining>=-40){
+    if(state.playback.autoPauseScheduledKey===key) return;
+
+    clearAutoPauseTimer();
+    const remainingMs=Math.max(0,cue.endMs-(video.currentTime*1000));
+    const playbackRate=Math.max(0.1,Number(video.playbackRate)||1);
+    state.playback.autoPauseScheduledKey=key;
+    state.playback.autoPauseTimer=setTimeout(()=>{
+      state.playback.autoPauseTimer=null;
+      state.playback.autoPauseScheduledKey="";
+      if(state.settings.autoPauseAfterSentence!==true || video.paused) return;
+      if(state.playback.autoPausedCueKey===key || state.playback.autoPauseReleasedCueKey===key) return;
+      if((video.currentTime*1000)+8<cue.endMs){
+        maybeAutoPauseCue(video,cue,provider);
+        return;
+      }
       state.playback.autoPausedCueKey=key;
       video.pause();
-    }
+    },Math.ceil(remainingMs/playbackRate)+8);
   }
 
   function renderAnalyzedTokens(node,text,data,hoverData=data){
@@ -2496,6 +2515,7 @@
       if(event?.type==="play"){
         noteAutoPausePlaybackResume("youtube",video,state.youtube.cues);
       }
+      if(event?.type==="seeking") clearAutoPauseTimer();
       const horizon=event?.type==="seeking" || event?.type==="seeked" ? 5 : 2;
       renderTimedCue(undefined,horizon);
     };
@@ -2828,6 +2848,7 @@
       if(event?.type==="play"){
         noteAutoPausePlaybackResume("zdf",video,state.zdf.cues);
       }
+      if(event?.type==="seeking") clearAutoPauseTimer();
       renderZdfCue();
     };
     ["timeupdate","seeking","seeked","play","pause","ratechange"].forEach(type=>
@@ -2979,7 +3000,7 @@
       state.settings.pauseOnWordHover=changes.pauseOnWordHover.newValue;
       if(changes.pauseOnWordHover.newValue!==true) finishSubtitleHoverPause();
     }
-    if(changes.autoPauseAfterSentence){ state.settings.autoPauseAfterSentence=changes.autoPauseAfterSentence.newValue; state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; }
+    if(changes.autoPauseAfterSentence){ state.settings.autoPauseAfterSentence=changes.autoPauseAfterSentence.newValue; state.playback.autoPausedCueKey=""; state.playback.autoPauseReleasedCueKey=""; if(changes.autoPauseAfterSentence.newValue!==true) clearAutoPauseTimer(); }
     if(changes.interfaceLanguage){
       state.settings.interfaceLanguage=changes.interfaceLanguage.newValue||"tr";
       updateSharedPanelUi();
