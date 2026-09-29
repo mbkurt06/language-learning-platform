@@ -2666,38 +2666,33 @@
 
     body.querySelectorAll(".gle-word-chip").forEach(button=>{
       const entry=analysis.find(item=>item.lemma===button.dataset.lemma);
-      let hoverTimer=null;
-      button.addEventListener("mouseenter",()=>{
-        hoverTimer=setTimeout(()=>showPanelWordTooltip(button,entry),180);
+      button.addEventListener("click",event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        showPanelWordTooltip(button,entry);
       });
-      button.addEventListener("mouseleave",event=>{
-        clearTimeout(hoverTimer);
-        const next=event.relatedTarget;
-        if(next && state.tooltip?.contains(next)) return;
-        scheduleTooltipHide(850);
-      });
-      button.addEventListener("click",()=>{
-        state.panel.selectedLemma=button.dataset.lemma;
-        renderSharedPanel();
+      button.addEventListener("dblclick",event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        if(adapter.id!=="web" || !entry?.occurrences?.length) return;
+        const item={kind:"word",key:entry.lemma,label:entry.lemma,meaning_tr:entry.meaningTr||""};
+        focusSavedOccurrence(item,entry.occurrences[0]);
       });
     });
 
     body.querySelectorAll(".gle-expression-chip").forEach(button=>{
       const entry=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===button.dataset.groupKey);
-      let hoverTimer=null;
-      button.addEventListener("mouseenter",()=>{
-        hoverTimer=setTimeout(()=>showPanelExpressionTooltip(button,entry),180);
+      button.addEventListener("click",event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        showPanelExpressionTooltip(button,entry);
       });
-      button.addEventListener("mouseleave",event=>{
-        clearTimeout(hoverTimer);
-        const next=event.relatedTarget;
-        if(next && state.tooltip?.contains(next)) return;
-        scheduleTooltipHide(850);
-      });
-      button.addEventListener("click",()=>{
-        state.panel.selectedGroupKey=button.dataset.groupKey;
-        state.panel.selectedLemma="";
-        renderSharedPanel();
+      button.addEventListener("dblclick",event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        if(adapter.id!=="web" || !entry?.occurrences?.length) return;
+        const item={kind:"expression",key:entry.patternId||entry.canonical,label:entry.canonical,meaning_tr:entry.meaningTr||""};
+        focusSavedOccurrence(item,entry.occurrences[0]);
       });
     });
 
@@ -3227,6 +3222,38 @@
     }catch(_error){}
   }
 
+  async function webLearningItemForHit(hit){
+    if(adapter.id!=="web" || !hit) return null;
+    const segment=state.web.segments?.[hit.segmentIndex];
+    if(!segment?.text) return null;
+    let data=null;
+    try{ data=await analyze(segment.text); }catch(_error){ return null; }
+    const wanted=hit.word.toLocaleLowerCase("de-DE");
+    const token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+      (data.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+    if(!token) return null;
+
+    const related=(data.hover?.[String(token.i)]||data.hover?.[token.i]||{}).primary_expressions||[];
+    for(const expr of related){
+      const key=expr.pattern_id||expr.canonical;
+      const item=state.learningItems.find(existing=>
+        itemStatus(existing)==="learning" &&
+        existing.kind==="expression" &&
+        (normalizeLearningIdentity(existing.key)===normalizeLearningIdentity(key) ||
+         normalizeLearningIdentity(existing.label)===normalizeLearningIdentity(expr.canonical))
+      );
+      if(item) return item;
+    }
+
+    const lemma=String(token.lemma||token.text||"").toLocaleLowerCase("de-DE");
+    return state.learningItems.find(existing=>
+      itemStatus(existing)==="learning" &&
+      existing.kind==="word" &&
+      (String(existing.key||"").toLocaleLowerCase("de-DE")===lemma ||
+       String(existing.label||"").toLocaleLowerCase("de-DE")===lemma)
+    ) || null;
+  }
+
   async function showWebWordTooltip(hit,pinned=false){
     if(adapter.id!=="web" || !hit) return;
     const pinKey=hit.segmentIndex+":"+hit.word+":"+hit.absoluteStart;
@@ -3257,18 +3284,36 @@
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
       const hit=webWordHitAtPoint(event.clientX,event.clientY);
       const key=hit ? hit.segmentIndex+":"+hit.word+":"+hit.absoluteStart : "";
-      if(!hit){ state.web.hoverKey=""; clearTimeout(state.web.hoverTimer); scheduleTooltipHide(500); return; }
+      if(!hit){
+        state.web.hoverKey="";
+        clearTimeout(state.web.hoverTimer);
+        scheduleTooltipHide(350);
+        return;
+      }
       if(key===state.web.hoverKey) return;
       state.web.hoverKey=key;
       clearTimeout(state.web.hoverTimer);
-      state.web.hoverTimer=setTimeout(()=>showWebWordTooltip(hit,false),320);
+      state.web.hoverTimer=setTimeout(async()=>{
+        const learningItem=await webLearningItemForHit(hit);
+        if(!learningItem){
+          if(!state.web.tooltipPinnedKey) scheduleTooltipHide(120);
+          return;
+        }
+        showWebWordTooltip(hit,false);
+      },260);
     },true);
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
       const selection=window.getSelection();
-      if(selection && !selection.isCollapsed && sanitizeLearningText(selection.toString()).split(/\s+/).length>=2) return;
+      if(selection && !selection.isCollapsed){
+        const selected=sanitizeLearningText(selection.toString());
+        if(selected.split(/\s+/).length>=2) return;
+      }
       const hit=webWordHitAtPoint(event.clientX,event.clientY);
-      if(hit){showWebWordTooltip(hit,true);return;}
+      if(hit){
+        showWebWordTooltip(hit,true);
+        return;
+      }
       state.web.tooltipPinnedKey="";
       state.web.hoverKey="";
       cancelTooltipHide();
