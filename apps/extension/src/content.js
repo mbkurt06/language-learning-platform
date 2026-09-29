@@ -60,6 +60,7 @@
       wordsView:"overview",
       wordsSearch:"",
       savedView:"all",
+      savedOccurrencePositions:{},
       senseRows:null,
       senseRowsVideoId:"",
       senseRowsPromise:null,
@@ -335,6 +336,7 @@
       meaning_tr:translation?.meaning||"",
       status:item.status||"learning",
       encounters:item.encounters||[],
+      metadata:item.metadata||{},
     };
   }
 
@@ -529,6 +531,57 @@
     if(!response.ok && response.status!==404) throw new Error("Platform API learning item "+response.status);
     await loadLearningItems();
   }
+
+  function itemStatus(item){
+    return item?.status==="learned" || item?.status==="known" ? "learned" : "learning";
+  }
+
+  async function setLearningStatus(payload,status){
+    const kind=payload.kind||"word";
+    const key=String(payload.key||"").toLocaleLowerCase("de-DE");
+    if(!key) return;
+    const existing=state.learningItems.find(item=>learningKey(item.kind,item.key)===learningKey(kind,key));
+    if(existing && itemStatus(existing)===status){
+      await removeLearningItem(kind,key);
+      return;
+    }
+    const profileId=state.learningProfileId || await ensureLearningProfile();
+    const apiBase=await platformApiBase();
+    const metadata={
+      ...(existing?.metadata||{}),
+      source:"chrome-extension",
+      saved:existing?.metadata?.saved!==false,
+      content_source:existing?.metadata?.content_source||currentContentDescriptor(),
+    };
+    const response=await platformFetch(apiBase+"/api/v1/learning-items",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        profile_id:profileId,
+        canonical_form:payload.label||existing?.label||key,
+        canonical_key:key,
+        category:kind,
+        status,
+        meaning:payload.meaning_tr||existing?.meaning_tr||null,
+        meaning_language:(payload.meaning_tr||existing?.meaning_tr)?"tr":null,
+        metadata,
+      }),
+    });
+    if(!response.ok) throw new Error("learning status "+response.status);
+    await loadLearningItems();
+  }
+
+  async function setSavedFlag(item,saved){
+    if(!item?.id) return;
+    if(saved){
+      await setLearningStatus({
+        kind:item.kind,key:item.key,label:item.label,meaning_tr:item.meaning_tr
+      },itemStatus(item));
+      return;
+    }
+    await removeLearningItem(item.kind,item.key);
+  }
+
 
   function renderCard(data, tokenIndex, anchor){
     cancelTooltipHide();
@@ -1918,9 +1971,13 @@
     const chips=entries.map(entry=>{
       const learning=Boolean(learningItemForLemma(entry.lemma));
       const unknown=state.youtube.videoUnknownLemmas.has(entry.lemma);
+      const item=learningItemForLemma(entry.lemma);
+      const status=itemStatus(item);
       return '<div class="gle-word-chip-wrap'+(unknown?" unknown":"")+'">'+
-        '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+(learning?"★ ":"")+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
-        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Altyazıda anlam gösterimini kapat":"Bu kelimenin anlamını altyazıda göster")+'">'+(unknown?"✓":"+")+'</button>'+
+        '<button type="button" class="gle-word-chip'+(learning?" learning":"")+'" data-lemma="'+escAttr(entry.lemma)+'"><span>'+esc(entry.lemma)+'</span><b>'+entry.count+'×</b></button>'+
+        '<button type="button" class="gle-word-status '+(item&&status==="learning"?"active":"")+'" data-word-learning="'+escAttr(entry.lemma)+'" title="Öğreniyorum">Ö</button>'+
+        '<button type="button" class="gle-word-status '+(item&&status==="learned"?"active":"")+'" data-word-known="'+escAttr(entry.lemma)+'" title="Biliyorum">✓</button>'+
+        '<button type="button" class="gle-word-mark'+(unknown?" active":"")+'" data-mark-lemma="'+escAttr(entry.lemma)+'" title="'+(unknown?"Altyazıda anlam gösterimini kapat":"Bu kelimenin anlamını altyazıda göster")+'">'+(unknown?"Aa":"a")+'</button>'+
       '</div>';
     }).join("");
     return '<section class="gle-word-group"><h3>'+esc(title)+'</h3><div class="gle-word-grid">'+chips+'</div></section>';
@@ -1991,11 +2048,16 @@
         const videoUnknown=state.youtube.videoUnknownExpressions.has(
           String(entry.patternId||entry.canonical||"").toLocaleLowerCase("de-DE")
         );
+        const savedItem=state.learningItems.find(item=>item.kind==="expression" &&
+          [entry.patternId,entry.canonical].map(value=>String(value||"").toLocaleLowerCase("de-DE")).includes(String(item.key||"").toLocaleLowerCase("de-DE")));
+        const status=itemStatus(savedItem);
         return '<div class="gle-expression-chip-wrap'+(videoUnknown?" unknown":"")+'">'+
           '<button type="button" class="gle-expression-chip'+(learning?" learning":"")+'" data-group-key="'+escAttr(entry.key)+'">'+
-            '<span>'+(learning?"★ ":"")+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
+            '<span>'+esc(entry.canonical)+'</span><b>'+entry.count+'×</b>'+
           '</button>'+
-          '<button type="button" class="gle-expression-learn'+(videoUnknown?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(videoUnknown?"Bu video için anlam gösterimini kapat":"Bu video için anlamını altyazıda göster")+'">'+(videoUnknown?"✓":"+")+'</button>'+
+          '<button type="button" class="gle-expression-status '+(savedItem&&status==="learning"?"active":"")+'" data-expression-learning="'+escAttr(entry.key)+'" title="Öğreniyorum">Ö</button>'+
+          '<button type="button" class="gle-expression-status '+(savedItem&&status==="learned"?"active":"")+'" data-expression-known="'+escAttr(entry.key)+'" title="Biliyorum">✓</button>'+
+          '<button type="button" class="gle-expression-learn'+(videoUnknown?" active":"")+'" data-group-learn-key="'+escAttr(entry.key)+'" title="'+(videoUnknown?"Bu video için anlam gösterimini kapat":"Bu video için anlamını altyazıda göster")+'">'+(videoUnknown?"Aa":"a")+'</button>'+
         '</div>';
       }).join("");
       return '<div class="gle-expression-subgroup"><h4>'+esc(expressionGroupLabel(type))+'</h4><div class="gle-expression-grid">'+chips+'</div></div>';
@@ -2225,29 +2287,12 @@
   }
 
   async function setSenseStatus(row,status){
-    const profileId=state.learningProfileId || await ensureLearningProfile();
-    const apiBase=await platformApiBase();
-    const response=await platformFetch(apiBase+"/api/v1/learning-items",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        profile_id:profileId,
-        canonical_form:row.canonical,
-        canonical_key:row.key,
-        category:"learning-unit",
-        status,
-        meaning:row.meaningTr,
-        meaning_language:"tr",
-        metadata:{
-          source:"chrome-extension",
-          cue_index:row.cueIndex,
-          sense_id:row.senseId||null,
-          pattern_id:row.patternId||null,
-        },
-      }),
-    });
-    if(!response.ok) throw new Error("word sense status "+response.status);
-    await loadLearningItems();
+    await setLearningStatus({
+      kind:"learning-unit",
+      key:row.key,
+      label:row.canonical,
+      meaning_tr:row.meaningTr,
+    },status);
   }
 
   function renderWordSenseTable(body){
@@ -2346,6 +2391,29 @@
       });
     });
 
+    const bindExpressionStatus=(selector,status,dataKey)=>body.querySelectorAll(selector).forEach(button=>{
+      button.addEventListener("click",async event=>{
+        event.stopPropagation();
+        const entry=(state.youtube.expressionGroupsAnalysis||[]).find(item=>item.key===button.dataset[dataKey]);
+        if(!entry) return;
+        button.disabled=true;
+        try{
+          await setLearningStatus({
+            kind:"expression",
+            key:entry.patternId||entry.canonical,
+            label:entry.canonical,
+            meaning_tr:entry.meaningTr||"",
+          },status);
+          renderSharedPanel();
+        }catch(error){
+          console.warn("Expression status failed",error);
+          button.disabled=false;
+        }
+      });
+    });
+    bindExpressionStatus("[data-expression-learning]","learning","expressionLearning");
+    bindExpressionStatus("[data-expression-known]","learned","expressionKnown");
+
     body.querySelectorAll(".gle-expression-learn").forEach(button=>{
       button.addEventListener("click",async event=>{
         event.stopPropagation();
@@ -2360,6 +2428,24 @@
         }
       });
     });
+
+    const bindWordStatus=(selector,status,dataKey)=>body.querySelectorAll(selector).forEach(button=>{
+      button.addEventListener("click",async event=>{
+        event.stopPropagation();
+        const lemma=button.dataset[dataKey];
+        if(!lemma) return;
+        button.disabled=true;
+        try{
+          await setLearningStatus({kind:"word",key:lemma,label:lemma},status);
+          renderSharedPanel();
+        }catch(error){
+          console.warn("Word status failed",error);
+          button.disabled=false;
+        }
+      });
+    });
+    bindWordStatus("[data-word-learning]","learning","wordLearning");
+    bindWordStatus("[data-word-known]","learned","wordKnown");
 
     body.querySelectorAll(".gle-word-mark").forEach(button=>{
       button.addEventListener("click",event=>{
@@ -2442,6 +2528,12 @@
 
   function learningItemSavedFromCurrentContent(item){
     const descriptor=currentContentDescriptor();
+    const source=item?.metadata?.content_source||{};
+    if(
+      String(source.provider||"")===descriptor.provider &&
+      String(source.externalId||source.external_id||"")===String(descriptor.externalId||"")
+    ) return true;
+    if(String(source.url||"") && String(source.url)===String(descriptor.url||"")) return true;
     const encounters=Array.isArray(item?.encounters)?item.encounters:[];
     return encounters.some(encounter=>{
       const provider=String(encounter.provider||"");
@@ -2461,7 +2553,89 @@
       const present=currentContentLearningKeys();
       return all.filter(item=>present.has(learningKey(item.kind,item.key)));
     }
+    if(state.panel.savedView==="learning") return all.filter(item=>itemStatus(item)==="learning");
+    if(state.panel.savedView==="known") return all.filter(item=>itemStatus(item)==="learned");
     return all;
+  }
+
+  function contentOccurrencesForLearningItem(item){
+    const wantedKey=String(item?.key||"").toLocaleLowerCase("de-DE");
+    const wantedLabel=String(item?.label||"").toLocaleLowerCase("de-DE");
+    const word=(state.youtube.transcriptAnalysis||[]).find(entry=>{
+      const lemma=String(entry.lemma||"").toLocaleLowerCase("de-DE");
+      return lemma===wantedKey || lemma===wantedLabel;
+    });
+    const expression=(state.youtube.expressionGroupsAnalysis||[]).find(entry=>{
+      const pattern=String(entry.patternId||"").toLocaleLowerCase("de-DE");
+      const canonical=String(entry.canonical||"").toLocaleLowerCase("de-DE");
+      return pattern===wantedKey || canonical===wantedKey || canonical===wantedLabel;
+    });
+    const sense=(state.panel.senseRows||[]).find(row=>
+      String(row.key||"").toLocaleLowerCase("de-DE")===wantedKey ||
+      String(row.canonical||"").toLocaleLowerCase("de-DE")===wantedLabel ||
+      String(row.lemma||"").toLocaleLowerCase("de-DE")===wantedLabel
+    );
+    return [...new Set([
+      ...(expression?.occurrences||[]),
+      ...(word?.occurrences||[]),
+      ...(sense?.occurrences||[]),
+    ])].sort((a,b)=>a-b);
+  }
+
+  function focusSavedOccurrence(item,cueIndex){
+    playYouTubeCue(cueIndex);
+    if(adapter.id==="web"){
+      const word=(state.youtube.transcriptAnalysis||[]).find(entry=>
+        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.key||item?.label||"").toLocaleLowerCase("de-DE") ||
+        String(entry.lemma||"").toLocaleLowerCase("de-DE")===String(item?.label||"").toLocaleLowerCase("de-DE")
+      );
+      const forms=word?.forms?.length ? word.forms : [item?.label,item?.key].filter(Boolean);
+      requestAnimationFrame(()=>highlightWebTarget(cueIndex,forms));
+    }
+  }
+
+  function highlightWebTarget(cueIndex,forms){
+    if(adapter.id!=="web") return;
+    const segment=state.web.segments?.[cueIndex];
+    const element=segment?.sourceElement;
+    if(!element?.isConnected) return;
+    if(!CSS?.highlights || typeof Highlight==="undefined") return;
+    const candidates=(forms||[]).map(value=>String(value||"").trim()).filter(Boolean).sort((a,b)=>b.length-a.length);
+    if(!candidates.length) return;
+    const walker=document.createTreeWalker(element,NodeFilter.SHOW_TEXT);
+    const ranges=[];
+    while(walker.nextNode()){
+      const node=walker.currentNode;
+      const text=String(node.nodeValue||"");
+      const lower=text.toLocaleLowerCase("de-DE");
+      for(const form of candidates){
+        const needle=form.toLocaleLowerCase("de-DE");
+        let start=0;
+        while(needle && (start=lower.indexOf(needle,start))!==-1){
+          const range=document.createRange();
+          range.setStart(node,start);
+          range.setEnd(node,start+form.length);
+          ranges.push(range);
+          start+=Math.max(1,form.length);
+        }
+        if(ranges.length) break;
+      }
+    }
+    CSS.highlights.delete("gle-saved-target");
+    if(ranges.length) CSS.highlights.set("gle-saved-target",new Highlight(...ranges));
+  }
+
+  function navigateSavedItem(item,direction=0){
+    const id=learningKey(item.kind,item.key);
+    const occurrences=contentOccurrencesForLearningItem(item);
+    if(!occurrences.length) return;
+    let position=Number(state.panel.savedOccurrencePositions[id]||0);
+    if(direction>0) position=(position+1)%occurrences.length;
+    if(direction<0) position=(position-1+occurrences.length)%occurrences.length;
+    position=Math.max(0,Math.min(position,occurrences.length-1));
+    state.panel.savedOccurrencePositions[id]=position;
+    focusSavedOccurrence(item,occurrences[position]);
+    renderSharedPanel();
   }
 
   function renderPanelSaved(body){
@@ -2471,24 +2645,35 @@
       ["all","Tüm Kaydedilenler"],
       ["from-content","Bu İçerikten Kaydedilenler"],
       ["present-content","Bu İçerikte Geçenler"],
+      ["learning","Öğreniyorum"],
+      ["known","Biliyorum"],
     ];
     const toolbar='<div class="gle-saved-filters">'+tabs.map(([id,label])=>
       '<button type="button" data-saved-view="'+id+'" class="'+(state.panel.savedView===id?"active":"")+'">'+esc(label)+'</button>'
     ).join("")+'</div>';
     if(!items.length){
-      body.innerHTML=toolbar+'<div class="gle-panel-empty"><b>Bu görünümde kayıt yok.</b><span>Filtreyi değiştir veya bu içerikten yeni bir öğe kaydet.</span></div>';
+      body.innerHTML=toolbar+'<div class="gle-panel-empty"><b>Bu görünümde kayıt yok.</b><span>Filtreyi değiştir veya bu içerikten yeni bir öğe işaretle.</span></div>';
     }else{
       body.innerHTML=toolbar+'<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>kayıt</span></div>'+
         '<div class="gle-saved-list">'+items.map(item=>{
-          const present=presentKeys.has(learningKey(item.kind,item.key));
+          const itemKey=learningKey(item.kind,item.key);
+          const present=presentKeys.has(itemKey);
           const fromHere=learningItemSavedFromCurrentContent(item);
           const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
-          const status=item.status==="learned"||item.status==="known"?"Biliyorum":"Öğreniyorum";
+          const status=itemStatus(item)==="learned"?"Biliyorum":"Öğreniyorum";
           const flags=[type,status];
           if(fromHere) flags.push("Bu içerikten");
           if(present) flags.push("Bu içerikte");
-          return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(learningKey(item.kind,item.key))+'">'+
-            '<span><strong>★ '+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(flags.join(" · "))+'</em></span>'+
+          const occurrences=contentOccurrencesForLearningItem(item);
+          const pos=Math.min(Number(state.panel.savedOccurrencePositions[itemKey]||0),Math.max(0,occurrences.length-1));
+          return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(itemKey)+'">'+
+            '<button type="button" class="gle-saved-main" data-saved-open="'+escAttr(itemKey)+'"><strong>'+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(flags.join(" · "))+'</em></button>'+
+            '<div class="gle-saved-row-actions">'+
+              (occurrences.length?'<div class="gle-saved-nav"><button type="button" data-saved-prev="'+escAttr(itemKey)+'" title="Önceki kullanım">‹</button><span>'+(pos+1)+'/'+occurrences.length+'</span><button type="button" data-saved-next="'+escAttr(itemKey)+'" title="Sonraki kullanım">›</button></div>':'')+
+              '<button type="button" class="gle-saved-star active" data-saved-remove="'+escAttr(itemKey)+'" title="Kaydedilenlerden çıkar">★</button>'+
+              '<button type="button" class="gle-saved-status '+(itemStatus(item)==="learning"?"active":"")+'" data-saved-learning="'+escAttr(itemKey)+'" title="Öğreniyorum">Ö</button>'+
+              '<button type="button" class="gle-saved-status '+(itemStatus(item)==="learned"?"active":"")+'" data-saved-known="'+escAttr(itemKey)+'" title="Biliyorum">✓</button>'+
+            '</div>'+
           '</div>';
         }).join("")+'</div>';
     }
@@ -2496,6 +2681,31 @@
       state.panel.savedView=button.dataset.savedView||"all";
       renderSharedPanel();
     }));
+    const findItem=key=>state.learningItems.find(item=>learningKey(item.kind,item.key)===key);
+    body.querySelectorAll("[data-saved-open]").forEach(button=>button.addEventListener("click",()=>{
+      const item=findItem(button.dataset.savedOpen); if(item) navigateSavedItem(item,0);
+    }));
+    body.querySelectorAll("[data-saved-prev]").forEach(button=>button.addEventListener("click",event=>{
+      event.stopPropagation(); const item=findItem(button.dataset.savedPrev); if(item) navigateSavedItem(item,-1);
+    }));
+    body.querySelectorAll("[data-saved-next]").forEach(button=>button.addEventListener("click",event=>{
+      event.stopPropagation(); const item=findItem(button.dataset.savedNext); if(item) navigateSavedItem(item,1);
+    }));
+    body.querySelectorAll("[data-saved-remove]").forEach(button=>button.addEventListener("click",async()=>{
+      const item=findItem(button.dataset.savedRemove); if(!item) return;
+      button.disabled=true;
+      try{ await setSavedFlag(item,false); renderSharedPanel(); }catch(error){console.warn("Saved remove failed",error);button.disabled=false;}
+    }));
+    const bindSavedStatus=(selector,status,dataKey)=>body.querySelectorAll(selector).forEach(button=>button.addEventListener("click",async()=>{
+      const item=findItem(button.dataset[dataKey]); if(!item) return;
+      button.disabled=true;
+      try{
+        await setLearningStatus({kind:item.kind,key:item.key,label:item.label,meaning_tr:item.meaning_tr},status);
+        renderSharedPanel();
+      }catch(error){console.warn("Saved status failed",error);button.disabled=false;}
+    }));
+    bindSavedStatus("[data-saved-learning]","learning","savedLearning");
+    bindSavedStatus("[data-saved-known]","learned","savedKnown");
   }
 
   function csvCell(value){
@@ -2503,12 +2713,40 @@
     return '"'+text.replace(/"/g,'""')+'"';
   }
 
+  function exportTimestamp(){
+    const now=new Date();
+    const pad=value=>String(value).padStart(2,"0");
+    return now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate())+"_"+pad(now.getHours())+"-"+pad(now.getMinutes());
+  }
+
+  function exportSectionName(){
+    if(state.panel.tab==="saved"){
+      return ({
+        all:"Kaydedilenler",
+        "from-content":"Bu_Icerikten_Kaydedilenler",
+        "present-content":"Bu_Icerikte_Gecenler",
+        learning:"Ogreniyorum",
+        known:"Biliyorum",
+      })[state.panel.savedView] || "Kaydedilenler";
+    }
+    if(state.panel.tab==="words"){
+      return ({
+        overview:"Kelimeler",
+        alphabetical:"Kelimeler_A-Z",
+        frequency:"Kelimeler_Siklik",
+        groups:"Kelime_Gruplari",
+        senses:"Anlamlar",
+      })[state.panel.wordsView] || "Kelimeler";
+    }
+    return "Cumleler";
+  }
+
   function safeExportName(){
     const raw=(adapter.id==="youtube" ? currentYouTubeTitle() : document.title || "language-learning")
       .replace(/\s+/g," ").trim()
       .replace(/[\\/:*?"<>|]+/g,"-")
-      .slice(0,90);
-    return raw || "language-learning";
+      .slice(0,72);
+    return (raw || "language-learning")+"-"+exportSectionName()+"-"+exportTimestamp();
   }
 
   async function translationForCue(cue){
@@ -2581,55 +2819,52 @@
   function exportRecordForItem(exportItem,sentenceMode="bilingual"){
     if(exportItem.kind==="saved"){
       const item=exportItem.item;
+      const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
       return {
-        type:item.kind||"",
-        item:item.label||item.key||"",
-        meaning_tr:item.meaning_tr||"",
-        status:item.status||"",
-        key:item.key||"",
+        "Kelime / İfade":item.label||item.key||"",
+        "Türkçe anlam":item.meaning_tr||"",
+        "Tür":type,
+        "Durum":itemStatus(item)==="learned"?"Biliyorum":"Öğreniyorum",
       };
     }
     if(exportItem.kind==="sense"){
       const row=exportItem.row;
       return {
-        type:"learning-unit",
-        item:row.canonical||row.lemma||"",
-        meaning_tr:row.meaningTr||"",
-        unit_type:row.unitType||"",
-        surface:row.surface||"",
-        occurrences:(row.occurrences||[]).length,
+        "Kelime / İfade":row.canonical||row.lemma||"",
+        "Türkçe anlam":row.meaningTr||"",
+        "Tür":row.unitType||"Anlam/Kullanım",
+        "İçerikteki biçim":row.surface||"",
+        "Geçiş sayısı":(row.occurrences||[]).length,
       };
     }
     if(exportItem.kind==="group"){
       const entry=exportItem.entry;
       return {
-        type:"expression",
-        item:entry.canonical||"",
-        expression_type:expressionGroupLabel(entry.type),
-        meaning_tr:entry.meaningTr||"",
-        forms:(entry.forms||[]).join(", "),
-        frequency:entry.count||0,
+        "İfade":entry.canonical||"",
+        "Tür":expressionGroupLabel(entry.type),
+        "Türkçe anlam":entry.meaningTr||"",
+        "İçerikteki biçimler":(entry.forms||[]).join(", "),
+        "Sıklık":entry.count||0,
       };
     }
     if(exportItem.kind==="word"){
       const entry=exportItem.entry;
       const learning=learningItemForLemma(entry.lemma);
       return {
-        type:"word",
-        lemma:entry.lemma||"",
-        pos:entry.pos||"",
-        forms:(entry.forms||[]).join(", "),
-        frequency:entry.count||0,
-        status:learning?.status||"",
-        meaning_tr:learning?.meaning_tr||"",
+        "Kelime":entry.lemma||"",
+        "Kelime türü":posLabel(entry.pos||""),
+        "İçerikteki biçimler":(entry.forms||[]).join(", "),
+        "Sıklık":entry.count||0,
+        "Türkçe anlam":learning?.meaning_tr||"",
+        "Durum":learning?(itemStatus(learning)==="learned"?"Biliyorum":"Öğreniyorum"):"",
       };
     }
     const cue=exportItem.cue;
     return {
-      index:exportItem.index+1,
-      original:sentenceMode==="translation"?"":cue.text,
-      translation:"",
-      position:adapter.id==="web" ? String(exportItem.index+1) : panelClock(cue.startMs),
+      "Sıra":exportItem.index+1,
+      "Almanca":sentenceMode==="translation"?"":cue.text,
+      "Türkçe":"",
+      "Konum":adapter.id==="web" ? String(exportItem.index+1) : panelClock(cue.startMs),
     };
   }
 
@@ -2682,16 +2917,16 @@
     for(const item of selected){
       const record=exportRecordForItem(item,sentenceMode);
       if(item.kind==="sentence" && sentenceMode!=="original"){
-        record.translation=await translationForCue(item.cue);
+        record["Türkçe"]=await translationForCue(item.cue);
       }
       if(item.kind==="sentence" && sentenceMode==="translation"){
-        delete record.original;
+        delete record["Almanca"];
       }else if(item.kind==="sentence" && sentenceMode==="original"){
-        delete record.translation;
+        delete record["Türkçe"];
       }
       records.push(record);
     }
-    const base=safeExportName()+"-"+state.panel.tab;
+    const base=safeExportName();
     if(format==="json"){
       downloadTextFile(base+".json","application/json;charset=utf-8",JSON.stringify(records,null,2));
       return;
@@ -3212,10 +3447,15 @@
     if(!cues?.length || !ui) return false;
     const seconds=Number.isFinite(mediaTime)?mediaTime:ui.video.currentTime;
     let cue=cueAtTime(cues,seconds*1000);
-    if(!cue && ui.video.paused && state.playback.autoPausedCueKey.startsWith("zdf:")){
-      const heldIndex=Number(state.playback.autoPausedCueKey.slice(4));
+    if(!cue){
+      const holdKey=state.playback.autoPausedCueKey.startsWith("zdf:")
+        ? state.playback.autoPausedCueKey
+        : state.playback.autoPauseScheduledKey.startsWith("zdf:")
+          ? state.playback.autoPauseScheduledKey
+          : "";
+      const heldIndex=holdKey ? Number(holdKey.slice(4)) : NaN;
       const heldCue=Number.isInteger(heldIndex) ? cues[heldIndex] : null;
-      if(heldCue) cue=heldCue;
+      if(heldCue && seconds*1000<=Number(heldCue.endMs||0)+850) cue=heldCue;
     }
     if(!cue){
       ui.overlay.hidden=true;
