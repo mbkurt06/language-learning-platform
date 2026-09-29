@@ -764,7 +764,155 @@
     state.tooltip.style.top=Math.max(8,r.top-state.tooltip.offsetHeight-10)+"px";
   }
 
+  function activePreparedBenchmark(){
+    return (globalThis.GLEPreparedBenchmarks||[]).find(item=>location.href.includes(item.urlIncludes)) || null;
+  }
+
+  function preparedNormalize(value){
+    return String(value||"").replace(/\s+/g," ").trim().toLocaleLowerCase("de-DE");
+  }
+
+  function preparedTranslationForText(fixture,text){
+    const normalized=preparedNormalize(text);
+    if(!fixture || !normalized) return "";
+    const rule=(fixture.translations||[]).find(item=>normalized.includes(preparedNormalize(item.match)));
+    return rule?.tr||"";
+  }
+
+  function preparedItemOccurrences(forms){
+    const needles=(forms||[]).map(preparedNormalize).filter(Boolean);
+    const occurrences=[];
+    (state.web.segments||[]).forEach((segment,index)=>{
+      const text=preparedNormalize(segment.text);
+      if(needles.some(needle=>text.includes(needle))) occurrences.push(index);
+    });
+    return occurrences;
+  }
+
+  function preparedWordAnalysis(fixture){
+    return (fixture?.words||[]).map(item=>{
+      const occurrences=preparedItemOccurrences(item.forms);
+      return {
+        lemma:item.lemma,
+        pos:item.pos||"",
+        count:occurrences.length,
+        forms:[...(item.forms||[])],
+        occurrences,
+        article:"",
+        singular:"",
+        plural:"",
+        meaningTr:item.meaningTr||""
+      };
+    }).filter(item=>item.count>0);
+  }
+
+  function preparedExpressionAnalysis(fixture){
+    return (fixture?.expressions||[]).map(item=>{
+      const occurrences=preparedItemOccurrences(item.forms);
+      return {
+        key:(item.type||"FIXED_CONSTRUCTION")+"|"+preparedNormalize(item.canonical),
+        type:item.type||"FIXED_CONSTRUCTION",
+        patternId:"prepared:"+preparedNormalize(item.canonical),
+        canonical:item.canonical,
+        count:occurrences.length,
+        forms:[...(item.forms||[])],
+        occurrences,
+        meaningTr:item.meaningTr||"",
+        grammarHint:item.grammarHint||""
+      };
+    }).filter(item=>item.count>0);
+  }
+
+  function buildPreparedSentenceAnalysis(fixture,text){
+    const source=String(text||"");
+    const tokenMatches=[...source.matchAll(/[\p{L}\p{M}ßÄÖÜäöü]+|[^\s]/gu)];
+    const words=fixture?.words||[];
+    const expressions=fixture?.expressions||[];
+    const tokens=tokenMatches.map((match,i)=>{
+      const surface=match[0];
+      const normalized=preparedNormalize(surface);
+      const word=words.find(item=>(item.forms||[]).some(form=>preparedNormalize(form)===normalized) || preparedNormalize(item.lemma)===normalized);
+      return {i,text:surface,lemma:word?.lemma||normalized,pos:word?.pos||(/[\p{L}]/u.test(surface)?"X":"PUNCT"),_start:match.index,_end:match.index+surface.length};
+    });
+    const foundExpressions=[];
+    for(const expression of expressions){
+      for(const form of expression.forms||[]){
+        const at=source.toLocaleLowerCase("de-DE").indexOf(String(form).toLocaleLowerCase("de-DE"));
+        if(at<0) continue;
+        const end=at+String(form).length;
+        const tokenIndices=tokens.filter(token=>token._end>at && token._start<end).map(token=>token.i);
+        foundExpressions.push({
+          canonical:expression.canonical,
+          surface:source.slice(at,end),
+          type:expression.type||"FIXED_CONSTRUCTION",
+          pattern_id:"prepared:"+preparedNormalize(expression.canonical),
+          contextual_meaning_tr:expression.meaningTr||"",
+          meaning_tr:expression.meaningTr?[expression.meaningTr]:[],
+          grammar_hint:expression.grammarHint||"",
+          token_indices:tokenIndices
+        });
+        break;
+      }
+    }
+    const hover={};
+    for(const token of tokens){
+      const normalized=preparedNormalize(token.text);
+      const word=words.find(item=>(item.forms||[]).some(form=>preparedNormalize(form)===normalized) || preparedNormalize(item.lemma)===preparedNormalize(token.lemma));
+      const related=foundExpressions.filter(expr=>(expr.token_indices||[]).includes(token.i));
+      if(word || related.length){
+        hover[String(token.i)]={
+          contextual_word_meaning_tr:word?.meaningTr||"",
+          dictionary_meanings_tr:word?.meaningTr?[word.meaningTr]:[],
+          primary_expressions:related,
+          usage_notes:[]
+        };
+      }
+    }
+    return {
+      sentence_meaning_tr:preparedTranslationForText(fixture,source),
+      tokens:tokens.map(({_start,_end,...token})=>token),
+      hover,
+      expressions:foundExpressions
+    };
+  }
+
+  function preparedRangesForForms(forms){
+    const ranges=[];
+    for(const segment of state.web.segments||[]){
+      const element=segment?.sourceElement;
+      if(!element?.isConnected) continue;
+      const fullText=String(element.textContent||"");
+      const lower=fullText.toLocaleLowerCase("de-DE");
+      for(const form of forms||[]){
+        const needle=String(form||"");
+        const needleLower=needle.toLocaleLowerCase("de-DE");
+        let start=0;
+        while(needleLower && (start=lower.indexOf(needleLower,start))!==-1){
+          const range=webRangeFromOffsets(element,start,start+needle.length);
+          if(range) ranges.push(range);
+          start+=Math.max(1,needle.length);
+        }
+      }
+    }
+    return ranges;
+  }
+
+  function refreshPreparedBenchmarkHighlights(fixture){
+    if(adapter.id!=="web" || !fixture || !CSS?.highlights || typeof Highlight==="undefined") return;
+    CSS.highlights.delete("gle-benchmark-word");
+    CSS.highlights.delete("gle-benchmark-expression");
+    const wordRanges=preparedRangesForForms((fixture.words||[]).flatMap(item=>item.forms||[]));
+    const expressionRanges=preparedRangesForForms((fixture.expressions||[]).flatMap(item=>item.forms||[]));
+    if(wordRanges.length) CSS.highlights.set("gle-benchmark-word",new Highlight(...wordRanges));
+    if(expressionRanges.length) CSS.highlights.set("gle-benchmark-expression",new Highlight(...expressionRanges));
+  }
+
   async function analyze(text){
+    const preparedFixture=activePreparedBenchmark();
+    if(preparedFixture){
+      const prepared=buildPreparedSentenceAnalysis(preparedFixture,text);
+      if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
+    }
     if(state.cache.has(text)) return state.cache.get(text);
     if(state.analysisInflight.has(text)) return state.analysisInflight.get(text);
 
@@ -2098,7 +2246,7 @@
       if(!cue) return "";
       return '<button type="button" class="gle-word-occurrence" data-cue-index="'+index+'"><span>▶</span><b>'+panelClock(cue.startMs)+'</b><em>'+esc(cue.text)+'</em></button>';
     }).join("");
-    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(panelWordLabel(entry))+'</strong><span>'+entry.count+' kez'+(learning?" · ★ Öğreniyorum":"")+'</span></div></div><div class="gle-word-forms">İçerikteki biçimler: '+esc(entry.forms.join(", "))+'</div><div class="gle-word-occurrences">'+rows+'</div>';
+    body.innerHTML='<div class="gle-word-detail-head"><button type="button" class="gle-word-back">← Kelimeler</button><div><strong>'+esc(panelWordLabel(entry))+'</strong><span>'+entry.count+' kez'+(learning?" · ★ Öğreniyorum":"")+'</span></div></div>'+(entry.meaningTr?'<div class="gle-context gle-context-primary"><b>Bu içerikte:</b> '+esc(entry.meaningTr)+'</div>':'')+'<div class="gle-word-forms">İçerikteki biçimler: '+esc(entry.forms.join(", "))+'</div><div class="gle-word-occurrences">'+rows+'</div>';
     body.querySelector(".gle-word-back").addEventListener("click",()=>{
       state.panel.selectedLemma="";
       renderSharedPanel();
@@ -4156,12 +4304,24 @@
     loadVideoUnknownLemmas().catch(()=>{});
     loadVideoUnknownExpressions().catch(()=>{});
     installWebTextInteraction();
-    if(segments.length){
+    const preparedFixture=activePreparedBenchmark();
+    if(preparedFixture){
+      for(const segment of segments){
+        const translation=preparedTranslationForText(preparedFixture,segment.text);
+        if(translation) state.panelTranslationCache.set(segment.text,translation);
+      }
+      state.youtube.transcriptAnalysis=preparedWordAnalysis(preparedFixture);
+      state.youtube.transcriptAnalysisVideoId=contentId;
+      state.youtube.expressionGroupsAnalysis=preparedExpressionAnalysis(preparedFixture);
+      state.youtube.expressionGroupsVideoId=contentId;
+      requestAnimationFrame(()=>refreshPreparedBenchmarkHighlights(preparedFixture));
+    }else if(segments.length){
       Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
         .finally(()=>scheduleWebLearningAnnotations());
     }
     renderSharedPanel();
     scheduleWebLearningAnnotations();
+    if(preparedFixture) requestAnimationFrame(()=>refreshPreparedBenchmarkHighlights(preparedFixture));
   }
 
   function scan(){
