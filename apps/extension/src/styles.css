@@ -1160,3 +1160,30 @@ html[data-gle-theme="light"] .gle-settings-track{
   background:rgba(233,213,255,.70)!important;
   border-color:rgba(124,58,237,.78)!important
 }
+
+
+/* Final shared panel-handle geometry: anchor the open handle to the panel's
+   actual rendered left edge so every provider protrudes by the full handle
+   width, regardless of provider-specific right insets. */
+#gle-panel-edge-handle.gle-panel-edge-handle:not(.collapsed){
+  left:calc(var(--gle-panel-handle-left,30px) - 30px)!important;
+  right:auto!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle.collapsed{
+  left:auto!important;
+  right:0!important
+}
+
+/* Keep the resting handle subtle, then make hover clearly brighter. */
+#gle-panel-edge-handle.gle-panel-edge-handle{
+  background:rgba(216,180,254,.46)!important;
+  border-color:rgba(124,58,237,.58)!important;
+  color:rgba(76,29,149,.88)!important;
+  box-shadow:-3px 0 10px rgba(0,0,0,.18)!important
+}
+#gle-panel-edge-handle.gle-panel-edge-handle:hover{
+  background:rgba(243,232,255,.94)!important;
+  border-color:rgba(139,92,246,.98)!important;
+  color:#4c1d95!important;
+  box-shadow:-4px 0 16px rgba(124,58,237,.34)!important
+}
