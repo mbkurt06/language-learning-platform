@@ -1317,3 +1317,19 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
 .gle-export-go{background:#7c3aed;color:white;border-color:#7c3aed!important}
 .gle-saved-global{cursor:default}
 .gle-saved-global em{display:block;margin-top:3px;font-size:11px;color:#94a3b8;font-style:normal}
+
+
+/* Saved filters */
+.gle-saved-filters{
+  display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;
+  border-bottom:1px solid rgba(148,163,184,.18);
+}
+.gle-saved-filters button{
+  border:1px solid rgba(148,163,184,.24);
+  background:transparent;color:inherit;border-radius:999px;
+  padding:6px 9px;font-size:11px;cursor:pointer;
+}
+.gle-saved-filters button.active{
+  background:rgba(124,58,237,.2);
+  border-color:rgba(124,58,237,.55);
+}

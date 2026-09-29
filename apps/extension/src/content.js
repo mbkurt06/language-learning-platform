@@ -59,6 +59,7 @@
       docked:false,
       wordsView:"overview",
       wordsSearch:"",
+      savedView:"all",
       senseRows:null,
       senseRowsVideoId:"",
       senseRowsPromise:null,
@@ -435,7 +436,7 @@
         status:"learning",
         meaning:normalized.meaning_tr||null,
         meaning_language:normalized.meaning_tr?"tr":null,
-        metadata:{source:"chrome-extension"},
+        metadata:{source:"chrome-extension",content_source:currentContentDescriptor()},
       }),
     });
     if(!response.ok) throw new Error("Platform API learning item "+response.status);
@@ -445,39 +446,49 @@
     return created;
   }
 
-  function currentYouTubeEncounter(surfaceForm){
-    if(adapter.id!=="youtube") return null;
-    const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v");
-    if(!videoId) return null;
+  function currentContentDescriptor(){
+    if(adapter.id==="youtube"){
+      const videoId=state.youtube.videoId || new URL(location.href).searchParams.get("v") || "";
+      return {provider:"youtube",sourceType:"video",externalId:videoId,url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId)};
+    }
+    if(adapter.id==="zdf"){
+      return {provider:"zdf",sourceType:"video",externalId:state.zdf.videoId||location.href,url:location.href};
+    }
+    if(adapter.id==="web"){
+      return {provider:"web",sourceType:"article",externalId:location.href,url:location.href};
+    }
+    return {provider:adapter.id||"web",sourceType:"page",externalId:location.href,url:location.href};
+  }
 
-    const cue=state.youtube.cues?.[state.youtube.cueIndex] || null;
-    const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
+  function currentContentEncounter(surfaceForm){
+    const descriptor=currentContentDescriptor();
+    if(!descriptor.externalId) return null;
+    const cue=state.youtube.cues?.[state.youtube.cueIndex] || state.zdf.cues?.[state.zdf.cueIndex] || null;
+    const video=adapter.id==="youtube"
+      ? (state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video"))
+      : adapter.id==="zdf"
+        ? (state.zdf.video || document.querySelector("video"))
+        : null;
     const fallbackStart=Math.max(0,Math.round((video?.currentTime||0)*1000));
     const startMs=Number.isFinite(cue?.startMs) ? Math.round(cue.startMs) : fallbackStart;
-    const endMs=Number.isFinite(cue?.endMs) && cue.endMs>startMs
-      ? Math.round(cue.endMs)
-      : startMs+5000;
-    const sentence=cue?.text || state.youtube.germanLine?.dataset.gleText || "";
-
+    const endMs=Number.isFinite(cue?.endMs) && cue.endMs>startMs ? Math.round(cue.endMs) : startMs+5000;
+    const sentence=cue?.text || state.youtube.germanLine?.dataset.gleText || state.zdf.germanLine?.dataset.gleText || "";
     return {
       surface_form:surfaceForm,
       sentence,
-      provider:"youtube",
-      source_type:"video",
-      external_id:videoId,
-      url:"https://www.youtube.com/watch?v="+encodeURIComponent(videoId),
-      title:document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim() || null,
-      media_timestamp_ms:startMs,
-      media_end_timestamp_ms:endMs,
-      context:{
-        cue_index:cue?.index ?? null,
-        page_url:location.href,
-      },
+      provider:descriptor.provider,
+      source_type:descriptor.sourceType,
+      external_id:descriptor.externalId,
+      url:descriptor.url,
+      title:(adapter.id==="youtube" ? document.title.replace(/\s*-\s*YouTube\s*$/u,"").trim() : document.title.trim()) || null,
+      media_timestamp_ms:video ? startMs : null,
+      media_end_timestamp_ms:video ? endMs : null,
+      context:{cue_index:cue?.index ?? null,page_url:location.href},
     };
   }
 
   async function captureCurrentEncounter(learningItemId,surfaceForm,encounterSnapshot=null){
-    const encounter=encounterSnapshot || currentYouTubeEncounter(surfaceForm);
+    const encounter=encounterSnapshot || currentContentEncounter(surfaceForm);
     if(!encounter || !encounter.sentence) return;
     const apiBase=await platformApiBase();
     const response=await platformFetch(apiBase+"/api/v1/encounters",{
@@ -498,7 +509,7 @@
     if(state.encounterCaptureKeys.has(key)) return;
     state.encounterCaptureKeys.add(key);
 
-    const snapshot=currentYouTubeEncounter(surfaceForm);
+    const snapshot=currentContentEncounter(surfaceForm);
     if(!snapshot){
       state.encounterCaptureKeys.delete(key);
       return;
@@ -789,6 +800,23 @@
     clearTimeout(state.playback.autoPauseTimer);
     state.playback.autoPauseTimer=null;
     state.playback.autoPauseScheduledKey="";
+  }
+
+  function maybeAutoPausePreviousCueAtTransition(video,cues,currentCue,provider){
+    if(state.settings.autoPauseAfterSentence!==true || !video || video.paused || video.seeking) return false;
+    const previousIndex=state.youtube.cueIndex;
+    if(previousIndex<0 || previousIndex===currentCue?.index) return false;
+    const previous=cues?.[previousIndex];
+    if(!previous) return false;
+    const previousKey=autoPauseCueKey(provider,previous);
+    if(state.playback.autoPausedCueKey===previousKey || state.playback.autoPauseReleasedCueKey===previousKey) return false;
+    const nowMs=video.currentTime*1000;
+    const drift=nowMs-Number(previous.endMs||0);
+    if(drift < -40 || drift > 750) return false;
+    clearAutoPauseTimer();
+    state.playback.autoPausedCueKey=previousKey;
+    video.pause();
+    return true;
   }
 
   function maybeAutoPauseCue(video,cue,provider){
@@ -1629,7 +1657,7 @@
     const cues=state.youtube.cues||[];
     const first=cues[0];
     const last=cues[cues.length-1];
-    return "gleExpressionGroups:v2:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
+    return "gleExpressionGroups:v3:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
   }
 
   async function analyzeWholeYouTubeExpressionGroups(){
@@ -1670,14 +1698,16 @@
         const grouped=new Map();
         for(const {item,cueIndex} of items){
           for(const expression of item.expressions||[]){
-            const key=String(expression.type||"")+"|"+String(expression.pattern_id||expression.canonical||"");
+            const canonical=String(expression.canonical||expression.surface||"").trim();
+            const type=String(expression.type||"");
+            const key=type+"|"+canonical.toLocaleLowerCase("de-DE");
             let entry=grouped.get(key);
             if(!entry){
               entry={
                 key,
-                type:String(expression.type||""),
+                type,
                 patternId:String(expression.pattern_id||""),
-                canonical:String(expression.canonical||expression.surface||""),
+                canonical,
                 count:0,
                 forms:new Set(),
                 occurrences:[],
@@ -1685,10 +1715,16 @@
                 grammarHint:expression.grammar_hint || "",
               };
               grouped.set(key,entry);
+            }else{
+              if(!entry.patternId && expression.pattern_id) entry.patternId=String(expression.pattern_id);
+              if(!entry.meaningTr) entry.meaningTr=expression.contextual_meaning_tr || (expression.meaning_tr||[])[0] || "";
+              if(!entry.grammarHint && expression.grammar_hint) entry.grammarHint=expression.grammar_hint;
             }
-            entry.count+=1;
             if(expression.surface) entry.forms.add(String(expression.surface));
-            if(!entry.occurrences.includes(cueIndex)) entry.occurrences.push(cueIndex);
+            if(!entry.occurrences.includes(cueIndex)){
+              entry.occurrences.push(cueIndex);
+              entry.count+=1;
+            }
           }
         }
 
@@ -1715,7 +1751,7 @@
     const cues=state.youtube.cues||[];
     const first=cues[0];
     const last=cues[cues.length-1];
-    return "gleTranscriptAnalysis:v2:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
+    return "gleTranscriptAnalysis:v3:"+state.youtube.videoId+":"+cues.length+":"+Math.round(first?.startMs||0)+":"+Math.round(last?.endMs||0);
   }
 
   async function analyzeWholeYouTubeTranscript(){
@@ -2398,36 +2434,68 @@
 
   function currentContentLearningKeys(){
     const keys=new Set();
-    for(const entry of state.youtube.transcriptAnalysis||[]){
-      keys.add(learningKey("word",entry.lemma));
-    }
-    for(const entry of state.youtube.expressionGroupsAnalysis||[]){
-      keys.add(learningKey("expression",entry.patternId||entry.canonical));
-    }
-    for(const row of state.panel.senseRows||[]){
-      keys.add(learningKey("learning-unit",row.key));
-    }
+    for(const entry of state.youtube.transcriptAnalysis||[]) keys.add(learningKey("word",entry.lemma));
+    for(const entry of state.youtube.expressionGroupsAnalysis||[]) keys.add(learningKey("expression",entry.patternId||entry.canonical));
+    for(const row of state.panel.senseRows||[]) keys.add(learningKey("learning-unit",row.key));
     return keys;
   }
 
-  function renderPanelSaved(body){
-    const items=[...state.learningItems].sort((a,b)=>
+  function learningItemSavedFromCurrentContent(item){
+    const descriptor=currentContentDescriptor();
+    const encounters=Array.isArray(item?.encounters)?item.encounters:[];
+    return encounters.some(encounter=>{
+      const provider=String(encounter.provider||"");
+      const external=String(encounter.external_id||"");
+      const url=String(encounter.url||encounter.context?.page_url||"");
+      if(provider && provider===descriptor.provider && external && external===descriptor.externalId) return true;
+      return Boolean(url && (url===descriptor.url || url===location.href));
+    });
+  }
+
+  function filteredSavedItems(){
+    const all=[...state.learningItems].sort((a,b)=>
       String(a.label||a.key||"").localeCompare(String(b.label||b.key||""),"de")
     );
-    if(!items.length){
-      body.innerHTML='<div class="gle-panel-empty"><b>Henüz kayıtlı öğrenme öğesi yok.</b><span>Bir kelime veya ifadeyi ★ Öğren olarak kaydettiğinde burada görünür.</span></div>';
-      return;
+    if(state.panel.savedView==="from-content") return all.filter(learningItemSavedFromCurrentContent);
+    if(state.panel.savedView==="present-content"){
+      const present=currentContentLearningKeys();
+      return all.filter(item=>present.has(learningKey(item.kind,item.key)));
     }
+    return all;
+  }
+
+  function renderPanelSaved(body){
+    const items=filteredSavedItems();
     const presentKeys=currentContentLearningKeys();
-    body.innerHTML='<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>'+esc(uiText("globalSaved"))+'</span></div>'+
-      '<div class="gle-saved-list">'+items.map(item=>{
-        const present=presentKeys.has(learningKey(item.kind,item.key));
-        const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
-        const status=item.status==="learned"||item.status==="known"?"Biliyorum":"Öğreniyorum";
-        return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(learningKey(item.kind,item.key))+'">'+
-          '<span><strong>★ '+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(type)+' · '+esc(status)+(present?' · '+esc(uiText("inThisContent")):"")+'</em></span>'+
-        '</div>';
-      }).join("")+'</div>';
+    const tabs=[
+      ["all","Tüm Kaydedilenler"],
+      ["from-content","Bu İçerikten Kaydedilenler"],
+      ["present-content","Bu İçerikte Geçenler"],
+    ];
+    const toolbar='<div class="gle-saved-filters">'+tabs.map(([id,label])=>
+      '<button type="button" data-saved-view="'+id+'" class="'+(state.panel.savedView===id?"active":"")+'">'+esc(label)+'</button>'
+    ).join("")+'</div>';
+    if(!items.length){
+      body.innerHTML=toolbar+'<div class="gle-panel-empty"><b>Bu görünümde kayıt yok.</b><span>Filtreyi değiştir veya bu içerikten yeni bir öğe kaydet.</span></div>';
+    }else{
+      body.innerHTML=toolbar+'<div class="gle-panel-summary"><strong>'+items.length+'</strong><span>kayıt</span></div>'+
+        '<div class="gle-saved-list">'+items.map(item=>{
+          const present=presentKeys.has(learningKey(item.kind,item.key));
+          const fromHere=learningItemSavedFromCurrentContent(item);
+          const type=item.kind==="expression"?"İfade":item.kind==="learning-unit"?"Anlam/Kullanım":"Kelime";
+          const status=item.status==="learned"||item.status==="known"?"Biliyorum":"Öğreniyorum";
+          const flags=[type,status];
+          if(fromHere) flags.push("Bu içerikten");
+          if(present) flags.push("Bu içerikte");
+          return '<div class="gle-saved-word gle-saved-global" data-saved-key="'+escAttr(learningKey(item.kind,item.key))+'">'+
+            '<span><strong>★ '+esc(item.label||item.key)+'</strong><small>'+esc(item.meaning_tr||"")+'</small><em>'+esc(flags.join(" · "))+'</em></span>'+
+          '</div>';
+        }).join("")+'</div>';
+    }
+    body.querySelectorAll("[data-saved-view]").forEach(button=>button.addEventListener("click",()=>{
+      state.panel.savedView=button.dataset.savedView||"all";
+      renderSharedPanel();
+    }));
   }
 
   function csvCell(value){
@@ -2466,7 +2534,7 @@
     }
 
     if(state.panel.tab==="saved"){
-      return state.learningItems.map((item,index)=>({
+      return filteredSavedItems().map((item,index)=>({
         id:"saved:"+index,
         label:item.label||item.key||("Kayıt "+(index+1)),
         kind:"saved",
@@ -2579,16 +2647,34 @@
   }
 
   function printExport(records,title){
-    const popup=window.open("","_blank","noopener,noreferrer");
-    if(!popup) throw new Error("PDF/Print penceresi açılamadı");
     const rows=records.map(record=>
       '<div class="r">'+Object.entries(record).filter(([,v])=>String(v??"")!=="").map(([k,v])=>
         '<div><b>'+esc(k)+'</b><span>'+esc(String(v??""))+'</span></div>'
       ).join("")+'</div>'
     ).join("");
-    popup.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>body{font-family:system-ui,-apple-system,sans-serif;margin:32px;color:#111}h1{font-size:22px}.r{padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid}.r div{display:grid;grid-template-columns:150px 1fr;gap:12px;margin:4px 0}.r b{font-size:12px;text-transform:uppercase;color:#666}.r span{white-space:pre-wrap}</style></head><body><h1>'+esc(title)+'</h1>'+rows+'</body></html>');
-    popup.document.close();
-    setTimeout(()=>{ popup.focus(); popup.print(); },250);
+    const iframe=document.createElement("iframe");
+    iframe.setAttribute("aria-hidden","true");
+    iframe.style.position="fixed";
+    iframe.style.right="0";
+    iframe.style.bottom="0";
+    iframe.style.width="1px";
+    iframe.style.height="1px";
+    iframe.style.border="0";
+    iframe.style.opacity="0";
+    document.documentElement.appendChild(iframe);
+    const doc=iframe.contentDocument;
+    if(!doc){ iframe.remove(); throw new Error("PDF/Print belgesi oluşturulamadı"); }
+    doc.open();
+    doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>@page{margin:16mm}body{font-family:system-ui,-apple-system,sans-serif;margin:0;color:#111}h1{font-size:22px}.r{padding:12px 0;border-bottom:1px solid #ddd;break-inside:avoid}.r div{display:grid;grid-template-columns:150px 1fr;gap:12px;margin:4px 0}.r b{font-size:12px;text-transform:uppercase;color:#666}.r span{white-space:pre-wrap}</style></head><body><h1>'+esc(title)+'</h1>'+rows+'</body></html>');
+    doc.close();
+    setTimeout(()=>{
+      try{
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      }finally{
+        setTimeout(()=>iframe.remove(),1500);
+      }
+    },300);
   }
 
   async function performExport(selected,format,sentenceMode){
@@ -2797,6 +2883,7 @@
     }
 
     prefetchYouTubeAnalyses(cue.index,prefetchHorizon);
+    if(maybeAutoPausePreviousCueAtTransition(video,cues,cue,"youtube")) return true;
     maybeAutoPauseCue(video,cue,"youtube");
 
     if(state.youtube.cueIndex!==cue.index){
