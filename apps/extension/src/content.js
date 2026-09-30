@@ -883,6 +883,21 @@
     return "";
   }
 
+  async function enrichTooltipWithLexicalFallback(data,token,hit){
+    if(!data || !token || tooltipHasMeaning(data,token.i)) return {data,token};
+    const lexicalText=sanitizeLearningText(token.lemma||token.text||hit?.word||"");
+    if(!lexicalText) return {data,token};
+    try{
+      const lexicalData=await analyzePlatform(lexicalText);
+      const lexicalToken=(lexicalData.tokens||[]).find(item=>
+        normalizeLearningIdentity(item.lemma||item.text)===normalizeLearningIdentity(lexicalText)
+      ) || lexicalData.tokens?.[0];
+      if(!lexicalToken) return {data,token};
+      data=mergeTooltipMeaningData(data,token,lexicalData,lexicalToken);
+    }catch(_error){}
+    return {data,token};
+  }
+
   function tooltipHasMeaning(data,tokenIndex){
     const h=data?.hover?.[String(tokenIndex)]||data?.hover?.[tokenIndex]||{};
     const expressions=h.primary_expressions||[];
@@ -974,7 +989,7 @@
       : "";
     const contextual=primaryMeaning
       ? `<div class="gle-context gle-context-primary"><b>Bu cümlede:</b> ${esc(primaryMeaning)}</div>`
-      : "";
+      : '<div class="gle-note">Türkçe anlam bulunamadı.</div>';
 
     const usage=notes.filter(note=>note.kind!=="GRAMMAR_ROLE")
       .map(note=>`<div class="gle-note"><b>${esc(note.label)}</b> · ${esc(note.explanation_tr)}</div>`)
@@ -3262,9 +3277,23 @@
   }
 
   function supplementalExpressionTokenIndices(tokens,canonical,existingIndices=[]){
-    const indices=new Set(existingIndices||[]);
     const normalizedCanonical=normalizeLearningIdentity(canonical);
     const terms=fixedExpressionTerms(canonical);
+    const tokenByIndex=new Map((tokens||[]).map(token=>[token.i,token]));
+    const matchesFixedTerm=token=>{
+      if(!token) return false;
+      const text=normalizeLearningIdentity(token.text);
+      const lemma=normalizeLearningIdentity(token.lemma);
+      return terms.some(term=>
+        text===term || lemma===term ||
+        daPronounRepresentsPreposition(text,term) ||
+        daPronounRepresentsPreposition(lemma,term)
+      );
+    };
+    // Existing engine spans can include slot fillers such as "diese Reformen"
+    // for canonical "über etwas diskutieren". Keep only fixed lexical parts;
+    // placeholders/arguments must not become clickable structure members.
+    const indices=new Set((existingIndices||[]).filter(index=>matchesFixedTerm(tokenByIndex.get(index))));
     if(/(^|\\s)sich(\\s|$)/u.test(normalizedCanonical)){
       const reflexiveForms=new Set(["mich","dich","sich","uns","euch"]);
       const alreadyHasReflexive=[...indices].some(index=>{
@@ -3652,6 +3681,16 @@
             expressions=ensureWebExpressionHover(data,token);
           }
         }
+      }
+
+      // Final lexical safety net: if the clicked token still has no Turkish
+      // meaning, analyze only its lemma/surface so LibreTranslate-backed
+      // lexical resolution can fill common words such as adjectives.
+      if(!tooltipHasMeaning(data,token.i)){
+        const enriched=await enrichTooltipWithLexicalFallback(data,token,hit);
+        data=enriched.data;
+        token=enriched.token;
+        expressions=ensureWebExpressionHover(data,token);
       }
 
       const offsets=tokenOffsetsInText(segment.text,data.tokens||[]);
