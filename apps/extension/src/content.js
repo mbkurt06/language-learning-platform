@@ -3333,6 +3333,59 @@
     return [...indices];
   }
 
+  function preparedExpressionRangesForLearningItem(item,segment,element,sentenceStart){
+    const fixture=activePreparedBenchmark();
+    if(!fixture || item?.kind!=="expression" || !segment?.text || !element) return [];
+    const itemKey=normalizeLearningIdentity(item.key);
+    const itemLabel=normalizeLearningIdentity(item.label);
+    const expression=(fixture.expressions||[]).find(entry=>{
+      const canonical=normalizeLearningIdentity(entry.canonical);
+      const pattern=normalizeLearningIdentity("prepared:"+preparedNormalize(entry.canonical));
+      return itemKey===canonical || itemLabel===canonical || itemKey===pattern;
+    });
+    if(!expression) return [];
+
+    const source=String(segment.text||"");
+    const sourceLower=source.toLocaleLowerCase("de-DE");
+    const forms=(expression.forms||[]).map(String).filter(Boolean);
+    let form=null,formStart=-1;
+    for(const candidate of forms){
+      const at=sourceLower.indexOf(candidate.toLocaleLowerCase("de-DE"));
+      if(at>=0){ form=candidate; formStart=at; break; }
+    }
+    if(formStart<0) return [];
+
+    const spanText=source.slice(formStart,formStart+form.length);
+    const spanLower=spanText.toLocaleLowerCase("de-DE");
+    const parts=(expression.highlightParts||[]).map(String).filter(Boolean);
+    const excluded=new Set((expression.highlightExcludeParts||[]).map(part=>preparedNormalize(part)));
+    const ranges=[];
+    const used=[];
+    for(const part of parts){
+      const normalizedPart=preparedNormalize(part);
+      if(!normalizedPart || excluded.has(normalizedPart)) continue;
+      const needle=part.toLocaleLowerCase("de-DE");
+      let searchFrom=0;
+      let at=-1;
+      while((at=spanLower.indexOf(needle,searchFrom))>=0){
+        const end=at+part.length;
+        const overlaps=used.some(([a,b])=>at<b && end>a);
+        if(!overlaps){
+          used.push([at,end]);
+          const range=webRangeFromOffsets(
+            element,
+            sentenceStart+formStart+at,
+            sentenceStart+formStart+end
+          );
+          if(range) ranges.push(range);
+          break;
+        }
+        searchFrom=at+Math.max(1,part.length);
+      }
+    }
+    return ranges;
+  }
+
   async function webRangesForLearningItem(item,cueIndex){
     if(adapter.id!=="web") return {ranges:[],meaning:item?.meaning_tr||""};
     const segment=state.web.segments?.[cueIndex];
@@ -3354,13 +3407,22 @@
       const entry=expressionEntryForItem(item);
       const match=findExpressionMatch(data,item,entry);
       if(match) meaning=match.contextual_meaning_tr||(match.meaning_tr||[])[0]||entry?.meaningTr||meaning;
-      const canonical=match?.canonical||entry?.canonical||item?.label||item?.key||"";
-      const tokenIndices=supplementalExpressionTokenIndices(tokens,canonical,match?.token_indices||[]);
-      for(const tokenIndex of tokenIndices){
-        const off=offsets.get(tokenIndex);
-        if(!off) continue;
-        const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
-        if(range) ranges.push(range);
+
+      // Prepared benchmark expressions carry explicit semantic highlightParts.
+      // Prefer those exact parts for persistent learning highlights so slot
+      // fillers and infinitive markers cannot shift or pollute the ranges.
+      const preparedRanges=preparedExpressionRangesForLearningItem(item,segment,element,sentenceStart);
+      if(preparedRanges.length){
+        ranges.push(...preparedRanges);
+      }else{
+        const canonical=match?.canonical||entry?.canonical||item?.label||item?.key||"";
+        const tokenIndices=supplementalExpressionTokenIndices(tokens,canonical,match?.token_indices||[]);
+        for(const tokenIndex of tokenIndices){
+          const off=offsets.get(tokenIndex);
+          if(!off) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+          if(range) ranges.push(range);
+        }
       }
     }else{
       const wanted=String(item?.key||item?.label||"").toLocaleLowerCase("de-DE");
