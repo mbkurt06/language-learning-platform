@@ -51,7 +51,7 @@
       {lemma:"die Baustelle",forms:["Baustellen"],pos:"NOUN",meaningTr:"bu bağlamda: çözülmesi gereken sorun alanı"},
       {lemma:"pflegebedürftig",forms:["pflegebedürftigere"],pos:"ADJ",meaningTr:"bakıma ihtiyaç duyan"},
       {lemma:"die Bevölkerung",forms:["Bevölkerung"],pos:"NOUN",meaningTr:"nüfus"},
-      {lemma:"einzahlen",forms:["einzahlen"],pos:"VERB",meaningTr:"prim / para yatırmak"},
+      {lemma:"einzahlen",forms:["einzahlen","zahlt"],occurrenceForms:["einzahlen","zahlt der Staat für alle Kinder zwischen sechs und 18 Jahren monatlich zehn Euro in die Altersvorsorge ein"],pos:"VERB",meaningTr:"prim / para yatırmak"},
       {lemma:"die Pflegeversicherung",forms:["Pflegeversicherung"],pos:"NOUN",meaningTr:"bakım sigortası"},
       {lemma:"gesetzlich",forms:["gesetzlichen"],pos:"ADJ",meaningTr:"yasal, kamu sistemine ait"},
       {lemma:"das Defizit",forms:["Defizit"],pos:"NOUN",meaningTr:"açık, bütçe açığı"},
