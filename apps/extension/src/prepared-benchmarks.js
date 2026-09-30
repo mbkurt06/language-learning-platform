@@ -176,7 +176,7 @@
       {lemma:"die Kurskorrektur",forms:["Kurskorrektur"],pos:"NOUN",meaningTr:"politika / yön değişikliği"},
       {lemma:"ankündigen",forms:["kündigt"],pos:"VERB",meaningTr:"duyurmak, açıklamak"},
       {lemma:"die Änderung",forms:["Änderungen"],pos:"NOUN",meaningTr:"değişiklik"},
-      {lemma:"die Kasse",forms:["Kassen"],pos:"NOUN",meaningTr:"bu cümlede: yasal sağlık sigortaları / sağlık sigortası fonları"},
+      {lemma:"die Kasse",forms:["Kassen"],pos:"NOUN",meaningTr:"yasal sağlık sigortaları / sağlık sigortası fonları"},
       {lemma:"der Bundesrat",forms:["Bundesrat"],pos:"NOUN",meaningTr:"Federal Konsey"},
       {lemma:"der Nebenschauplatz",forms:["Nebenschauplätzen","Nebenschauplätze"],pos:"NOUN",meaningTr:"mecazen: tali / ikincil tartışma alanı"},
       {lemma:"der Koalitionär",forms:["Koalitionäre"],pos:"NOUN",meaningTr:"koalisyon ortağı siyasetçi"},
