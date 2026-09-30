@@ -1516,7 +1516,7 @@ html:not(.gle-web-panel-open) body{
   pointer-events:none;
 }
 ::highlight(gle-learning-web){
-  background:rgba(250,204,21,.55);
+  background:rgba(253,230,138,.38);
   color:inherit;
 }
 ::highlight(gle-saved-target){
@@ -1660,6 +1660,10 @@ html:not(.gle-web-panel-open) body{
 }
 ::highlight(gle-sentence-target){
   background:rgba(59,130,246,.34)!important;
+  color:inherit!important;
+}
+::highlight(gle-web-active-structure){
+  background:rgba(59,130,246,.62)!important;
   color:inherit!important;
 }
 
