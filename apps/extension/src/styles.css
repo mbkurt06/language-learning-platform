@@ -1316,6 +1316,8 @@ html.gle-zdf-panel-open #gle-panel-edge-handle.gle-panel-edge-handle:not(.collap
 .gle-export-cancel{background:transparent;color:#e2e8f0}
 .gle-export-highlight-pdf{background:#0f766e;color:white;border-color:#14b8a6!important;margin-right:auto}
 .gle-export-highlight-pdf:hover{background:#115e59}
+.gle-export-panel-diagnostic{background:#172554;color:#dbeafe;border-color:#3b82f6!important}
+.gle-export-panel-diagnostic:hover{background:#1e3a8a}
 .gle-export-go{background:#7c3aed;color:white;border-color:#7c3aed!important}
 .gle-saved-global{cursor:default}
 .gle-saved-global em{display:block;margin-top:3px;font-size:11px;color:#94a3b8;font-style:normal}
