@@ -1132,7 +1132,9 @@
         forms:[...(item.forms||[])],
         occurrences,
         meaningTr:item.meaningTr||"",
-        grammarHint:item.grammarHint||""
+        grammarHint:item.grammarHint||"",
+        highlightParts:[...(item.highlightParts||[])],
+        highlightExcludeParts:[...(item.highlightExcludeParts||[])]
       };
     }).filter(item=>item.count>0);
   }
@@ -3373,6 +3375,35 @@
     return {normalized:normalized.trim(),map,raw};
   }
 
+  function preparedExpressionTokenRanges(expression,data,segment,element){
+    if(!expression || !data || !segment?.text || !element) return [];
+    const prepared=String(expression.pattern_id||expression.patternId||"").startsWith("prepared:");
+    if(!prepared && !(expression.highlight_parts||expression.highlightParts||[]).length) return [];
+    const tokenIndices=[...(expression.token_indices||[])];
+    if(!tokenIndices.length) return [];
+
+    const mapped=normalizedTextOffsetMap(element.textContent||"");
+    const normalizedElement=mapped.normalized;
+    const normalizedSegment=String(segment.text||"").replace(/\s+/g," ").trim();
+    const segmentStart=normalizedElement.toLocaleLowerCase("de-DE").indexOf(normalizedSegment.toLocaleLowerCase("de-DE"));
+    if(segmentStart<0) return [];
+
+    const offsets=tokenOffsetsInText(normalizedSegment,data.tokens||[]);
+    const ranges=[];
+    for(const tokenIndex of tokenIndices){
+      const off=offsets.get(tokenIndex);
+      if(!off) continue;
+      const normalizedStart=segmentStart+off.start;
+      const normalizedEnd=segmentStart+off.end-1;
+      const rawStart=mapped.map[normalizedStart];
+      const rawEndInclusive=mapped.map[normalizedEnd];
+      if(!Number.isInteger(rawStart) || !Number.isInteger(rawEndInclusive)) continue;
+      const range=webRangeFromOffsets(element,rawStart,rawEndInclusive+1);
+      if(range) ranges.push(range);
+    }
+    return ranges;
+  }
+
   function expressionSemanticRanges(expression,element){
     if(!expression || !element) return [];
     const parts=(expression.highlight_parts||expression.highlightParts||[]).map(value=>String(value||"").replace(/\s+/g," ").trim()).filter(Boolean);
@@ -3831,14 +3862,19 @@
     const seen=new Set();
     const add=expr=>{
       if(!expr) return;
-      const indices=supplementalExpressionTokenIndices(
-        data?.tokens||[],
-        expr.canonical||expr.surface||"",
-        expr.token_indices||[]
-      );
-      // Never trust a precomputed hover membership blindly. Engine/prepared
-      // spans may include argument/slot fillers (e.g. "Reformen" filling
-      // canonical "etwas"). Only fixed lexical parts may own the expression.
+      const prepared=String(expr.pattern_id||expr.patternId||"").startsWith("prepared:");
+      const semanticParts=expr.highlight_parts||expr.highlightParts||[];
+      const indices=(prepared || semanticParts.length)
+        ? [...(expr.token_indices||[])]
+        : supplementalExpressionTokenIndices(
+            data?.tokens||[],
+            expr.canonical||expr.surface||"",
+            expr.token_indices||[]
+          );
+      // Prepared benchmark analysis already resolved the exact semantic token
+      // membership from highlightParts. Do not re-filter conjugated/separable
+      // forms against the canonical lemma (e.g. droht vs drohen,
+      // steht ... gegenüber vs gegenüberstehen).
       if(!indices.includes(tokenIndex)) return;
       const normalized={
         ...expr,
@@ -3854,8 +3890,15 @@
     for(const expr of tokenHover.primary_expressions||[]) add(expr);
     for(const expr of data?.expressions||[]) add(expr);
     return candidates.sort((a,b)=>{
-      const aTokens=supplementalExpressionTokenIndices(data?.tokens||[],a.canonical||a.surface||"",a.token_indices||[]).length;
-      const bTokens=supplementalExpressionTokenIndices(data?.tokens||[],b.canonical||b.surface||"",b.token_indices||[]).length;
+      const resolvedCount=expr=>{
+        const prepared=String(expr.pattern_id||expr.patternId||"").startsWith("prepared:");
+        const semanticParts=expr.highlight_parts||expr.highlightParts||[];
+        return (prepared || semanticParts.length)
+          ? (expr.token_indices||[]).length
+          : supplementalExpressionTokenIndices(data?.tokens||[],expr.canonical||expr.surface||"",expr.token_indices||[]).length;
+      };
+      const aTokens=resolvedCount(a);
+      const bTokens=resolvedCount(b);
       if(aTokens!==bTokens) return bTokens-aTokens;
       const aSpecific=(String(a.canonical||"").match(/\\betwas\\b/gu)||[]).length;
       const bSpecific=(String(b.canonical||"").match(/\\betwas\\b/gu)||[]).length;
@@ -3930,8 +3973,15 @@
       // Single source of truth: the selected popup expression carries its own
       // semantic highlight parts. If any member selects this expression, use
       // those exact parts for the active blue highlight.
-      const semanticRanges=expression ? expressionSemanticRanges(expression,element) : [];
-      if(semanticRanges.length){
+      const preparedTokenRanges=expression
+        ? preparedExpressionTokenRanges(expression,data,segment,element)
+        : [];
+      const semanticRanges=!preparedTokenRanges.length && expression
+        ? expressionSemanticRanges(expression,element)
+        : [];
+      if(preparedTokenRanges.length){
+        ranges.push(...preparedTokenRanges);
+      }else if(semanticRanges.length){
         ranges.push(...semanticRanges);
       }else{
         const tokenIndices=expression
