@@ -39,8 +39,7 @@
       {match:"Bei den Diskussionen über all diese Reformen fällt auf",tr:"Tüm bu reform tartışmalarında dikkat çeken nokta, çatışma hatlarının yalnızca Union ile SPD arasında uzanmaması."},
       {match:"Die Einigung bei einer Reform wird gern als Verhandlungsmasse",tr:"Bir reformdaki uzlaşma, bir sonraki reform görüşmelerinde pazarlık unsuru olarak kullanılabiliyor."},
       {match:"Insofern sind die einzelnen Reformen kaum voneinander zu trennen",tr:"Bu nedenle tek tek reformları birbirinden ayırmak neredeyse mümkün değil."},
-      {match:"Das Gesamtbild wird am Ende den Ausschlag geben",tr:"Sonuçta belirleyici olan genel tablo olacak."}
-    ],
+      {match:"Das Gesamtbild wird am Ende den Ausschlag geben",tr:"Sonuçta belirleyici olan genel tablo olacak."},
       {match:"Pflege, Rente, Gesundheit Über diese Reformen diskutiert Schwarz-Rot",tr:"Bakım, emeklilik ve sağlık: Siyah-kırmızı koalisyon bu reformları tartışıyor."},
       {match:"Was auf der To-do-Liste steht",tr:"Gündemde hangi başlıkların bulunduğu."},
       {match:"Reform der Krankenversicherung Wer muss wie viel sparen im Gesundheitswesen",tr:"Sağlık sigortası reformu: Sağlık sisteminde kim ne kadar tasarruf etmeli?"},
@@ -86,7 +85,8 @@
       {match:"PODCAST 23.09.2026",tr:"PODCAST 23.09.2026"},
       {match:"11KM Warum Regieren immer komplizierter wird",tr:"11KM: Yönetmek neden giderek daha karmaşık hale geliyor?"},
       {match:"Der Podcast 11KM über eine Demokratie im Dauerstress",tr:"11KM podcast'i, sürekli baskı altındaki bir demokrasiyi ele alıyor."},
-      {match:"Dieses Thema im Programm: RBB24 Inforadio",tr:"Bu konu programda: RBB24 Inforadio | Haberler | 29.09.2026 | 09:11; Das Erste | tagesschau | 29.09.2026 | 20:00."},
+      {match:"Dieses Thema im Programm: RBB24 Inforadio",tr:"Bu konu programda: RBB24 Inforadio | Haberler | 29.09.2026 | 09:11; Das Erste | tagesschau | 29.09.2026 | 20:00."}
+    ],
     words:[
       {lemma:"beteuern",forms:["beteuert"],pos:"VERB",meaningTr:"vurgulamak, ısrarla belirtmek"},
       {lemma:"die Reform",forms:["Reformen","Reform"],pos:"NOUN",meaningTr:"reform, yeniden düzenleme"},
