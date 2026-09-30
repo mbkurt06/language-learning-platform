@@ -3092,7 +3092,19 @@
 
   function supplementalExpressionTokenIndices(tokens,canonical,existingIndices=[]){
     const indices=new Set(existingIndices||[]);
+    const normalizedCanonical=normalizeLearningIdentity(canonical);
     const terms=fixedExpressionTerms(canonical);
+    if(/(^|\\s)sich(\\s|$)/u.test(normalizedCanonical)){
+      const reflexiveForms=new Set(["mich","dich","sich","uns","euch"]);
+      const alreadyHasReflexive=[...indices].some(index=>{
+        const token=(tokens||[]).find(t=>t.i===index);
+        return reflexiveForms.has(normalizeLearningIdentity(token?.text));
+      });
+      if(!alreadyHasReflexive){
+        const reflexive=(tokens||[]).find(t=>reflexiveForms.has(normalizeLearningIdentity(t.text)));
+        if(reflexive) indices.add(reflexive.i);
+      }
+    }
     for(const term of terms){
       const represented=[...indices].some(index=>{
         const token=(tokens||[]).find(t=>t.i===index);
@@ -3376,6 +3388,130 @@
     }catch(_error){}
   }
 
+  function webTokenForHit(data,hit){
+    const segment=state.web.segments?.[hit?.segmentIndex];
+    if(!segment?.text || !hit) return null;
+    const tokens=data?.tokens||[];
+    const element=segment.sourceElement;
+    const fullText=String(element?.textContent||"");
+    let sentenceStart=fullText.indexOf(segment.text);
+    if(sentenceStart<0) sentenceStart=fullText.toLocaleLowerCase("de-DE").indexOf(String(segment.text).toLocaleLowerCase("de-DE"));
+    const localStart=sentenceStart>=0 ? hit.absoluteStart-sentenceStart : -1;
+    if(localStart>=0){
+      const offsets=tokenOffsetsInText(segment.text,tokens);
+      for(const token of tokens){
+        const off=offsets.get(token.i);
+        if(off && localStart>=off.start && localStart<off.end) return token;
+      }
+    }
+    const wanted=String(hit.word||"").toLocaleLowerCase("de-DE");
+    return tokens.find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
+      tokens.find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted) || null;
+  }
+
+  function webExpressionCandidatesForToken(data,tokenIndex){
+    const tokenHover=data?.hover?.[String(tokenIndex)]||data?.hover?.[tokenIndex]||{};
+    const candidates=[];
+    const seen=new Set();
+    const add=expr=>{
+      if(!expr) return;
+      const identity=normalizeLearningIdentity(expr.pattern_id||expr.canonical||expr.surface||"");
+      if(identity && seen.has(identity)) return;
+      if(identity) seen.add(identity);
+      candidates.push(expr);
+    };
+    for(const expr of tokenHover.primary_expressions||[]) add(expr);
+    for(const expr of data?.expressions||[]){
+      const indices=supplementalExpressionTokenIndices(data?.tokens||[],expr.canonical||expr.surface||"",expr.token_indices||[]);
+      if(indices.includes(tokenIndex)) add({...expr,token_indices:indices});
+    }
+    return candidates.sort((a,b)=>{
+      const aTokens=supplementalExpressionTokenIndices(data?.tokens||[],a.canonical||a.surface||"",a.token_indices||[]).length;
+      const bTokens=supplementalExpressionTokenIndices(data?.tokens||[],b.canonical||b.surface||"",b.token_indices||[]).length;
+      if(aTokens!==bTokens) return bTokens-aTokens;
+      const aSpecific=(String(a.canonical||"").match(/\\betwas\\b/gu)||[]).length;
+      const bSpecific=(String(b.canonical||"").match(/\\betwas\\b/gu)||[]).length;
+      if(aSpecific!==bSpecific) return bSpecific-aSpecific;
+      return String(b.canonical||"").length-String(a.canonical||"").length;
+    });
+  }
+
+  function ensureWebExpressionHover(data,token){
+    if(!data || !token) return [];
+    const candidates=webExpressionCandidatesForToken(data,token.i);
+    if(!candidates.length) return candidates;
+    if(!data.hover) data.hover={};
+    const key=String(token.i);
+    const hover=data.hover[key]||data.hover[token.i]||{};
+    data.hover[key]={...hover,primary_expressions:candidates};
+    return candidates;
+  }
+
+  function clearWebStructureHighlight(){
+    if(CSS?.highlights) CSS.highlights.delete("gle-web-active-structure");
+  }
+
+  async function showWebStructureForHit(hit){
+    if(adapter.id!=="web" || !hit) return;
+    const segment=state.web.segments?.[hit.segmentIndex];
+    const element=segment?.sourceElement;
+    if(!segment?.text || !element?.isConnected) return;
+    try{
+      let data=await analyze(segment.text);
+      let token=webTokenForHit(data,hit);
+      if(!token) return;
+      let expressions=ensureWebExpressionHover(data,token);
+
+      // Prepared benchmark data is intentionally curated. If the clicked token
+      // has no prepared structure, ask the normal analyzer before treating it
+      // as a standalone word.
+      if(activePreparedBenchmark() && !expressions.length){
+        const fallback=await analyzePlatform(segment.text);
+        const fallbackToken=webTokenForHit(fallback,hit);
+        if(fallbackToken){
+          const fallbackExpressions=ensureWebExpressionHover(fallback,fallbackToken);
+          if(fallbackExpressions.length){
+            data=fallback;
+            token=fallbackToken;
+            expressions=fallbackExpressions;
+          }
+        }
+      }
+
+      const offsets=tokenOffsetsInText(segment.text,data.tokens||[]);
+      const fullText=String(element.textContent||"");
+      let sentenceStart=fullText.indexOf(segment.text);
+      if(sentenceStart<0) sentenceStart=fullText.toLocaleLowerCase("de-DE").indexOf(String(segment.text).toLocaleLowerCase("de-DE"));
+      const ranges=[];
+      const expression=expressions[0]||null;
+      const tokenIndices=expression
+        ? supplementalExpressionTokenIndices(data.tokens||[],expression.canonical||expression.surface||"",expression.token_indices||[])
+        : [token.i];
+
+      if(sentenceStart>=0){
+        for(const tokenIndex of tokenIndices){
+          const off=offsets.get(tokenIndex);
+          if(!off) continue;
+          const range=webRangeFromOffsets(element,sentenceStart+off.start,sentenceStart+off.end);
+          if(range) ranges.push(range);
+        }
+      }
+      if(!ranges.length && hit.range) ranges.push(hit.range);
+
+      clearWebStructureHighlight();
+      if(ranges.length && CSS?.highlights && typeof Highlight!=="undefined"){
+        const highlight=new Highlight(...ranges);
+        try{ highlight.priority=100; }catch(_error){}
+        CSS.highlights.set("gle-web-active-structure",highlight);
+      }
+
+      state.web.tooltipPinnedKey="structure:"+hit.segmentIndex+":"+token.i;
+      cancelTooltipHide();
+      state.youtube.cueIndex=hit.segmentIndex;
+      renderCard(data,token.i,{getBoundingClientRect:()=>hit.rect,contains:()=>false});
+    }catch(_error){}
+  }
+
   async function webLearningItemForHit(hit){
     if(adapter.id!=="web" || !hit) return null;
     const segment=state.web.segments?.[hit.segmentIndex];
@@ -3422,10 +3558,9 @@
     state.youtube.cueIndex=hit.segmentIndex;
     try{
       let data=await analyze(segment.text);
-      const wanted=hit.word.toLocaleLowerCase("de-DE");
-      let token=(data.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
-        (data.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+      let token=webTokenForHit(data,hit);
       if(!token) return;
+      ensureWebExpressionHover(data,token);
 
       const hover=data.hover?.[String(token.i)]||data.hover?.[token.i]||{};
       const hasMeaning=Boolean(
@@ -3439,11 +3574,11 @@
       // the normal platform analyzer so the popup never becomes an empty shell.
       if(activePreparedBenchmark() && !hasMeaning){
         const fallback=await analyzePlatform(segment.text);
-        const fallbackToken=(fallback.tokens||[]).find(t=>String(t.text||"").toLocaleLowerCase("de-DE")===wanted) ||
-          (fallback.tokens||[]).find(t=>String(t.lemma||"").toLocaleLowerCase("de-DE")===wanted);
+        const fallbackToken=webTokenForHit(fallback,hit);
         if(fallbackToken){
           data=fallback;
           token=fallbackToken;
+          ensureWebExpressionHover(data,token);
         }
       }
 
@@ -3457,6 +3592,7 @@
     // Web article popups are click-only. Hovering a yellow learning mark must not open or close a popup.
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      clearWebStructureHighlight();
       const selection=window.getSelection();
       if(selection && !selection.isCollapsed){
         const selected=sanitizeLearningText(selection.toString());
@@ -3473,6 +3609,15 @@
       state.web.hoverKey="";
       cancelTooltipHide();
       if(state.tooltip) state.tooltip.hidden=true;
+    },true);
+    document.addEventListener("dblclick",event=>{
+      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
+      const hit=webWordHitAtPoint(event.clientX,event.clientY);
+      if(!hit) return;
+      event.preventDefault();
+      event.stopPropagation();
+      try{ window.getSelection()?.removeAllRanges(); }catch(_error){}
+      showWebStructureForHit(hit);
     },true);
     document.addEventListener("mouseup",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
