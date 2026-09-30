@@ -3333,6 +3333,27 @@
     return [...indices];
   }
 
+  function normalizedTextOffsetMap(value){
+    const raw=String(value||"");
+    let normalized="",pendingSpace=false;
+    const map=[];
+    for(let i=0;i<raw.length;i++){
+      const ch=raw[i];
+      if(/\s/u.test(ch)){
+        if(normalized && !pendingSpace) pendingSpace=true;
+        continue;
+      }
+      if(pendingSpace){
+        normalized+=" ";
+        map.push(i);
+        pendingSpace=false;
+      }
+      normalized+=ch;
+      map.push(i);
+    }
+    return {normalized:normalized.trim(),map,raw};
+  }
+
   function preparedExpressionRangesForLearningItem(item,segment,element,sentenceStart){
     const fixture=activePreparedBenchmark();
     if(!fixture || item?.kind!=="expression" || !segment?.text || !element) return [];
@@ -3345,19 +3366,23 @@
     });
     if(!expression) return [];
 
-    const source=String(segment.text||"");
-    const sourceLower=source.toLocaleLowerCase("de-DE");
-    const forms=(expression.forms||[]).map(String).filter(Boolean);
+    // Work against the element's real DOM text, but search in a whitespace-
+    // normalized view. Segment text is normalized during extraction, so using
+    // its character offsets directly against textContent can drift whenever
+    // the page contains line breaks or repeated whitespace.
+    const mapped=normalizedTextOffsetMap(element.textContent||"");
+    const normalizedElement=mapped.normalized.toLocaleLowerCase("de-DE");
+    const forms=(expression.forms||[]).map(value=>String(value||"").replace(/\s+/g," ").trim()).filter(Boolean);
     let form=null,formStart=-1;
     for(const candidate of forms){
-      const at=sourceLower.indexOf(candidate.toLocaleLowerCase("de-DE"));
+      const at=normalizedElement.indexOf(candidate.toLocaleLowerCase("de-DE"));
       if(at>=0){ form=candidate; formStart=at; break; }
     }
     if(formStart<0) return [];
 
-    const spanText=source.slice(formStart,formStart+form.length);
+    const spanText=mapped.normalized.slice(formStart,formStart+form.length);
     const spanLower=spanText.toLocaleLowerCase("de-DE");
-    const parts=(expression.highlightParts||[]).map(String).filter(Boolean);
+    const parts=(expression.highlightParts||[]).map(value=>String(value||"").replace(/\s+/g," ").trim()).filter(Boolean);
     const excluded=new Set((expression.highlightExcludeParts||[]).map(part=>preparedNormalize(part)));
     const ranges=[];
     const used=[];
@@ -3372,12 +3397,14 @@
         const overlaps=used.some(([a,b])=>at<b && end>a);
         if(!overlaps){
           used.push([at,end]);
-          const range=webRangeFromOffsets(
-            element,
-            sentenceStart+formStart+at,
-            sentenceStart+formStart+end
-          );
-          if(range) ranges.push(range);
+          const normalizedStart=formStart+at;
+          const normalizedEnd=formStart+end-1;
+          const rawStart=mapped.map[normalizedStart];
+          const rawEndInclusive=mapped.map[normalizedEnd];
+          if(Number.isInteger(rawStart) && Number.isInteger(rawEndInclusive)){
+            const range=webRangeFromOffsets(element,rawStart,rawEndInclusive+1);
+            if(range) ranges.push(range);
+          }
           break;
         }
         searchFrom=at+Math.max(1,part.length);
