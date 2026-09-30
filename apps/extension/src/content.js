@@ -2218,6 +2218,36 @@
     }
   }
 
+  function focusPanelSentence(index){
+    if(!Number.isInteger(index) || index<0) return;
+    const changed=state.youtube.cueIndex!==index;
+    state.youtube.cueIndex=index;
+    const panel=state.panel.element;
+    if(!panel || state.panel.collapsed) return;
+
+    if(state.panel.tab!=="subtitles"){
+      state.panel.tab="subtitles";
+      state.panel.selectedLemma="";
+      state.panel.selectedGroupKey="";
+      renderSharedPanel();
+    }else if(changed){
+      updatePanelActiveCue();
+    }
+
+    requestAnimationFrame(()=>{
+      const current=state.panel.element?.querySelector('[data-cue-index="'+index+'"]');
+      if(!current) return;
+      current.classList.add("active");
+      const list=current.closest(".gle-transcript-list");
+      if(list){
+        const top=Math.max(0,current.offsetTop-4);
+        list.scrollTop=top;
+      }else{
+        current.scrollIntoView({block:"start"});
+      }
+    });
+  }
+
   function learningItemForLemma(lemma){
     return state.learningItems.find(item=>
       item.kind==="word" &&
@@ -4007,7 +4037,7 @@
 
       state.web.tooltipPinnedKey="structure:"+hit.segmentIndex+":"+token.i;
       cancelTooltipHide();
-      state.youtube.cueIndex=hit.segmentIndex;
+      focusPanelSentence(hit.segmentIndex);
       renderCard(data,token.i,{getBoundingClientRect:()=>hit.rect,contains:()=>false});
     }catch(_error){}
   }
@@ -4055,7 +4085,7 @@
     }
     const segment=state.web.segments[hit.segmentIndex];
     if(!segment?.text) return;
-    state.youtube.cueIndex=hit.segmentIndex;
+    focusPanelSentence(hit.segmentIndex);
     try{
       let data=await analyze(segment.text);
       let token=webTokenForHit(data,hit);
