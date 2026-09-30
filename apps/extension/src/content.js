@@ -44,7 +44,7 @@
     analysisInflight:new Map(),
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88},
+    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipLeft:null,tooltipTop:null},
     playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:"",autoPauseTimer:null,autoPauseScheduledKey:""},
     learningItems:[],
     learningProfileId:null,
@@ -228,14 +228,64 @@
     state.tooltipHideTimer=null;
   }
 
+  function tooltipPersistent(){
+    return state.settings.tooltipPersistent===true;
+  }
+
   function scheduleTooltipHide(delay=240){
+    if(tooltipPersistent()) return;
     if(adapter.id==="web" && state.web.tooltipPinnedKey) return;
     if(state.tooltipHideTimer) return;
     state.tooltipHideTimer=setTimeout(()=>{
       state.tooltipHideTimer=null;
+      if(tooltipPersistent()) return;
       if(adapter.id==="web" && state.web.tooltipPinnedKey) return;
       if(state.tooltip) state.tooltip.hidden=true;
     },delay);
+  }
+
+  function tooltipToolbarHtml(){
+    const locked=state.settings.tooltipPositionLocked===true;
+    const persistent=state.settings.tooltipPersistent===true;
+    return '<div class="gle-tooltip-tools">'+
+      '<button type="button" class="gle-tooltip-drag-handle" title="Popup\'ı sürükle" aria-label="Popup\'ı sürükle">⋮⋮</button>'+
+      '<span class="gle-tooltip-tools-spacer"></span>'+
+      '<button type="button" class="gle-tooltip-tool '+(locked?'active':'')+'" data-tooltip-position-lock title="Konumu sabitle" aria-label="Konumu sabitle">📌</button>'+
+      '<button type="button" class="gle-tooltip-tool '+(persistent?'active':'')+'" data-tooltip-persistent title="Sürekli görünür" aria-label="Sürekli görünür">👁</button>'+
+    '</div>';
+  }
+
+  function syncTooltipToolStates(){
+    if(!state.tooltip) return;
+    state.tooltip.querySelector("[data-tooltip-position-lock]")?.classList.toggle("active",state.settings.tooltipPositionLocked===true);
+    state.tooltip.querySelector("[data-tooltip-persistent]")?.classList.toggle("active",state.settings.tooltipPersistent===true);
+  }
+
+  function clampTooltipPosition(left,top){
+    const el=state.tooltip;
+    const width=el?.offsetWidth||360;
+    const height=el?.offsetHeight||180;
+    return {
+      left:Math.max(8,Math.min(Number(left)||8,window.innerWidth-width-8)),
+      top:Math.max(8,Math.min(Number(top)||8,window.innerHeight-height-8)),
+    };
+  }
+
+  function applyTooltipPosition(anchor){
+    const locked=state.settings.tooltipPositionLocked===true;
+    const savedLeft=Number(state.settings.tooltipLeft);
+    const savedTop=Number(state.settings.tooltipTop);
+    if(locked && Number.isFinite(savedLeft) && Number.isFinite(savedTop)){
+      const pos=clampTooltipPosition(savedLeft,savedTop);
+      state.tooltip.style.left=pos.left+"px";
+      state.tooltip.style.top=pos.top+"px";
+      return;
+    }
+    const r=anchor?.getBoundingClientRect?.();
+    if(!r) return;
+    const pos=clampTooltipPosition(r.left,r.top-state.tooltip.offsetHeight-10);
+    state.tooltip.style.left=pos.left+"px";
+    state.tooltip.style.top=pos.top+"px";
   }
 
   function createTooltip(){
@@ -252,6 +302,66 @@
       if(next && state.playback.hoverAnchor?.contains?.(next)) return;
       scheduleSubtitleHoverResume();
     });
+
+    let drag=null;
+    el.addEventListener("pointerdown",event=>{
+      const handle=event.target.closest?.(".gle-tooltip-drag-handle");
+      if(!handle) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect=el.getBoundingClientRect();
+      drag={dx:event.clientX-rect.left,dy:event.clientY-rect.top,pointerId:event.pointerId};
+      el.classList.add("gle-tooltip-dragging");
+      try{ handle.setPointerCapture(event.pointerId); }catch(_error){}
+    });
+    document.addEventListener("pointermove",event=>{
+      if(!drag || event.pointerId!==drag.pointerId) return;
+      const pos=clampTooltipPosition(event.clientX-drag.dx,event.clientY-drag.dy);
+      el.style.left=pos.left+"px";
+      el.style.top=pos.top+"px";
+      state.settings.tooltipLeft=pos.left;
+      state.settings.tooltipTop=pos.top;
+    },true);
+    document.addEventListener("pointerup",event=>{
+      if(!drag || event.pointerId!==drag.pointerId) return;
+      drag=null;
+      el.classList.remove("gle-tooltip-dragging");
+      if(state.settings.tooltipPositionLocked===true){
+        chrome.storage.sync.set({tooltipLeft:state.settings.tooltipLeft,tooltipTop:state.settings.tooltipTop});
+      }
+    },true);
+
+    el.addEventListener("click",event=>{
+      const lockButton=event.target.closest?.("[data-tooltip-position-lock]");
+      if(lockButton){
+        event.preventDefault();
+        event.stopPropagation();
+        const next=state.settings.tooltipPositionLocked!==true;
+        state.settings.tooltipPositionLocked=next;
+        if(next){
+          const rect=el.getBoundingClientRect();
+          const pos=clampTooltipPosition(rect.left,rect.top);
+          state.settings.tooltipLeft=pos.left;
+          state.settings.tooltipTop=pos.top;
+          chrome.storage.sync.set({tooltipPositionLocked:true,tooltipLeft:pos.left,tooltipTop:pos.top});
+        }else{
+          chrome.storage.sync.set({tooltipPositionLocked:false});
+        }
+        syncTooltipToolStates();
+        return;
+      }
+      const persistentButton=event.target.closest?.("[data-tooltip-persistent]");
+      if(persistentButton){
+        event.preventDefault();
+        event.stopPropagation();
+        const next=state.settings.tooltipPersistent!==true;
+        state.settings.tooltipPersistent=next;
+        chrome.storage.sync.set({tooltipPersistent:next});
+        if(next) cancelTooltipHide();
+        syncTooltipToolStates();
+      }
+    });
+
     document.documentElement.appendChild(el);
     return el;
   }
@@ -846,7 +956,7 @@
         '</div>'
       : "";
 
-    state.tooltip.innerHTML=header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>";
+    state.tooltip.innerHTML=tooltipToolbarHtml()+(header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>");
     const bindTooltipStatus=(selector,status)=>state.tooltip.querySelector(selector)?.addEventListener("click",async event=>{
       event.stopPropagation();
       const button=event.currentTarget;
@@ -869,10 +979,9 @@
     bindTooltipStatus(".gle-learn-star","learning");
     bindTooltipStatus(".gle-learn-known","learned");
 
-    const r=anchor.getBoundingClientRect();
     state.tooltip.hidden=false;
-    state.tooltip.style.left=Math.min(window.innerWidth-370,Math.max(8,r.left))+"px";
-    state.tooltip.style.top=Math.max(8,r.top-state.tooltip.offsetHeight-10)+"px";
+    syncTooltipToolStates();
+    applyTooltipPosition(anchor);
   }
 
   function activePreparedBenchmark(){
@@ -3379,12 +3488,13 @@
       const meaning=cleanTranslationText(data?.sentence_meaning_tr||"");
       const rect=range.getBoundingClientRect();
       state.tooltip.innerHTML=
+        tooltipToolbarHtml()+
         '<div class="gle-hover-head"><b>Cümle</b><span>Seçili metin</span></div>'+
         '<div class="gle-context gle-context-primary"><b>Almanca:</b> '+esc(cleaned)+'</div>'+
         (meaning?'<div class="gle-context"><b>Türkçe:</b> '+esc(meaning)+'</div>':'<div class="gle-note">Çeviri bulunamadı.</div>');
       state.tooltip.hidden=false;
-      state.tooltip.style.left=Math.min(window.innerWidth-370,Math.max(8,rect.left))+"px";
-      state.tooltip.style.top=Math.max(8,rect.top-state.tooltip.offsetHeight-10)+"px";
+      syncTooltipToolStates();
+      applyTooltipPosition({getBoundingClientRect:()=>rect});
     }catch(_error){}
   }
 
@@ -3605,10 +3715,12 @@
         showWebWordTooltip(hit,true);
         return;
       }
-      state.web.tooltipPinnedKey="";
-      state.web.hoverKey="";
-      cancelTooltipHide();
-      if(state.tooltip) state.tooltip.hidden=true;
+      if(!tooltipPersistent()){
+        state.web.tooltipPinnedKey="";
+        state.web.hoverKey="";
+        cancelTooltipHide();
+        if(state.tooltip) state.tooltip.hidden=true;
+      }
     },true);
     document.addEventListener("dblclick",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
@@ -5082,7 +5194,11 @@
     germanFontSize:100,
     translationFontSize:100,
     youtubeSubtitlePositionY:82,
-    zdfSubtitlePositionY:88
+    zdfSubtitlePositionY:88,
+    tooltipPositionLocked:false,
+    tooltipPersistent:false,
+    tooltipLeft:null,
+    tooltipTop:null
   },settings=>{
     const legacyTranslation=settings.showSentenceTranslation;
     const migrated={};
@@ -5141,6 +5257,11 @@
     if(changes.germanFontSize) state.settings.germanFontSize=changes.germanFontSize.newValue;
     if(changes.translationFontSize) state.settings.translationFontSize=changes.translationFontSize.newValue;
     if(changes.youtubeSubtitlePositionY) state.settings.youtubeSubtitlePositionY=changes.youtubeSubtitlePositionY.newValue;
+    if(changes.tooltipPositionLocked) state.settings.tooltipPositionLocked=changes.tooltipPositionLocked.newValue===true;
+    if(changes.tooltipPersistent) state.settings.tooltipPersistent=changes.tooltipPersistent.newValue===true;
+    if(changes.tooltipLeft) state.settings.tooltipLeft=changes.tooltipLeft.newValue;
+    if(changes.tooltipTop) state.settings.tooltipTop=changes.tooltipTop.newValue;
+    syncTooltipToolStates();
     applySharedAppearance();
     if(changes.showPanelTranslation && state.panel.tab==="subtitles") renderSharedPanel();
     if(changes.showVideoTranslation) refreshVideoTranslations();
