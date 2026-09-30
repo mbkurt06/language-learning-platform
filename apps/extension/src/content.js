@@ -2611,6 +2611,7 @@
             cueIndex:entry.occurrences?.[0]??0,
             surface:entry.forms?.[0]||entry.lemma,
             occurrences:[...(entry.occurrences||[])],
+            wordEntry:entry,
           }));
           return;
         }
@@ -2701,6 +2702,16 @@
   }
 
   async function setSenseStatus(row,status){
+    if(row?.wordEntry){
+      await setLearningStatus({
+        kind:"word",
+        key:row.lemma,
+        label:panelWordLabel(row.wordEntry)||row.lemma,
+        meaning_tr:row.meaningTr,
+        surface:row.surface||row.lemma,
+      },status);
+      return;
+    }
     await setLearningStatus({
       kind:"learning-unit",
       key:row.key,
@@ -2719,7 +2730,11 @@
     const q=String(state.panel.wordsSearch||"").trim().toLocaleLowerCase("de-DE");
     const rows=senseRowsWithExpressions().filter(row=>!q || String(row.lemma||"").toLocaleLowerCase("de-DE").includes(q) || String(row.meaningTr||"").toLocaleLowerCase("tr-TR").includes(q));
     const table='<div class="gle-sense-table"><div class="gle-sense-head"><span>Öğrenme birimi</span><span>Bu kullanımdaki anlam</span><span>Tür</span><span>Durum</span></div>'+rows.map(row=>{
-      const item=row.expressionEntry ? learningItemForExpression(row.expressionEntry) : learningItemForSense(row);
+      const item=row.expressionEntry
+        ? learningItemForExpression(row.expressionEntry)
+        : row.wordEntry
+          ? learningItemForLemma(row.lemma)
+          : learningItemForSense(row);
       const learning=item && itemStatus(item)==="learning";
       const known=item && itemStatus(item)==="learned";
       return '<div class="gle-sense-row" data-sense-key="'+escAttr(row.key)+'"><button type="button" class="gle-sense-word" data-sense-jump="'+escAttr(row.key)+'">'+esc(row.canonical)+'</button><span class="gle-sense-meaning">'+esc(row.meaningTr)+'</span><span class="gle-sense-type">'+esc(row.unitType)+'</span><span class="gle-sense-actions"><button type="button" data-sense-learn="'+escAttr(row.key)+'" class="'+(learning?"active":"")+'" title="Öğreniyorum">'+(learning?"★":"☆")+'</button><button type="button" data-sense-known="'+escAttr(row.key)+'" class="'+(known?"active":"")+'" title="Biliyorum">✓</button></span></div>';
