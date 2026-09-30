@@ -391,6 +391,102 @@
     };
   }
 
+  const LEARNING_ITEM_ALIASES=[
+    {
+      oldKeys:["prepared:widerstand regt sich"],
+      oldLabels:["Widerstand regt sich"],
+      newKey:"prepared:sich regen",
+      newLabel:"sich regen",
+      meaningTr:"ortaya çıkmak, baş göstermek; burada: itiraz / direnç oluşmak",
+    },
+    {
+      oldKeys:["prepared:jemandem fällt etwas auf"],
+      oldLabels:["jemandem fällt etwas auf"],
+      newKey:"prepared:jemandem auffallen",
+      newLabel:"jemandem auffallen",
+      meaningTr:"birinin dikkatini çekmek",
+    },
+    {
+      oldKeys:["prepared:viel vorhaben"],
+      oldLabels:["viel vorhaben"],
+      newKey:"prepared:vorhaben",
+      newLabel:"vorhaben",
+      meaningTr:"planlamak, niyetinde olmak",
+    },
+  ];
+
+  function learningAliasForRawItem(item){
+    const key=normalizeLearningIdentity(item?.canonical_key||"");
+    const label=normalizeLearningIdentity(item?.canonical_form||"");
+    return LEARNING_ITEM_ALIASES.find(alias=>
+      alias.oldKeys.some(value=>normalizeLearningIdentity(value)===key) ||
+      alias.oldLabels.some(value=>normalizeLearningIdentity(value)===label)
+    ) || null;
+  }
+
+  async function migrateLearningItemAliases(rawItems,profileId,apiBase){
+    let changed=false;
+    const items=Array.isArray(rawItems)?rawItems:[];
+    for(const oldItem of items){
+      if(oldItem?.category!=="expression") continue;
+      const alias=learningAliasForRawItem(oldItem);
+      if(!alias || !oldItem.id) continue;
+
+      const existingTarget=items.find(item=>
+        item?.category==="expression" &&
+        normalizeLearningIdentity(item.canonical_key)===normalizeLearningIdentity(alias.newKey)
+      );
+
+      let targetId=existingTarget?.id||null;
+      if(!targetId){
+        const create=await platformFetch(apiBase+"/api/v1/learning-items",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            profile_id:profileId,
+            canonical_form:alias.newLabel,
+            canonical_key:alias.newKey,
+            category:"expression",
+            status:oldItem.status||"learning",
+            meaning:alias.meaningTr||((oldItem.translations||[]).find(entry=>entry.language==="tr")?.meaning)||null,
+            meaning_language:"tr",
+            metadata:{...(oldItem.metadata||{}),migrated_from_canonical:oldItem.canonical_key||oldItem.canonical_form||""},
+          }),
+        });
+        if(!create.ok) continue;
+        try{ targetId=(await create.json())?.id||null; }catch(_error){}
+      }
+
+      if(targetId){
+        for(const encounter of oldItem.encounters||[]){
+          const body={
+            learning_item_id:targetId,
+            surface_form:encounter.surface_form||alias.newLabel,
+            sentence:encounter.sentence||"",
+            provider:encounter.provider||"",
+            source_type:encounter.source_type||"",
+            external_id:encounter.external_id||"",
+            url:encounter.url||"",
+            title:encounter.title||null,
+            media_timestamp_ms:encounter.media_timestamp_ms??null,
+            media_end_timestamp_ms:encounter.media_end_timestamp_ms??null,
+            context:encounter.context||{},
+          };
+          if(!body.sentence) continue;
+          await platformFetch(apiBase+"/api/v1/encounters",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(body),
+          }).catch(()=>{});
+        }
+      }
+
+      const remove=await platformFetch(apiBase+"/api/v1/learning-items/"+encodeURIComponent(oldItem.id),{method:"DELETE"});
+      if(remove.ok || remove.status===404) changed=true;
+    }
+    return changed;
+  }
+
   function normalizeApiLearningItem(item){
     const translation=(item.translations||[]).find(entry=>entry.language==="tr") || item.translations?.[0];
     return {
@@ -477,9 +573,16 @@
   async function loadLearningItems(){
     const profileId=state.learningProfileId || await ensureLearningProfile();
     const apiBase=await platformApiBase();
-    const response=await platformFetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
+    let response=await platformFetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
     if(!response.ok) throw new Error("Platform API learning items "+response.status);
-    const payload=await response.json();
+    let payload=await response.json();
+
+    if(await migrateLearningItemAliases(payload.items||[],profileId,apiBase)){
+      response=await platformFetch(apiBase+"/api/v1/learning-items?profile_id="+encodeURIComponent(profileId));
+      if(!response.ok) throw new Error("Platform API learning items "+response.status);
+      payload=await response.json();
+    }
+
     state.learningItems=(payload.items||[]).map(normalizeApiLearningItem);
     refreshLearningHighlights();
     if(["youtube","zdf","web"].includes(adapter.id) && state.panel.element && !state.panel.element.hidden){
@@ -799,7 +902,7 @@
 
   function preparedWordAnalysis(fixture){
     return (fixture?.words||[]).map(item=>{
-      const occurrences=preparedItemOccurrences(item.forms);
+      const occurrences=preparedItemOccurrences(item.occurrenceForms||item.forms);
       return {
         lemma:item.lemma,
         pos:item.pos||"",
@@ -2495,6 +2598,23 @@
     state.panel.senseRows=null;
     const task=(async()=>{
       try{
+        const fixture=activePreparedBenchmark();
+        if(fixture){
+          state.panel.senseRows=preparedWordAnalysis(fixture).map(entry=>({
+            key:"prepared-word:"+normalizeLearningIdentity(entry.lemma),
+            lemma:entry.lemma,
+            canonical:entry.lemma,
+            meaningTr:entry.meaningTr||"",
+            unitType:posLabel(entry.pos||""),
+            senseId:"",
+            patternId:"",
+            cueIndex:entry.occurrences?.[0]??0,
+            surface:entry.forms?.[0]||entry.lemma,
+            occurrences:[...(entry.occurrences||[])],
+          }));
+          return;
+        }
+
         const apiBase=await platformApiBase();
         const rows=new Map();
         const batchSize=120;
@@ -3319,37 +3439,7 @@
   function installWebTextInteraction(){
     if(adapter.id!=="web" || state.web.interactionReady) return;
     state.web.interactionReady=true;
-    document.addEventListener("mousemove",event=>{
-      if(state.web.tooltipPinnedKey) return;
-      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
-      const hit=webWordHitAtPoint(event.clientX,event.clientY);
-      const key=hit ? hit.segmentIndex+":"+hit.word+":"+hit.absoluteStart : "";
-      if(!hit){
-        state.web.hoverKey="";
-        clearTimeout(state.web.hoverTimer);
-        scheduleTooltipHide(420);
-        return;
-      }
-      if(key===state.web.hoverKey){
-        // Moving inside the same yellow token must never let an older hide
-        // timer close the popup.
-        cancelTooltipHide();
-        return;
-      }
-      state.web.hoverKey=key;
-      clearTimeout(state.web.hoverTimer);
-      state.web.hoverTimer=setTimeout(async()=>{
-        const learningItem=await webLearningItemForHit(hit);
-        if(!learningItem){
-          if(!state.web.tooltipPinnedKey) scheduleTooltipHide(220);
-          return;
-        }
-        // As long as the pointer is on any token belonging to a current
-        // learning item, keep the popup stable while moving across it.
-        cancelTooltipHide();
-        showWebWordTooltip(hit,false);
-      },120);
-    },true);
+    // Web article popups are click-only. Hovering a yellow learning mark must not open or close a popup.
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
       const selection=window.getSelection();
@@ -3359,6 +3449,8 @@
       }
       const hit=webWordHitAtPoint(event.clientX,event.clientY);
       if(hit){
+        clearTimeout(state.web.hoverTimer);
+        state.web.hoverKey="";
         showWebWordTooltip(hit,true);
         return;
       }
