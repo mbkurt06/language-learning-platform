@@ -3616,16 +3616,23 @@
     const seen=new Set();
     const add=expr=>{
       if(!expr) return;
-      const identity=normalizeLearningIdentity(expr.pattern_id||expr.canonical||expr.surface||"");
+      const indices=supplementalExpressionTokenIndices(
+        data?.tokens||[],
+        expr.canonical||expr.surface||"",
+        expr.token_indices||[]
+      );
+      // Never trust a precomputed hover membership blindly. Engine/prepared
+      // spans may include argument/slot fillers (e.g. "Reformen" filling
+      // canonical "etwas"). Only fixed lexical parts may own the expression.
+      if(!indices.includes(tokenIndex)) return;
+      const normalized={...expr,token_indices:indices};
+      const identity=normalizeLearningIdentity(normalized.pattern_id||normalized.canonical||normalized.surface||"");
       if(identity && seen.has(identity)) return;
       if(identity) seen.add(identity);
-      candidates.push(expr);
+      candidates.push(normalized);
     };
     for(const expr of tokenHover.primary_expressions||[]) add(expr);
-    for(const expr of data?.expressions||[]){
-      const indices=supplementalExpressionTokenIndices(data?.tokens||[],expr.canonical||expr.surface||"",expr.token_indices||[]);
-      if(indices.includes(tokenIndex)) add({...expr,token_indices:indices});
-    }
+    for(const expr of data?.expressions||[]) add(expr);
     return candidates.sort((a,b)=>{
       const aTokens=supplementalExpressionTokenIndices(data?.tokens||[],a.canonical||a.surface||"",a.token_indices||[]).length;
       const bTokens=supplementalExpressionTokenIndices(data?.tokens||[],b.canonical||b.surface||"",b.token_indices||[]).length;
