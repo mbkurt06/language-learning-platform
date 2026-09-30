@@ -3699,10 +3699,11 @@
   function installWebTextInteraction(){
     if(adapter.id!=="web" || state.web.interactionReady) return;
     state.web.interactionReady=true;
-    // Web article popups are click-only. Hovering a yellow learning mark must not open or close a popup.
+    // A single click is the only word interaction on web text:
+    // resolve the clicked learning unit, highlight the word/full structure in blue,
+    // and open/update the popup. Hover and double-click have no word action.
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
-      clearWebStructureHighlight();
       const selection=window.getSelection();
       if(selection && !selection.isCollapsed){
         const selected=sanitizeLearningText(selection.toString());
@@ -3712,24 +3713,17 @@
       if(hit){
         clearTimeout(state.web.hoverTimer);
         state.web.hoverKey="";
-        showWebWordTooltip(hit,true);
+        try{ window.getSelection()?.removeAllRanges(); }catch(_error){}
+        showWebStructureForHit(hit);
         return;
       }
+      clearWebStructureHighlight();
       if(!tooltipPersistent()){
         state.web.tooltipPinnedKey="";
         state.web.hoverKey="";
         cancelTooltipHide();
         if(state.tooltip) state.tooltip.hidden=true;
       }
-    },true);
-    document.addEventListener("dblclick",event=>{
-      if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
-      const hit=webWordHitAtPoint(event.clientX,event.clientY);
-      if(!hit) return;
-      event.preventDefault();
-      event.stopPropagation();
-      try{ window.getSelection()?.removeAllRanges(); }catch(_error){}
-      showWebStructureForHit(hit);
     },true);
     document.addEventListener("mouseup",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
