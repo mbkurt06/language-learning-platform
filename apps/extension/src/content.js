@@ -3612,6 +3612,192 @@
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
 
+  async function buildPanelDiagnosticExport(){
+    if(!state.youtube.transcriptAnalysis) await analyzeWholeYouTubeTranscript().catch(()=>{});
+    if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups().catch(()=>{});
+    if(adapter.id==="web" && (!state.panel.senseRows || state.panel.senseRowsVideoId!==state.youtube.videoId)){
+      await analyzePanelWordSenses().catch(()=>{});
+    }
+
+    const cues=state.youtube.cues||[];
+    const sentences=[];
+    for(let index=0;index<cues.length;index++){
+      const cue=cues[index];
+      sentences.push({
+        index:index+1,
+        start_ms:Number.isFinite(cue.startMs)?cue.startMs:null,
+        end_ms:Number.isFinite(cue.endMs)?cue.endMs:null,
+        source:cue.text||"",
+        translation_tr:await translationForCue(cue),
+      });
+    }
+
+    const words=(state.youtube.transcriptAnalysis||[]).map(entry=>({
+      lemma:entry.lemma||"",
+      pos:entry.pos||"",
+      pos_label:posLabel(entry.pos||""),
+      count:entry.count||0,
+      forms:[...(entry.forms||[])],
+      occurrences:[...(entry.occurrences||[])].map(i=>i+1),
+      meaning_tr:entry.meaningTr||"",
+      article:entry.article||"",
+      singular:entry.singular||"",
+      plural:entry.plural||"",
+      status:(()=>{const item=learningItemForLemma(entry.lemma);return item?itemStatus(item):"";})(),
+    }));
+
+    const groups=(state.youtube.expressionGroupsAnalysis||[]).map(entry=>({
+      canonical:entry.canonical||"",
+      type:entry.type||"",
+      type_label:expressionGroupLabel(entry.type||""),
+      pattern_id:entry.patternId||"",
+      count:entry.count||0,
+      forms:[...(entry.forms||[])],
+      occurrences:[...(entry.occurrences||[])].map(i=>i+1),
+      meaning_tr:entry.meaningTr||"",
+      grammar_hint:entry.grammarHint||"",
+      status:(()=>{const item=learningItemForExpression(entry);return item?itemStatus(item):"";})(),
+    }));
+
+    const senses=senseRowsWithExpressions().map(row=>({
+      key:row.key||"",
+      lemma:row.lemma||"",
+      canonical:row.canonical||"",
+      meaning_tr:row.meaningTr||"",
+      unit_type:row.unitType||"",
+      sense_id:row.senseId||"",
+      pattern_id:row.patternId||"",
+      surface:row.surface||"",
+      occurrences:[...(row.occurrences||[])].map(i=>i+1),
+    }));
+
+    const saved=[...state.learningItems].map(item=>({
+      id:item.id||null,
+      kind:item.kind||"",
+      key:item.key||"",
+      label:item.label||"",
+      meaning_tr:item.meaning_tr||"",
+      status:itemStatus(item),
+      present_in_current_content:contentOccurrencesForLearningItem(item).length>0,
+      saved_from_current_content:learningItemSavedFromCurrentContent(item),
+      occurrences:contentOccurrencesForLearningItem(item).map(i=>i+1),
+      metadata:item.metadata||{},
+      encounters:(item.encounters||[]).map(encounter=>({
+        surface_form:encounter.surface_form||"",
+        sentence:encounter.sentence||"",
+        provider:encounter.provider||"",
+        source_type:encounter.source_type||"",
+        external_id:encounter.external_id||"",
+        url:encounter.url||"",
+        media_timestamp_ms:encounter.media_timestamp_ms??null,
+        media_end_timestamp_ms:encounter.media_end_timestamp_ms??null,
+      })),
+    }));
+
+    const settings={
+      extensionEnabled:state.settings.extensionEnabled!==false,
+      showVideoTranslation:state.settings.showVideoTranslation!==false,
+      showPanelTranslation:state.settings.showPanelTranslation!==false,
+      followActiveSubtitle:state.settings.followActiveSubtitle!==false,
+      pauseOnWordHover:state.settings.pauseOnWordHover===true,
+      autoPauseAfterSentence:state.settings.autoPauseAfterSentence===true,
+      interfaceLanguage:state.settings.interfaceLanguage||"tr",
+      theme:state.settings.theme||"system",
+      panelWidthFactor:Number(state.settings.panelWidthFactor||1),
+      germanFontSize:Number(state.settings.germanFontSize||100),
+      translationFontSize:Number(state.settings.translationFontSize||100),
+      youtubeSubtitlePositionY:Number(state.settings.youtubeSubtitlePositionY||82),
+      zdfSubtitlePositionY:Number(state.settings.zdfSubtitlePositionY||88),
+    };
+
+    return {
+      diagnostic_version:1,
+      generated_at:new Date().toISOString(),
+      extension:{
+        version:chrome.runtime.getManifest()?.version||"",
+        adapter:adapter.id,
+      },
+      page:{
+        title:document.title||"",
+        url:location.href,
+        provider:currentContentDescriptor().provider,
+        source_type:currentContentDescriptor().sourceType,
+        external_id:currentContentDescriptor().externalId,
+      },
+      panel:{
+        current_tab:state.panel.tab,
+        collapsed:Boolean(state.panel.collapsed),
+        docked:Boolean(state.panel.docked),
+        words_view:state.panel.wordsView,
+        saved_view:state.panel.savedView,
+        selected_lemma:state.panel.selectedLemma||"",
+        selected_group_key:state.panel.selectedGroupKey||"",
+        searches:{
+          words:state.panel.wordsSearch||"",
+          saved:state.panel.savedSearch||"",
+          subtitles:state.panel.subtitleSearch||"",
+        },
+        menus:{
+          tabs:[
+            {id:"subtitles",label:uiText("subtitles")},
+            {id:"words",label:uiText("words")},
+            {id:"saved",label:uiText("saved")},
+          ],
+          word_views:[
+            {id:"overview",label:"Genel"},
+            {id:"alphabetical",label:"A-Z"},
+            {id:"frequency",label:"Sıklık"},
+            {id:"groups",label:"Kelime grupları"},
+            {id:"senses",label:"Anlamlar"},
+          ],
+          saved_views:[
+            {id:"learning",label:"Öğreniyorum"},
+            {id:"from-content",label:"Bu İçerikten Kaydedilenler"},
+            {id:"present-content",label:"Bu İçerikte Geçenler"},
+            {id:"known",label:"Biliyorum"},
+          ],
+          export_formats:["TXT","CSV","JSON","PDF / Print","Highlight PDF","Panel Diagnostic JSON"],
+          settings_sections:[
+            {id:"general",label:uiText("general"),items:["interfaceLanguage","theme","extensionEnabled"]},
+            {id:"translation",label:uiText("translationView"),items:["showVideoTranslation","showPanelTranslation","followActiveSubtitle"]},
+            {id:"playback",label:uiText("playbackBehavior"),items:["pauseOnWordHover","autoPauseAfterSentence"]},
+            {id:"text-size",label:uiText("textSize"),items:["germanFontSize","translationFontSize"]},
+          ],
+        },
+      },
+      settings,
+      counts:{
+        sentences:sentences.length,
+        words:words.length,
+        groups:groups.length,
+        senses:senses.length,
+        saved:saved.length,
+      },
+      sentences,
+      words,
+      word_views:{
+        overview:words,
+        alphabetical:[...words].sort((a,b)=>String(a.lemma).localeCompare(String(b.lemma),"de")),
+        frequency:[...words].sort((a,b)=>b.count-a.count || String(a.lemma).localeCompare(String(b.lemma),"de")),
+      },
+      groups,
+      senses,
+      saved:{
+        all:saved,
+        learning:saved.filter(item=>item.status==="learning"),
+        known:saved.filter(item=>item.status==="learned"),
+        from_current_content:saved.filter(item=>item.saved_from_current_content),
+        present_in_current_content:saved.filter(item=>item.present_in_current_content),
+      },
+    };
+  }
+
+  async function downloadPanelDiagnosticExport(){
+    const payload=await buildPanelDiagnosticExport();
+    const filename=safeExportName("Panel_Diagnostic")+".json";
+    downloadTextFile(filename,"application/json;charset=utf-8",JSON.stringify(payload,null,2));
+  }
+
   function exportExpressionPriority(expressions){
     return [...(expressions||[])].sort((a,b)=>{
       const tokenDiff=(b.token_indices||[]).length-(a.token_indices||[]).length;
@@ -3795,7 +3981,7 @@
       wordSections+
       '<div class="gle-export-selectbar"><label><input type="checkbox" class="gle-export-all"> '+esc(uiText("exportSelectAll"))+'</label><span class="gle-export-count">0</span></div>'+
       '<div class="gle-export-items"></div>'+
-      '<footer>'+(adapter.id==="web"?'<button type="button" class="gle-export-highlight-pdf">Highlight PDF</button>':"")+'<button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
+      '<footer>'+(adapter.id==="web"?'<button type="button" class="gle-export-highlight-pdf">Highlight PDF</button>':"")+'<button type="button" class="gle-export-panel-diagnostic">Panel Diagnostic JSON</button><button type="button" class="gle-export-cancel">'+esc(uiText("exportCancel"))+'</button><button type="button" class="gle-export-go">'+esc(uiText("exportDownload"))+'</button></footer></div>';
     document.documentElement.appendChild(dialog);
     const close=()=>dialog.remove();
     dialog.querySelector(".gle-export-close").addEventListener("click",close);
@@ -3811,6 +3997,19 @@
         console.warn("Highlight PDF export failed",error);
         button.disabled=false;
         button.textContent="Highlight PDF";
+      }
+    });
+    dialog.querySelector(".gle-export-panel-diagnostic")?.addEventListener("click",async event=>{
+      const button=event.currentTarget;
+      button.disabled=true;
+      button.textContent="Panel hazırlanıyor…";
+      try{
+        await downloadPanelDiagnosticExport();
+        close();
+      }catch(error){
+        console.warn("Panel diagnostic export failed",error);
+        button.disabled=false;
+        button.textContent="Panel Diagnostic JSON";
       }
     });
     dialog.addEventListener("click",event=>{if(event.target===dialog)close();});
