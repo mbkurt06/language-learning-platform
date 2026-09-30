@@ -1266,11 +1266,106 @@
     }
   }
 
+  function mergePreparedContextualAnalysis(prepared,platform){
+    if(!prepared || !platform) return prepared||platform;
+    const merged={
+      ...prepared,
+      sentence_meaning_tr:firstMeaning(prepared.sentence_meaning_tr,platform.sentence_meaning_tr),
+      hover:{...(prepared.hover||{})},
+    };
+    const preparedTokens=prepared.tokens||[];
+    const platformTokens=platform.tokens||[];
+    const used=new Set();
+
+    const matchPlatformToken=(preparedToken,index)=>{
+      const sameIndex=platformTokens[index];
+      if(sameIndex && normalizedTokenText(sameIndex)===normalizedTokenText(preparedToken) && !used.has(sameIndex.i)){
+        used.add(sameIndex.i);
+        return sameIndex;
+      }
+      const wantedText=normalizeLearningIdentity(preparedToken?.text||"");
+      const wantedLemma=normalizeLearningIdentity(preparedToken?.lemma||"");
+      const candidate=platformTokens.find(token=>{
+        if(used.has(token.i)) return false;
+        const text=normalizeLearningIdentity(token.text||"");
+        const lemma=normalizeLearningIdentity(token.lemma||"");
+        return (wantedText && text===wantedText) || (wantedLemma && lemma===wantedLemma);
+      });
+      if(candidate) used.add(candidate.i);
+      return candidate||null;
+    };
+
+    merged.tokens=preparedTokens.map((token,index)=>{
+      const fallbackToken=matchPlatformToken(token,index);
+      if(!fallbackToken) return token;
+      const preparedLooksGeneric=!token.lemma || normalizeLearningIdentity(token.lemma)===normalizeLearningIdentity(token.text) || token.pos==="X";
+      return {
+        ...fallbackToken,
+        ...token,
+        lemma:preparedLooksGeneric?(fallbackToken.lemma||token.lemma):token.lemma,
+        pos:token.pos==="X"?(fallbackToken.pos||token.pos):token.pos,
+      };
+    });
+
+    const fallbackByPreparedIndex=new Map();
+    used.clear();
+    for(let index=0;index<preparedTokens.length;index++){
+      const fallbackToken=matchPlatformToken(preparedTokens[index],index);
+      if(fallbackToken) fallbackByPreparedIndex.set(preparedTokens[index].i,fallbackToken);
+    }
+
+    for(const preparedToken of preparedTokens){
+      const fallbackToken=fallbackByPreparedIndex.get(preparedToken.i);
+      if(!fallbackToken) continue;
+      const primaryKey=String(preparedToken.i);
+      const primaryHover=merged.hover[primaryKey]||merged.hover[preparedToken.i]||{};
+      const fallbackHover=platform.hover?.[String(fallbackToken.i)]||platform.hover?.[fallbackToken.i]||{};
+      merged.hover[primaryKey]={
+        ...fallbackHover,
+        ...primaryHover,
+        contextual_word_meaning_tr:firstMeaning(
+          primaryHover.contextual_word_meaning_tr,
+          fallbackHover.contextual_word_meaning_tr,
+          fallbackHover.dictionary_meanings_tr
+        ),
+        dictionary_meanings_tr:meaningValues(primaryHover.dictionary_meanings_tr).length
+          ? primaryHover.dictionary_meanings_tr
+          : fallbackHover.dictionary_meanings_tr,
+        lexical_form:primaryHover.lexical_form||fallbackHover.lexical_form,
+        usage_notes:(primaryHover.usage_notes||[]).length?primaryHover.usage_notes:(fallbackHover.usage_notes||[]),
+        primary_expressions:(primaryHover.primary_expressions||[]).length
+          ? primaryHover.primary_expressions
+          : (fallbackHover.primary_expressions||[]),
+      };
+    }
+    return merged;
+  }
+
+  async function warmPreparedContextualMeanings(){
+    if(adapter.id!=="web" || !activePreparedBenchmark()) return;
+    const texts=(state.web.segments||[]).map(item=>item.text).filter(Boolean);
+    if(!texts.length) return;
+    let cursor=0;
+    const worker=async()=>{
+      while(cursor<texts.length){
+        const index=cursor++;
+        const text=texts[index];
+        try{ await analyzePlatform(text); }catch(_error){}
+      }
+    };
+    await Promise.all([worker(),worker(),worker()]);
+  }
+
   async function analyze(text){
     const preparedFixture=activePreparedBenchmark();
     if(preparedFixture){
       const prepared=buildPreparedSentenceAnalysis(preparedFixture,text);
-      if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
+      try{
+        const platform=await analyzePlatform(text);
+        return mergePreparedContextualAnalysis(prepared,platform);
+      }catch(_error){
+        if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
+      }
     }
     return analyzePlatform(text);
   }
@@ -5580,6 +5675,7 @@
       state.youtube.expressionGroupsAnalysis=preparedExpressionAnalysis(preparedFixture);
       state.youtube.expressionGroupsVideoId=contentId;
       requestAnimationFrame(()=>refreshPreparedBenchmarkHighlights(preparedFixture));
+      warmPreparedContextualMeanings().catch(()=>{});
     }else if(segments.length){
       Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
         .finally(()=>scheduleWebLearningAnnotations());
