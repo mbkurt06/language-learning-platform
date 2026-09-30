@@ -917,40 +917,12 @@
   }
 
   function refreshPreparedBenchmarkHighlights(fixture){
-    if(adapter.id!=="web" || !fixture || !CSS?.highlights || typeof Highlight==="undefined") return;
+    if(adapter.id!=="web" || !fixture || !CSS?.highlights) return;
+    // Curated benchmark analysis still powers words, expressions and the PDF
+    // review data, but the article itself stays visually quiet. Only the
+    // user's own "Öğreniyorum" items are highlighted persistently in yellow.
     CSS.highlights.delete("gle-benchmark-word");
     CSS.highlights.delete("gle-benchmark-expression");
-    const wordRanges=preparedRangesForForms((fixture.words||[]).flatMap(item=>item.forms||[]));
-    const expressionRanges=[];
-    for(const expression of fixture.expressions||[]){
-      if(!(expression.highlightParts||[]).length){
-        expressionRanges.push(...preparedRangesForForms(expression.forms||[]));
-        continue;
-      }
-      for(const segment of state.web.segments||[]){
-        const element=segment?.sourceElement;
-        if(!element?.isConnected) continue;
-        const fullText=String(element.textContent||"");
-        const lower=fullText.toLocaleLowerCase("de-DE");
-        for(const form of expression.forms||[]){
-          const formLower=String(form).toLocaleLowerCase("de-DE");
-          const formStart=lower.indexOf(formLower);
-          if(formStart<0) continue;
-          const formEnd=formStart+String(form).length;
-          for(const part of expression.highlightParts||[]){
-            const partLower=String(part).toLocaleLowerCase("de-DE");
-            let partStart=lower.indexOf(partLower,formStart);
-            while(partStart>=0 && partStart<formEnd){
-              const range=webRangeFromOffsets(element,partStart,partStart+String(part).length);
-              if(range) expressionRanges.push(range);
-              partStart=lower.indexOf(partLower,partStart+Math.max(1,String(part).length));
-            }
-          }
-        }
-      }
-    }
-    if(wordRanges.length) CSS.highlights.set("gle-benchmark-word",new Highlight(...wordRanges));
-    if(expressionRanges.length) CSS.highlights.set("gle-benchmark-expression",new Highlight(...expressionRanges));
   }
 
   async function analyzePlatform(text){
@@ -3355,20 +3327,28 @@
       if(!hit){
         state.web.hoverKey="";
         clearTimeout(state.web.hoverTimer);
-        scheduleTooltipHide(350);
+        scheduleTooltipHide(420);
         return;
       }
-      if(key===state.web.hoverKey) return;
+      if(key===state.web.hoverKey){
+        // Moving inside the same yellow token must never let an older hide
+        // timer close the popup.
+        cancelTooltipHide();
+        return;
+      }
       state.web.hoverKey=key;
       clearTimeout(state.web.hoverTimer);
       state.web.hoverTimer=setTimeout(async()=>{
         const learningItem=await webLearningItemForHit(hit);
         if(!learningItem){
-          if(!state.web.tooltipPinnedKey) scheduleTooltipHide(120);
+          if(!state.web.tooltipPinnedKey) scheduleTooltipHide(220);
           return;
         }
+        // As long as the pointer is on any token belonging to a current
+        // learning item, keep the popup stable while moving across it.
+        cancelTooltipHide();
         showWebWordTooltip(hit,false);
-      },260);
+      },120);
     },true);
     document.addEventListener("click",event=>{
       if(event.target?.closest?.("#gle-shared-panel,#gle-tooltip,#gle-export-dialog,#gle-settings-dialog,.gle-web-learning-layer")) return;
@@ -3664,14 +3644,6 @@
   async function highlightedWebExportRows(){
     if(adapter.id!=="web") return [];
     const preparedFixture=activePreparedBenchmark();
-    const preparedWordSet=new Set((preparedFixture?.words||[]).flatMap(item=>[
-      preparedNormalize(item.lemma),
-      ...(item.forms||[]).map(preparedNormalize)
-    ]).filter(Boolean));
-    const transcriptWordSet=new Set((state.youtube.transcriptAnalysis||[]).flatMap(item=>[
-      preparedNormalize(item.lemma),
-      ...(item.forms||[]).map(preparedNormalize)
-    ]).filter(Boolean));
     const rows=[];
     for(let index=0;index<(state.web.segments||[]).length;index++){
       const segment=state.web.segments[index];
@@ -3693,10 +3665,6 @@
         const expr=expressionByToken.get(token.i);
         const learningExpr=expr && exportLearningExpression(expr);
         const learningWord=exportLearningWord(token);
-        const lemma=preparedNormalize(token.lemma||token.text||"");
-        const surface=preparedNormalize(token.text||"");
-        const wordSet=preparedFixture ? preparedWordSet : transcriptWordSet;
-        const isWord=wordSet.has(lemma) || wordSet.has(surface);
         let cls="";
         let title="";
         if(learningExpr || learningWord){
@@ -3705,9 +3673,6 @@
         }else if(expr){
           cls="expression";
           title=expr.canonical||"";
-        }else if(isWord){
-          cls="word";
-          title=token.lemma||token.text||"";
         }
         const piece=cls
           ? '<mark class="'+cls+'" title="'+escAttr(title)+'">'+esc(token.text)+'</mark>'
@@ -3742,10 +3707,10 @@
     doc.open();
     doc.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+
       '@page{size:A4;margin:14mm 15mm}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;margin:0;font-size:13px;line-height:1.65}'+
-      'h1{font-size:20px;line-height:1.2;margin:0 0 4px}.meta{font-size:10px;color:#64748b;margin-bottom:14px;overflow-wrap:anywhere}.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;font-size:10px}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.lw{background:rgba(37,99,235,.42)}.le{background:rgba(168,85,247,.30)}.ll{background:rgba(250,204,21,.55)}'+
-      'p{margin:0 0 9px;break-inside:avoid}.index{display:inline-block;color:#94a3b8;font-size:9px;width:24px;vertical-align:2px}mark{color:inherit;padding:1px 2px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}mark.word{background:rgba(37,99,235,.42)}mark.expression{background:rgba(168,85,247,.30)}mark.learning{background:rgba(250,204,21,.55)}'+
+      'h1{font-size:20px;line-height:1.2;margin:0 0 4px}.meta{font-size:10px;color:#64748b;margin-bottom:14px;overflow-wrap:anywhere}.legend{display:flex;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;font-size:10px}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}.le{background:rgba(168,85,247,.30)}.ll{background:rgba(250,204,21,.55)}'+
+      'p{margin:0 0 9px;break-inside:avoid}.index{display:inline-block;color:#94a3b8;font-size:9px;width:24px;vertical-align:2px}mark{color:inherit;padding:1px 2px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}mark.expression{background:rgba(168,85,247,.30)}mark.learning{background:rgba(250,204,21,.55)}'+
       '</style></head><body><h1>'+esc(document.title||"Web Highlight Export")+'</h1><div class="meta">'+esc(location.href)+'</div>'+
-      '<div class="legend"><span><i class="lw"></i>Kelime</span><span><i class="le"></i>Kelime grubu / yapı</span><span><i class="ll"></i>Öğreniyorum</span></div>'+body+'</body></html>');
+      '<div class="legend"><span><i class="le"></i>Kelime grubu / yapı</span><span><i class="ll"></i>Öğreniyorum</span></div>'+body+'</body></html>');
     doc.close();
     try{doc.title=title;}catch(_error){}
     setTimeout(()=>{
