@@ -951,6 +951,8 @@
           contextual_meaning_tr:firstMeaning(expr.contextual_meaning_tr,match.contextual_meaning_tr,match.meaning_tr),
           meaning_tr:meaningValues(expr.meaning_tr).length?expr.meaning_tr:match.meaning_tr,
           grammar_hint:expr.grammar_hint||match.grammar_hint||"",
+          highlight_parts:[...(expr.highlight_parts||expr.highlightParts||match.highlight_parts||match.highlightParts||[])],
+          highlight_exclude_parts:[...(expr.highlight_exclude_parts||expr.highlightExcludeParts||match.highlight_exclude_parts||match.highlightExcludeParts||[])],
         };
       });
     }else if(fallbackExpressions.length){
@@ -1166,7 +1168,9 @@
           contextual_meaning_tr:expression.meaningTr||"",
           meaning_tr:expression.meaningTr?[expression.meaningTr]:[],
           grammar_hint:expression.grammarHint||"",
-          token_indices:tokenIndices
+          token_indices:tokenIndices,
+          highlight_parts:[...(expression.highlightParts||[])],
+          highlight_exclude_parts:[...(expression.highlightExcludeParts||[])]
         });
         break;
       }
@@ -3369,6 +3373,51 @@
     return {normalized:normalized.trim(),map,raw};
   }
 
+  function expressionSemanticRanges(expression,element){
+    if(!expression || !element) return [];
+    const parts=(expression.highlight_parts||expression.highlightParts||[]).map(value=>String(value||"").replace(/\s+/g," ").trim()).filter(Boolean);
+    if(!parts.length) return [];
+    const excluded=new Set((expression.highlight_exclude_parts||expression.highlightExcludeParts||[]).map(part=>preparedNormalize(part)));
+    const surface=String(expression.surface||"").replace(/\s+/g," ").trim();
+    if(!surface) return [];
+
+    const mapped=normalizedTextOffsetMap(element.textContent||"");
+    const normalizedElement=mapped.normalized.toLocaleLowerCase("de-DE");
+    const surfaceLower=surface.toLocaleLowerCase("de-DE");
+    const surfaceStart=normalizedElement.indexOf(surfaceLower);
+    if(surfaceStart<0) return [];
+
+    const spanText=mapped.normalized.slice(surfaceStart,surfaceStart+surface.length);
+    const spanLower=spanText.toLocaleLowerCase("de-DE");
+    const ranges=[];
+    const used=[];
+    for(const part of parts){
+      const normalizedPart=preparedNormalize(part);
+      if(!normalizedPart || excluded.has(normalizedPart)) continue;
+      const needle=part.toLocaleLowerCase("de-DE");
+      let searchFrom=0;
+      let at=-1;
+      while((at=spanLower.indexOf(needle,searchFrom))>=0){
+        const end=at+part.length;
+        const overlaps=used.some(([a,b])=>at<b && end>a);
+        if(!overlaps){
+          used.push([at,end]);
+          const normalizedStart=surfaceStart+at;
+          const normalizedEnd=surfaceStart+end-1;
+          const rawStart=mapped.map[normalizedStart];
+          const rawEndInclusive=mapped.map[normalizedEnd];
+          if(Number.isInteger(rawStart) && Number.isInteger(rawEndInclusive)){
+            const range=webRangeFromOffsets(element,rawStart,rawEndInclusive+1);
+            if(range) ranges.push(range);
+          }
+          break;
+        }
+        searchFrom=at+Math.max(1,part.length);
+      }
+    }
+    return ranges;
+  }
+
   function preparedExpressionEntryForValue(value){
     const fixture=activePreparedBenchmark();
     if(!fixture || !value) return null;
@@ -3791,7 +3840,12 @@
       // spans may include argument/slot fillers (e.g. "Reformen" filling
       // canonical "etwas"). Only fixed lexical parts may own the expression.
       if(!indices.includes(tokenIndex)) return;
-      const normalized={...expr,token_indices:indices};
+      const normalized={
+        ...expr,
+        token_indices:indices,
+        highlight_parts:[...(expr.highlight_parts||expr.highlightParts||[])],
+        highlight_exclude_parts:[...(expr.highlight_exclude_parts||expr.highlightExcludeParts||[])]
+      };
       const identity=normalizeLearningIdentity(normalized.pattern_id||normalized.canonical||normalized.surface||"");
       if(identity && seen.has(identity)) return;
       if(identity) seen.add(identity);
@@ -3872,12 +3926,13 @@
       if(sentenceStart<0) sentenceStart=fullText.toLocaleLowerCase("de-DE").indexOf(String(segment.text).toLocaleLowerCase("de-DE"));
       const ranges=[];
       const expression=expressions[0]||null;
-      const preparedSemanticRanges=expression
-        ? preparedExpressionRangesForValue(expression,segment,element)
-        : [];
 
-      if(preparedSemanticRanges.length){
-        ranges.push(...preparedSemanticRanges);
+      // Single source of truth: the selected popup expression carries its own
+      // semantic highlight parts. If any member selects this expression, use
+      // those exact parts for the active blue highlight.
+      const semanticRanges=expression ? expressionSemanticRanges(expression,element) : [];
+      if(semanticRanges.length){
+        ranges.push(...semanticRanges);
       }else{
         const tokenIndices=expression
           ? supplementalExpressionTokenIndices(data.tokens||[],expression.canonical||expression.surface||"",expression.token_indices||[])
