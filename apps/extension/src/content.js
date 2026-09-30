@@ -869,6 +869,68 @@
   }
 
 
+  function meaningValues(value){
+    if(Array.isArray(value)) return value.map(item=>sanitizeLearningText(item)).filter(Boolean);
+    const cleaned=sanitizeLearningText(value||"");
+    return cleaned?[cleaned]:[];
+  }
+
+  function firstMeaning(...values){
+    for(const value of values){
+      const items=meaningValues(value);
+      if(items.length) return items[0];
+    }
+    return "";
+  }
+
+  function tooltipHasMeaning(data,tokenIndex){
+    const h=data?.hover?.[String(tokenIndex)]||data?.hover?.[tokenIndex]||{};
+    const expressions=h.primary_expressions||[];
+    if(firstMeaning(h.contextual_word_meaning_tr,h.dictionary_meanings_tr)) return true;
+    return expressions.some(expr=>firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr));
+  }
+
+  function mergeTooltipMeaningData(primary,primaryToken,fallback,fallbackToken){
+    if(!primary || !primaryToken || !fallback || !fallbackToken) return primary;
+    const primaryKey=String(primaryToken.i);
+    const fallbackHover=fallback.hover?.[String(fallbackToken.i)]||fallback.hover?.[fallbackToken.i]||{};
+    const primaryHover=primary.hover?.[primaryKey]||primary.hover?.[primaryToken.i]||{};
+    if(!primary.hover) primary.hover={};
+
+    const merged={...primaryHover};
+    if(!firstMeaning(merged.contextual_word_meaning_tr) && firstMeaning(fallbackHover.contextual_word_meaning_tr)){
+      merged.contextual_word_meaning_tr=fallbackHover.contextual_word_meaning_tr;
+    }
+    if(!meaningValues(merged.dictionary_meanings_tr).length && meaningValues(fallbackHover.dictionary_meanings_tr).length){
+      merged.dictionary_meanings_tr=fallbackHover.dictionary_meanings_tr;
+    }
+    if(!merged.lexical_form && fallbackHover.lexical_form) merged.lexical_form=fallbackHover.lexical_form;
+    if(!(merged.usage_notes||[]).length && (fallbackHover.usage_notes||[]).length) merged.usage_notes=fallbackHover.usage_notes;
+
+    const fallbackExpressions=fallbackHover.primary_expressions||[];
+    if((merged.primary_expressions||[]).length){
+      merged.primary_expressions=merged.primary_expressions.map(expr=>{
+        if(firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr)) return expr;
+        const match=fallbackExpressions.find(candidate=>
+          normalizeLearningIdentity(candidate.pattern_id||candidate.canonical||candidate.surface||"")===
+          normalizeLearningIdentity(expr.pattern_id||expr.canonical||expr.surface||"")
+        ) || fallbackExpressions[0];
+        if(!match) return expr;
+        return {
+          ...expr,
+          contextual_meaning_tr:firstMeaning(expr.contextual_meaning_tr,match.contextual_meaning_tr,match.meaning_tr),
+          meaning_tr:meaningValues(expr.meaning_tr).length?expr.meaning_tr:match.meaning_tr,
+          grammar_hint:expr.grammar_hint||match.grammar_hint||"",
+        };
+      });
+    }else if(fallbackExpressions.length){
+      merged.primary_expressions=fallbackExpressions;
+    }
+
+    primary.hover[primaryKey]=merged;
+    return primary;
+  }
+
   function renderCard(data, tokenIndex, anchor){
     cancelTooltipHide();
     const h=data.hover?.[String(tokenIndex)]||data.hover?.[tokenIndex]||{};
@@ -884,7 +946,7 @@
     const expr=expressions[0];
     const lexical=h.lexical_form;
     const notes=h.usage_notes||[];
-    const dictionaryMeanings=h.dictionary_meanings_tr||[];
+    const dictionaryMeanings=meaningValues(h.dictionary_meanings_tr);
     const sourceToken=(data.tokens||[]).find(token=>token.i===tokenIndex);
     const lemma=sourceToken?.lemma||sourceToken?.text||"";
     if(!expr && lexical?.article){
@@ -904,8 +966,8 @@
     const primaryLabel=expr ? expr.canonical : nounLabel;
     const primaryType=expr ? expressionTypeLabel(expr.type) : posLabel(sourceToken?.pos);
     const primaryMeaning=expr
-      ? (expr.contextual_meaning_tr||(expr.meaning_tr||[])[0]||h.contextual_word_meaning_tr||"")
-      : (h.contextual_word_meaning_tr||dictionaryMeanings[0]||"");
+      ? firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr,h.contextual_word_meaning_tr,dictionaryMeanings)
+      : firstMeaning(h.contextual_word_meaning_tr,dictionaryMeanings);
 
     const header=primaryLabel
       ? `<div class="gle-hover-head"><b>${esc(primaryLabel)}</b><span>${esc(primaryType)}</span></div>`
@@ -3572,18 +3634,22 @@
       if(!token) return;
       let expressions=ensureWebExpressionHover(data,token);
 
-      // Prepared benchmark data is intentionally curated. If the clicked token
-      // has no prepared structure, ask the normal analyzer before treating it
-      // as a standalone word.
-      if(activePreparedBenchmark() && !expressions.length){
+      // Prepared/fixture analysis may know the structure but still lack a
+      // Turkish meaning. Ask the normal analyzer whenever either the structure
+      // or the tooltip meaning is incomplete, then enrich rather than blindly
+      // discarding the curated structure.
+      if(activePreparedBenchmark() && (!expressions.length || !tooltipHasMeaning(data,token.i))){
         const fallback=await analyzePlatform(segment.text);
         const fallbackToken=webTokenForHit(fallback,hit);
         if(fallbackToken){
           const fallbackExpressions=ensureWebExpressionHover(fallback,fallbackToken);
-          if(fallbackExpressions.length){
+          if(!expressions.length && fallbackExpressions.length){
             data=fallback;
             token=fallbackToken;
             expressions=fallbackExpressions;
+          }else{
+            data=mergeTooltipMeaningData(data,token,fallback,fallbackToken);
+            expressions=ensureWebExpressionHover(data,token);
           }
         }
       }
@@ -3672,12 +3738,7 @@
       if(!token) return;
       ensureWebExpressionHover(data,token);
 
-      const hover=data.hover?.[String(token.i)]||data.hover?.[token.i]||{};
-      const hasMeaning=Boolean(
-        hover.contextual_word_meaning_tr ||
-        (hover.dictionary_meanings_tr||[]).length ||
-        (hover.primary_expressions||[]).some(expr=>expr.contextual_meaning_tr || (expr.meaning_tr||[]).length)
-      );
+      const hasMeaning=tooltipHasMeaning(data,token.i);
 
       // The prepared benchmark intentionally overrides only curated items.
       // For any clicked word without prepared lexical meaning, fall back to
@@ -3686,8 +3747,11 @@
         const fallback=await analyzePlatform(segment.text);
         const fallbackToken=webTokenForHit(fallback,hit);
         if(fallbackToken){
-          data=fallback;
-          token=fallbackToken;
+          data=mergeTooltipMeaningData(data,token,fallback,fallbackToken);
+          if(!tooltipHasMeaning(data,token.i)){
+            data=fallback;
+            token=fallbackToken;
+          }
           ensureWebExpressionHover(data,token);
         }
       }
