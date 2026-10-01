@@ -44,6 +44,8 @@
     analysisInflight:new Map(),
     aiIndexBusy:false,
     aiIndexLastStatus:"",
+    aiIndexDiagnostic:null,
+    aiLabDialog:null,
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
@@ -123,13 +125,14 @@
     }
     const aiButton=panel.querySelector(".gle-header-ai-analyze");
     if(aiButton){
-      aiButton.disabled=state.aiIndexBusy===true;
-      aiButton.textContent=state.aiIndexBusy?"AI…":(state.aiIndexLastStatus==="ready"?"AI ✓":"AI");
+      aiButton.disabled=false;
+      const aiSource=state.aiIndexDiagnostic?.source||"";
+      aiButton.textContent=state.aiIndexBusy?"AI…":(state.aiIndexLastStatus==="ready"?(aiSource==="database"?"DB ✓":"AI ✓"):"AI");
       aiButton.title=state.aiIndexBusy
-        ? "AI analizi sürüyor"
+        ? "AI analizi sürüyor — ayrıntıları aç"
         : (state.aiIndexLastStatus==="ready"
-          ? "Bu içerik AI ile analiz edildi"
-          : "Bu içeriği AI ile analiz et");
+          ? (aiSource==="database"?"Analiz veritabanından yüklendi — ayrıntıları aç":"Yeni AI analizi hazır — ayrıntıları aç")
+          : "AI Analiz Laboratuvarını aç");
       aiButton.setAttribute("aria-label",aiButton.title);
     }
     const settingsButton=panel.querySelector(".gle-header-settings");
@@ -1355,15 +1358,13 @@
     return true;
   }
 
-  async function runCurrentContentAiIndex(){
-    if(state.aiIndexBusy) return;
-    let request=null;
 
+  function currentAiIndexRequest(){
     if(adapter.id==="web"){
       let pageUrl;
       try{ pageUrl=new URL(location.href); pageUrl.hash=""; }catch(_error){ pageUrl=null; }
       const stableUrl=pageUrl?.toString()||location.href;
-      request={
+      return {
         provider:"web",
         sourceType:"article",
         externalId:stableUrl,
@@ -1372,9 +1373,10 @@
         cues:state.web.segments||[],
         contentId:"web:"+location.href,
       };
-    }else if(adapter.id==="youtube"){
+    }
+    if(adapter.id==="youtube"){
       const videoId=state.youtube.videoId||currentYouTubeVideoId();
-      request={
+      return {
         provider:"youtube",
         sourceType:"video",
         externalId:videoId,
@@ -1383,9 +1385,10 @@
         cues:state.youtube.cues||[],
         contentId:videoId,
       };
-    }else if(adapter.id==="zdf"){
+    }
+    if(adapter.id==="zdf"){
       const videoId=state.zdf.videoId||state.youtube.videoId;
-      request={
+      return {
         provider:"zdf",
         sourceType:"video",
         externalId:videoId,
@@ -1395,26 +1398,198 @@
         contentId:videoId,
       };
     }
+    return null;
+  }
+
+  function aiLabStats(diagnostic=state.aiIndexDiagnostic){
+    const segments=diagnostic?.response?.segments||[];
+    return {
+      segments:segments.length,
+      translated:segments.filter(item=>String(item.sentence_translation||"").trim()).length,
+      tokens:segments.reduce((sum,item)=>sum+(item.tokens||[]).length,0),
+      expressions:segments.reduce((sum,item)=>sum+(item.expressions||[]).length,0),
+    };
+  }
+
+  function aiLabSourceLabel(diagnostic=state.aiIndexDiagnostic){
+    if(diagnostic?.source==="database") return "Veritabanından geldi";
+    if(diagnostic?.source==="ai") return "Yeni AI analizi";
+    if(diagnostic?.status==="running") return "AI analizi çalışıyor";
+    if(diagnostic?.status==="error") return "Analiz başarısız";
+    if(diagnostic?.status==="missing") return "İçerik hazır değil";
+    return "Henüz analiz yapılmadı";
+  }
+
+  function aiLabStatusLabel(status){
+    return ({ready:"Hazır",running:"Çalışıyor",error:"Hata",missing:"Eksik içerik",idle:"Bekliyor"})[status]||"Bekliyor";
+  }
+
+  function buildAiAnalysisExport(){
+    const diagnostic=state.aiIndexDiagnostic||{
+      status:"idle",
+      source:"",
+      request:null,
+      response:null,
+      error:"",
+    };
+    return {
+      ai_analysis_export_version:1,
+      generated_at:new Date().toISOString(),
+      page:{
+        title:document.title||"",
+        url:location.href,
+        adapter:adapter.id,
+      },
+      result_source:diagnostic.source||"",
+      result_source_label:aiLabSourceLabel(diagnostic),
+      status:diagnostic.status||"idle",
+      started_at:diagnostic.started_at||null,
+      completed_at:diagnostic.completed_at||null,
+      error:diagnostic.error||"",
+      request:diagnostic.request||null,
+      stats:aiLabStats(diagnostic),
+      indexed_content:diagnostic.response||null,
+    };
+  }
+
+  function downloadAiAnalysisExport(){
+    const filename=safeExportName("AI_Analysis")+".json";
+    downloadTextFile(filename,"application/json;charset=utf-8",JSON.stringify(buildAiAnalysisExport(),null,2));
+  }
+
+  function renderAiLabDialog(){
+    const dialog=state.aiLabDialog;
+    if(!dialog?.isConnected) return;
+    const diagnostic=state.aiIndexDiagnostic||{status:"idle",source:"",request:null,response:null,error:""};
+    const stats=aiLabStats(diagnostic);
+    const response=diagnostic.response||{};
+    const request=diagnostic.request||currentAiIndexRequest()||{};
+    const sourceClass=diagnostic.source==="database"?"database":diagnostic.source==="ai"?"ai":"neutral";
+    const sourceLabel=aiLabSourceLabel(diagnostic);
+    const model=response.analyzer_model||"—";
+    const provider=response.analyzer_provider||"—";
+    const segments=response.segments||[];
+    const rows=segments.length
+      ? segments.map((segment,index)=>{
+          const expressions=(segment.expressions||[]).map(expr=>'<span class="gle-ai-lab-expression">'+esc(expr.canonical||expr.surface||"")+'</span>').join("");
+          return '<article class="gle-ai-lab-segment"><div class="gle-ai-lab-segment-head"><b>#'+esc(String(Number.isInteger(segment.index)?segment.index+1:index+1))+'</b><span>'+(segment.tokens||[]).length+' kelime · '+(segment.expressions||[]).length+' yapı</span></div><div class="gle-ai-lab-source">'+esc(segment.text||"")+'</div><div class="gle-ai-lab-translation">'+esc(segment.sentence_translation||"Çeviri yok")+'</div>'+(expressions?'<div class="gle-ai-lab-expressions">'+expressions+'</div>':"")+'</article>';
+        }).join("")
+      : '<div class="gle-ai-lab-empty">Henüz AI/DB analiz sonucu yok. “AI Analizi Başlat” düğmesi Gemini çağrısını yalnızca siz bastığınızda yapar.</div>';
+
+    const body=dialog.querySelector(".gle-ai-lab-body");
+    if(!body) return;
+    body.innerHTML=
+      '<section class="gle-ai-lab-summary">'+
+        '<div class="gle-ai-lab-status-line"><span class="gle-ai-lab-status '+sourceClass+'">'+esc(sourceLabel)+'</span><b>'+esc(aiLabStatusLabel(diagnostic.status||"idle"))+'</b></div>'+
+        '<dl>'+
+          '<div><dt>İçerik</dt><dd>'+esc(request.title||document.title||"—")+'</dd></div>'+
+          '<div><dt>Kaynak</dt><dd>'+esc(request.provider||adapter.id||"—")+'</dd></div>'+
+          '<div><dt>Sonuç nereden?</dt><dd>'+esc(sourceLabel)+'</dd></div>'+
+          '<div><dt>AI sağlayıcı</dt><dd>'+esc(provider)+'</dd></div>'+
+          '<div><dt>Model</dt><dd>'+esc(model)+'</dd></div>'+
+          '<div><dt>Content ID</dt><dd class="mono">'+esc(String(response.content_id||"—"))+'</dd></div>'+
+          '<div><dt>Content hash</dt><dd class="mono">'+esc(String(response.content_hash||"—"))+'</dd></div>'+
+          '<div><dt>Şema</dt><dd>'+esc(String(response.analysis_schema_version||"—"))+'</dd></div>'+
+        '</dl>'+
+        '<div class="gle-ai-lab-counts"><span><b>'+stats.segments+'</b>Cümle</span><span><b>'+stats.translated+'</b>Çeviri</span><span><b>'+stats.tokens+'</b>Kelime</span><span><b>'+stats.expressions+'</b>Yapı</span></div>'+
+        (diagnostic.error?'<pre class="gle-ai-lab-error">'+esc(diagnostic.error)+'</pre>':"")+
+      '</section>'+
+      '<section class="gle-ai-lab-results"><h3>AI çeviri ve dil analizi</h3>'+rows+'</section>';
+
+    const run=dialog.querySelector(".gle-ai-lab-run");
+    if(run){
+      run.disabled=state.aiIndexBusy===true;
+      run.textContent=state.aiIndexBusy?"Analiz sürüyor…":"AI Analizi Başlat";
+    }
+    const exportButton=dialog.querySelector(".gle-ai-lab-export");
+    if(exportButton) exportButton.disabled=!state.aiIndexDiagnostic;
+  }
+
+  function ensureAiLabDialog(){
+    let dialog=document.getElementById("gle-ai-lab-dialog");
+    if(dialog){
+      dialog.hidden=false;
+      state.aiLabDialog=dialog;
+      renderAiLabDialog();
+      return dialog;
+    }
+    dialog=document.createElement("div");
+    dialog.id="gle-ai-lab-dialog";
+    dialog.innerHTML='<div class="gle-ai-lab-card" role="dialog" aria-modal="true" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI Analiz Laboratuvarı</strong><small>AI / veritabanı kaynağını, çeviriyi ve dil analizini denetle</small></div><button type="button" class="gle-ai-lab-close" aria-label="Kapat">×</button></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
+    dialog.querySelector(".gle-ai-lab-close").addEventListener("click",()=>{dialog.hidden=true;});
+    dialog.addEventListener("click",event=>{if(event.target===dialog) dialog.hidden=true;});
+    dialog.querySelector(".gle-ai-lab-run").addEventListener("click",()=>runCurrentContentAiIndex());
+    dialog.querySelector(".gle-ai-lab-export").addEventListener("click",()=>downloadAiAnalysisExport());
+    document.documentElement.appendChild(dialog);
+    state.aiLabDialog=dialog;
+    renderAiLabDialog();
+    return dialog;
+  }
+
+  async function runCurrentContentAiIndex(){
+    if(state.aiIndexBusy) return;
+    const request=currentAiIndexRequest();
 
     if(!request?.externalId || !request?.cues?.length){
       state.aiIndexLastStatus="missing";
+      state.aiIndexDiagnostic={
+        status:"missing",
+        source:"",
+        started_at:new Date().toISOString(),
+        completed_at:new Date().toISOString(),
+        request:request?{
+          provider:request.provider,
+          source_type:request.sourceType,
+          external_id:request.externalId||"",
+          title:request.title||"",
+          url:request.url||"",
+          segment_count:Array.isArray(request.cues)?request.cues.length:0,
+        }:null,
+        response:null,
+        error:"Analiz için içerik/cümle verisi henüz hazır değil.",
+      };
       updateSharedPanelUi();
+      renderAiLabDialog();
       return;
     }
 
     state.aiIndexBusy=true;
     state.aiIndexLastStatus="";
+    state.aiIndexDiagnostic={
+      status:"running",
+      source:"",
+      started_at:new Date().toISOString(),
+      completed_at:null,
+      request:{
+        provider:request.provider,
+        source_type:request.sourceType,
+        external_id:String(request.externalId),
+        title:request.title||"",
+        url:request.url||"",
+        segment_count:request.cues.length,
+      },
+      response:null,
+      error:"",
+    };
     updateSharedPanelUi();
+    renderAiLabDialog();
     try{
       const indexed=await resolveIndexedContent(request);
       state.aiIndexLastStatus=indexed?"ready":"error";
     }catch(error){
       console.warn("Manual AI content analysis failed",error);
       state.aiIndexLastStatus="error";
+      state.aiIndexDiagnostic={
+        ...(state.aiIndexDiagnostic||{}),
+        status:"error",
+        completed_at:new Date().toISOString(),
+        error:String(error?.message||error),
+      };
     }finally{
       state.aiIndexBusy=false;
       updateSharedPanelUi();
       renderSharedPanel();
+      renderAiLabDialog();
     }
   }
 
@@ -1444,12 +1619,42 @@
           metadata:{indexed_by:"browser-extension"},
         }),
       });
-      if(response.status===409) return false;
-      if(!response.ok) throw new Error("content-index "+response.status);
+      if(response.status===409){
+        state.aiIndexDiagnostic={
+          ...(state.aiIndexDiagnostic||{}),
+          status:"error",
+          completed_at:new Date().toISOString(),
+          error:"Bu içerik için başka bir analiz işlemi zaten devam ediyor (409).",
+        };
+        renderAiLabDialog();
+        return false;
+      }
+      if(!response.ok){
+        const detail=(await response.text().catch(()=>"")).trim();
+        throw new Error("content-index "+response.status+(detail?": "+detail.slice(0,1600):""));
+      }
       const payload=await response.json();
-      return applyIndexedContentPayload(payload,cues,contentId||String(externalId));
+      const applied=applyIndexedContentPayload(payload,cues,contentId||String(externalId));
+      state.aiIndexDiagnostic={
+        ...(state.aiIndexDiagnostic||{}),
+        status:applied?"ready":"error",
+        source:payload.cached===true?"database":"ai",
+        completed_at:new Date().toISOString(),
+        response:payload,
+        error:applied?"":"AI/DB sonucu alındı fakat panel analiz durumuna uygulanamadı.",
+      };
+      renderAiLabDialog();
+      return applied;
     }catch(error){
       console.warn("Persistent AI content index unavailable; using local analysis fallback",error);
+      state.aiIndexDiagnostic={
+        ...(state.aiIndexDiagnostic||{}),
+        status:"error",
+        completed_at:new Date().toISOString(),
+        response:null,
+        error:String(error?.message||error),
+      };
+      renderAiLabDialog();
       return false;
     }
   }
@@ -2100,6 +2305,8 @@
   function resetYouTube(videoId=""){
     state.aiIndexLastStatus="";
     state.aiIndexBusy=false;
+    state.aiIndexDiagnostic=null;
+    renderAiLabDialog();
     clearTimeout(state.youtube.domTimer);
     clearTimeout(state.youtube.hideTimer);
     state.youtube.domTimer=null;
@@ -2490,7 +2697,7 @@
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
       renderPlayerControls();
     });
-    panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>runCurrentContentAiIndex());
+    panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>ensureAiLabDialog());
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
     panel.querySelector(".gle-panel-size-reset").addEventListener("click",async()=>{
       state.settings.panelWidthFactor=1;
@@ -4826,8 +5033,9 @@
     };
 
     return {
-      diagnostic_version:1,
+      diagnostic_version:2,
       generated_at:new Date().toISOString(),
+      ai_analysis:buildAiAnalysisExport(),
       extension:{
         version:chrome.runtime.getManifest()?.version||"",
         adapter:adapter.id,
@@ -5830,6 +6038,8 @@
     if(state.youtube.videoId===contentId) return;
     state.aiIndexLastStatus="";
     state.aiIndexBusy=false;
+    state.aiIndexDiagnostic=null;
+    renderAiLabDialog();
     state.youtube.videoId=contentId;
     state.youtube.cueIndex=-1;
     state.youtube.transcriptAnalysis=null;
