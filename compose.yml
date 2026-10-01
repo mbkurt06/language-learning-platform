@@ -50,7 +50,7 @@ services:
       context: ./apps/ai-analyzer
     environment:
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
-      AI_MODEL: ${AI_MODEL:-gemini-2.5-flash}
+      AI_MODEL: ${AI_MODEL:-gemini-2.5-flash-lite}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8780:8780"

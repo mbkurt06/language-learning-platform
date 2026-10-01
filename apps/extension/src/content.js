@@ -42,6 +42,8 @@
     cache:new Map(),
     panelTranslationCache:new Map(),
     analysisInflight:new Map(),
+    aiIndexBusy:false,
+    aiIndexLastStatus:"",
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
@@ -118,6 +120,17 @@
     if(exportButton){
       exportButton.title=uiText("exportData");
       exportButton.setAttribute("aria-label",uiText("exportData"));
+    }
+    const aiButton=panel.querySelector(".gle-header-ai-analyze");
+    if(aiButton){
+      aiButton.disabled=state.aiIndexBusy===true;
+      aiButton.textContent=state.aiIndexBusy?"AI…":(state.aiIndexLastStatus==="ready"?"AI ✓":"AI");
+      aiButton.title=state.aiIndexBusy
+        ? "AI analizi sürüyor"
+        : (state.aiIndexLastStatus==="ready"
+          ? "Bu içerik AI ile analiz edildi"
+          : "Bu içeriği AI ile analiz et");
+      aiButton.setAttribute("aria-label",aiButton.title);
     }
     const settingsButton=panel.querySelector(".gle-header-settings");
     if(settingsButton){
@@ -1342,6 +1355,69 @@
     return true;
   }
 
+  async function runCurrentContentAiIndex(){
+    if(state.aiIndexBusy) return;
+    let request=null;
+
+    if(adapter.id==="web"){
+      let pageUrl;
+      try{ pageUrl=new URL(location.href); pageUrl.hash=""; }catch(_error){ pageUrl=null; }
+      const stableUrl=pageUrl?.toString()||location.href;
+      request={
+        provider:"web",
+        sourceType:"article",
+        externalId:stableUrl,
+        title:document.title||null,
+        url:stableUrl,
+        cues:state.web.segments||[],
+        contentId:"web:"+location.href,
+      };
+    }else if(adapter.id==="youtube"){
+      const videoId=state.youtube.videoId||currentYouTubeVideoId();
+      request={
+        provider:"youtube",
+        sourceType:"video",
+        externalId:videoId,
+        title:currentYouTubeTitle(),
+        url:location.href,
+        cues:state.youtube.cues||[],
+        contentId:videoId,
+      };
+    }else if(adapter.id==="zdf"){
+      const videoId=state.zdf.videoId||state.youtube.videoId;
+      request={
+        provider:"zdf",
+        sourceType:"video",
+        externalId:videoId,
+        title:document.title||null,
+        url:location.href,
+        cues:state.zdf.cues||state.youtube.cues||[],
+        contentId:videoId,
+      };
+    }
+
+    if(!request?.externalId || !request?.cues?.length){
+      state.aiIndexLastStatus="missing";
+      updateSharedPanelUi();
+      return;
+    }
+
+    state.aiIndexBusy=true;
+    state.aiIndexLastStatus="";
+    updateSharedPanelUi();
+    try{
+      const indexed=await resolveIndexedContent(request);
+      state.aiIndexLastStatus=indexed?"ready":"error";
+    }catch(error){
+      console.warn("Manual AI content analysis failed",error);
+      state.aiIndexLastStatus="error";
+    }finally{
+      state.aiIndexBusy=false;
+      updateSharedPanelUi();
+      renderSharedPanel();
+    }
+  }
+
   async function resolveIndexedContent({provider,sourceType,externalId,title,url,cues,contentId}){
     if(!Array.isArray(cues) || !cues.length || !externalId) return false;
     try{
@@ -2022,6 +2098,8 @@
   }
 
   function resetYouTube(videoId=""){
+    state.aiIndexLastStatus="";
+    state.aiIndexBusy=false;
     clearTimeout(state.youtube.domTimer);
     clearTimeout(state.youtube.hideTimer);
     state.youtube.domTimer=null;
@@ -2392,7 +2470,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><button type="button" class="gle-panel-size-reset" aria-label="Panel genişliğini varsayılana getir" title="Panel genişliğini varsayılana getir"><span aria-hidden="true"></span></button><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><button type="button" class="gle-panel-size-reset" aria-label="Panel genişliğini varsayılana getir" title="Panel genişliğini varsayılana getir"><span aria-hidden="true"></span></button><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-ai-analyze" aria-label="Bu içeriği AI ile analiz et" title="Bu içeriği AI ile analiz et">AI</button><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -2412,6 +2490,7 @@
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
       renderPlayerControls();
     });
+    panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>runCurrentContentAiIndex());
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
     panel.querySelector(".gle-panel-size-reset").addEventListener("click",async()=>{
       state.settings.panelWidthFactor=1;
@@ -5316,20 +5395,8 @@
         refreshLearningHighlights();
       });
       renderSharedPanel();
-      resolveIndexedContent({
-        provider:"youtube",
-        sourceType:"video",
-        externalId:state.youtube.videoId||message.videoId||currentYouTubeVideoId(),
-        title:currentYouTubeTitle(),
-        url:location.href,
-        cues,
-        contentId:state.youtube.videoId||message.videoId||currentYouTubeVideoId(),
-      }).then(indexed=>{
-        if(!indexed){
-          analyzeWholeYouTubeTranscript();
-          analyzeWholeYouTubeExpressionGroups();
-        }
-      });
+      analyzeWholeYouTubeTranscript();
+      analyzeWholeYouTubeExpressionGroups();
       bindYouTubeVideo();
       const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
       const currentCue=video ? globalThis.GLEYoutubeCues.cueAtTime(cues,video.currentTime*1000) : cues[0];
@@ -5680,20 +5747,8 @@
         refreshLearningHighlights();
       });
       renderSharedPanel();
-      resolveIndexedContent({
-        provider:"zdf",
-        sourceType:"video",
-        externalId:videoId,
-        title:document.title||null,
-        url:location.href,
-        cues,
-        contentId:videoId,
-      }).then(indexed=>{
-        if(!indexed){
-          analyzeWholeYouTubeTranscript();
-          analyzeWholeYouTubeExpressionGroups();
-        }
-      });
+      analyzeWholeYouTubeTranscript();
+      analyzeWholeYouTubeExpressionGroups();
       renderZdfCue();
     }catch(error){
       state.zdf.error=String(error?.message||error);
@@ -5773,6 +5828,8 @@
 
   function resetSharedContentAnalysis(contentId){
     if(state.youtube.videoId===contentId) return;
+    state.aiIndexLastStatus="";
+    state.aiIndexBusy=false;
     state.youtube.videoId=contentId;
     state.youtube.cueIndex=-1;
     state.youtube.transcriptAnalysis=null;
@@ -5845,26 +5902,12 @@
       requestAnimationFrame(()=>refreshPreparedBenchmarkHighlights(preparedFixture));
     }
     if(segments.length){
-      let pageUrl;
-      try{ pageUrl=new URL(location.href); pageUrl.hash=""; }catch(_error){ pageUrl=null; }
-      const stableUrl=pageUrl?.toString()||location.href;
-      resolveIndexedContent({
-        provider:"web",
-        sourceType:"article",
-        externalId:stableUrl,
-        title:document.title||null,
-        url:stableUrl,
-        cues:segments,
-        contentId,
-      }).then(indexed=>{
-        if(indexed) return;
-        if(preparedFixture){
-          warmPreparedContextualMeanings().catch(()=>{});
-        }else{
-          Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
-            .finally(()=>scheduleWebLearningAnnotations());
-        }
-      });
+      if(preparedFixture){
+        warmPreparedContextualMeanings().catch(()=>{});
+      }else{
+        Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
+          .finally(()=>scheduleWebLearningAnnotations());
+      }
     }
     renderSharedPanel();
     scheduleWebLearningAnnotations();

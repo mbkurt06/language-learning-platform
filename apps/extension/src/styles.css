@@ -300,12 +300,16 @@ html.gle-zdf-panel-open #gle-player-controls{
   background:#6d28d9!important;border-color:#8b5cf6!important;color:#fff!important;
   box-shadow:0 0 0 1px rgba(168,85,247,.18)
 }
+.gle-header-ai-analyze{min-width:42px;padding:0 7px!important;font:800 11px/1 system-ui!important;letter-spacing:.02em}
+.gle-header-ai-analyze:hover{background:rgba(124,58,237,.16)!important;color:#fff!important}
+.gle-header-ai-analyze:disabled{opacity:.5;cursor:wait!important}
 .gle-header-settings{width:36px;font-size:17px!important}
 .gle-panel-actions .gle-panel-toggle{width:38px!important;flex:0 0 38px!important}
 
 /* When collapsed, the panel itself becomes the persistent G launcher. */
 #gle-shared-panel.collapsed .gle-panel-actions{display:flex!important;width:46px;height:54px}
 #gle-shared-panel.collapsed .gle-header-main-toggle,
+#gle-shared-panel.collapsed .gle-header-ai-analyze,
 #gle-shared-panel.collapsed .gle-header-settings{display:none!important}
 #gle-shared-panel.collapsed .gle-panel-toggle{
   display:block!important;width:46px!important;height:54px!important;
