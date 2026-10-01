@@ -1686,3 +1686,74 @@ html:not(.gle-web-panel-open) body{
 
 /* Curated benchmark words/expressions are analysis data only.
    The live article intentionally shows only the user's yellow learning marks. */
+
+
+/* AI Analysis Lab */
+#gle-ai-lab-dialog{
+  position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:24px;
+  background:rgba(2,6,23,.72);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+  font:14px/1.45 system-ui,-apple-system,sans-serif
+}
+#gle-ai-lab-dialog[hidden]{display:none!important}
+.gle-ai-lab-card{
+  width:min(980px,calc(100vw - 32px));height:min(88vh,860px);display:flex;flex-direction:column;
+  background:#0b0b0d;color:#f4f4f5;border:1px solid #34343b;border-radius:16px;overflow:hidden;
+  box-shadow:0 24px 80px rgba(0,0,0,.55)
+}
+.gle-ai-lab-card>header{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 18px;
+  background:#151519;border-bottom:1px solid #2b2b31
+}
+.gle-ai-lab-card>header>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gle-ai-lab-card>header strong{font-size:18px}
+.gle-ai-lab-card>header small{color:#a1a1aa}
+.gle-ai-lab-close{
+  appearance:none;border:0;background:transparent;color:#d4d4d8;font-size:28px;line-height:1;cursor:pointer
+}
+.gle-ai-lab-toolbar{
+  display:flex;gap:8px;padding:11px 16px;border-bottom:1px solid #292931;background:#101014
+}
+.gle-ai-lab-toolbar button{
+  appearance:none;border:1px solid #3f3f46;border-radius:8px;background:#202026;color:#fff;
+  padding:8px 11px;font:700 12px/1 system-ui,-apple-system,sans-serif;cursor:pointer
+}
+.gle-ai-lab-toolbar .gle-ai-lab-run{background:#4c1d95;border-color:#7c3aed}
+.gle-ai-lab-toolbar button:disabled{opacity:.48;cursor:default}
+.gle-ai-lab-body{flex:1;min-height:0;overflow:auto;background:#0b0b0d}
+.gle-ai-lab-summary{padding:16px;border-bottom:1px solid #292931;background:#111114}
+.gle-ai-lab-status-line{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.gle-ai-lab-status{
+  display:inline-flex;align-items:center;border:1px solid #52525b;border-radius:999px;padding:5px 9px;
+  background:#27272a;color:#e4e4e7;font-size:12px;font-weight:800
+}
+.gle-ai-lab-status.ai{background:#2e1065;border-color:#7c3aed;color:#e9d5ff}
+.gle-ai-lab-status.database{background:#052e16;border-color:#16a34a;color:#bbf7d0}
+.gle-ai-lab-summary dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;margin:0}
+.gle-ai-lab-summary dl>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;padding:5px 0}
+.gle-ai-lab-summary dt{color:#a1a1aa}
+.gle-ai-lab-summary dd{margin:0;color:#fafafa;overflow-wrap:anywhere}
+.gle-ai-lab-summary .mono{font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c4b5fd}
+.gle-ai-lab-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.gle-ai-lab-counts span{
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 8px;border:1px solid #292931;
+  border-radius:9px;background:#17171b;color:#a1a1aa;font-size:11px
+}
+.gle-ai-lab-counts b{font-size:19px;color:#fff}
+.gle-ai-lab-error{
+  margin:12px 0 0;padding:10px;border:1px solid #7f1d1d;border-radius:8px;background:#2b1114;color:#fecaca;
+  white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace
+}
+.gle-ai-lab-results>h3{position:sticky;top:0;z-index:2;margin:0;padding:11px 16px;background:#151519;border-bottom:1px solid #292931;font-size:13px}
+.gle-ai-lab-segment{padding:14px 16px;border-bottom:1px solid #222228;background:#0f0f12}
+.gle-ai-lab-segment:nth-of-type(even){background:#121216}
+.gle-ai-lab-segment-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px;color:#a78bfa;font-size:11px}
+.gle-ai-lab-source{font-size:15px;color:#f4f4f5;line-height:1.5}
+.gle-ai-lab-translation{margin-top:5px;color:#86efac;line-height:1.5}
+.gle-ai-lab-expressions{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.gle-ai-lab-expression{border:1px solid #4c1d95;border-radius:999px;background:#221335;color:#d8b4fe;padding:3px 7px;font-size:11px}
+.gle-ai-lab-empty{padding:34px 18px;text-align:center;color:#a1a1aa}
+@media(max-width:760px){
+  #gle-ai-lab-dialog{padding:8px}.gle-ai-lab-card{width:100%;height:95vh}
+  .gle-ai-lab-summary dl{grid-template-columns:1fr}
+  .gle-ai-lab-counts{grid-template-columns:repeat(2,1fr)}
+}
