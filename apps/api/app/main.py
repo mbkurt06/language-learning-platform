@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from typing import Annotated
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import hashlib
 import re
 from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import SessionLocal
 from .models import (
+    AiUsageEvent,
     ContentSource,
     Encounter,
     ExampleLexemeMatch,
@@ -687,6 +690,44 @@ def lookup_local_analysis(payload: LocalAnalysisLookupRequest, db: DbSession):
     return {"found": True, "analysis": analysis, "source_kind": row.source_kind}
 
 
+@app.post("/api/v1/local-analysis/lookup-batch")
+def lookup_local_analysis_batch(payload: ContentIndexRequest, db: DbSession):
+    matched = []
+    missing_indexes = []
+    for segment in payload.segments:
+        row = db.scalar(
+            select(LocalSentenceAnalysis).where(
+                LocalSentenceAnalysis.provider == payload.provider,
+                LocalSentenceAnalysis.external_id == payload.external_id,
+                LocalSentenceAnalysis.source_language == payload.source_language,
+                LocalSentenceAnalysis.target_language == payload.target_language,
+                LocalSentenceAnalysis.text_hash == _text_hash(segment.text),
+            )
+        )
+        if row is None:
+            missing_indexes.append(segment.index)
+            continue
+        analysis = dict(row.analysis_json or {})
+        analysis["analysis_source"] = "local"
+        analysis["local_source_kind"] = row.source_kind
+        matched.append({
+            "index": segment.index,
+            "text": segment.text,
+            "analysis": analysis,
+            "source_kind": row.source_kind,
+        })
+    total = len(payload.segments)
+    count = len(matched)
+    coverage = "full" if total and count == total else "partial" if count else "none"
+    return {
+        "coverage": coverage,
+        "matched_segments": count,
+        "total_segments": total,
+        "missing_indexes": missing_indexes,
+        "segments": matched,
+    }
+
+
 @app.post("/api/v1/local-analysis/upsert-batch")
 def upsert_local_analysis_batch(payload: LocalAnalysisBatchUpsertRequest, db: DbSession):
     stored = 0
@@ -748,6 +789,70 @@ def content_index_status(
     result["status"] = content.status
     result["progress"] = (content.metadata_json or {}).get("progress", {})
     return result
+
+
+def _record_ai_usage(db: Session, result: dict, *, content_id, batch_index: int):
+    usage = result.get("usage") or {}
+    request_count = int(usage.get("request_count") or 0)
+    total_tokens = int(usage.get("total_tokens") or 0)
+    if request_count <= 0 and total_tokens <= 0:
+        return
+    db.add(AiUsageEvent(
+        provider=str(result.get("provider") or "gemini"),
+        model=str(result.get("model") or "unknown"),
+        request_count=max(1, request_count),
+        input_tokens=int(usage.get("input_tokens") or 0),
+        output_tokens=int(usage.get("output_tokens") or 0),
+        total_tokens=total_tokens,
+        cached_tokens=int(usage.get("cached_tokens") or 0),
+        metadata_json={"content_id": str(content_id), "batch_index": batch_index},
+    ))
+
+
+def _usage_window(db: Session, since: datetime) -> dict:
+    row = db.execute(
+        select(
+            func.coalesce(func.sum(AiUsageEvent.request_count), 0),
+            func.coalesce(func.sum(AiUsageEvent.input_tokens), 0),
+            func.coalesce(func.sum(AiUsageEvent.output_tokens), 0),
+            func.coalesce(func.sum(AiUsageEvent.total_tokens), 0),
+            func.coalesce(func.sum(AiUsageEvent.cached_tokens), 0),
+        ).where(AiUsageEvent.created_at >= since)
+    ).one()
+    return {
+        "requests": int(row[0] or 0),
+        "input_tokens": int(row[1] or 0),
+        "output_tokens": int(row[2] or 0),
+        "total_tokens": int(row[3] or 0),
+        "cached_tokens": int(row[4] or 0),
+    }
+
+
+@app.get("/api/v1/ai-usage/summary")
+def ai_usage_summary(db: DbSession):
+    now = datetime.now(timezone.utc)
+    pacific = ZoneInfo("America/Los_Angeles")
+    now_pt = now.astimezone(pacific)
+    google_day_start = now_pt.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    latest = db.scalar(select(AiUsageEvent).order_by(AiUsageEvent.created_at.desc()).limit(1))
+    return {
+        "google_day": _usage_window(db, google_day_start),
+        "last_7_days": _usage_window(db, now - timedelta(days=7)),
+        "month_to_date": _usage_window(db, month_start),
+        "google_day_resets_at": (
+            (now_pt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+            .astimezone(timezone.utc)
+            .isoformat()
+        ),
+        "latest_model": latest.model if latest else None,
+        "latest_provider": latest.provider if latest else None,
+        "official_quota_remaining": None,
+        "official_quota_note": (
+            "Google remaining quota is not available through the Gemini API key alone; "
+            "Cloud Monitoring/Cloud Quotas authorization is required."
+        ),
+    }
 
 
 @app.post("/api/v1/content-index/resolve", response_model=ContentIndexResponse)
@@ -900,6 +1005,7 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
                             f"(segment indexes {indexes[0] if indexes else '?'}..{indexes[-1] if indexes else '?'}): {exc}"
                         ) from exc
 
+                    _record_ai_usage(db, result, content_id=content.id, batch_index=batch_index)
                     analyzer_provider = result.get("provider") or analyzer_provider
                     analyzer_model = result.get("model") or analyzer_model
                     by_index = {

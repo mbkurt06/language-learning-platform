@@ -115,6 +115,20 @@ class ExampleLexemeMatch(Base):
     surface_form: Mapped[str] = mapped_column(Text)
 
 
+class AiUsageEvent(Base):
+    __tablename__ = "ai_usage_events"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model: Mapped[str] = mapped_column(String(128), index=True)
+    request_count: Mapped[int] = mapped_column(default=1)
+    input_tokens: Mapped[int] = mapped_column(default=0)
+    output_tokens: Mapped[int] = mapped_column(default=0)
+    total_tokens: Mapped[int] = mapped_column(default=0)
+    cached_tokens: Mapped[int] = mapped_column(default=0)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class LocalSentenceAnalysis(Base):
     __tablename__ = "local_sentence_analyses"
     __table_args__ = (
