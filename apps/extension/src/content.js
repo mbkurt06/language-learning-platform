@@ -184,20 +184,26 @@
     if(aiButton){
       aiButton.disabled=false;
       aiButton.classList.remove("ai-full","ai-partial","ai-none","ai-running","source-mixed");
-      if(state.aiIndexBusy){
-        aiButton.classList.add("ai-running");
-        aiButton.textContent="AI…";
-        aiButton.title="AI analizi sürüyor";
-      }else if(allAi){
+      // Active translation provenance owns the color. "Busy" must never mask
+      // progressive AI results that are already visible on the page.
+      if(allAi){
         aiButton.classList.add("ai-full");
-        aiButton.textContent="AI ✓";
-        aiButton.title="Ekrandaki çevirilerin tamamı AI/AI veritabanından";
+        aiButton.textContent=state.aiIndexBusy?"AI… ✓":"AI ✓";
+        aiButton.title=state.aiIndexBusy
+          ? "AI analizi sürüyor; ekrandaki aktif çevirilerin tamamı şu anda AI"
+          : "Ekrandaki çevirilerin tamamı AI/AI veritabanından";
       }else if(partialAi){
         aiButton.classList.add(mixedAiGe?"source-mixed":"ai-partial");
-        aiButton.textContent="AI +";
+        aiButton.textContent=state.aiIndexBusy?"AI… +":"AI +";
         aiButton.title=mixedAiGe
-          ? "Karışık kaynak: bazı cümleler AI, bazıları German Engine/local"
+          ? (state.aiIndexBusy
+              ? "AI analizi sürüyor; aktif kaynak karışık: bazı cümleler AI, bazıları German Engine/local"
+              : "Karışık kaynak: bazı cümleler AI, bazıları German Engine/local")
           : "Bazı cümleler AI; kalan cümlelerde başka/fallback kaynak kullanılıyor";
+      }else if(state.aiIndexBusy){
+        aiButton.classList.add("ai-running");
+        aiButton.textContent="AI…";
+        aiButton.title="AI analizi sürüyor; henüz ekranda aktif AI cümlesi yok";
       }else{
         aiButton.classList.add("ai-none");
         aiButton.textContent="AI";
