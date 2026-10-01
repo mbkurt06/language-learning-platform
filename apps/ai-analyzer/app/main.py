@@ -125,26 +125,59 @@ INPUT SEGMENTS:
 def call_gemini(payload: AnalyzeBatchRequest) -> dict[str, Any]:
     model = gemini_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    body = {
-        "contents": [{"role": "user", "parts": [{"text": analyzer_prompt(payload)}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-        },
-    }
-    with httpx.Client(timeout=120.0) as client:
-        response = client.post(url, params={"key": gemini_key()}, json=body)
-        response.raise_for_status()
-        raw = response.json()
+    prompt = analyzer_prompt(payload)
 
-    candidates = raw.get("candidates") or []
-    if not candidates:
-        raise RuntimeError("Gemini returned no candidates")
-    parts = candidates[0].get("content", {}).get("parts", [])
-    text = "".join(str(part.get("text", "")) for part in parts).strip()
-    if not text:
-        raise RuntimeError("Gemini returned an empty response")
-    parsed = json.loads(text)
+    def request_once(extra_instruction: str = "") -> tuple[dict[str, Any], str]:
+        effective_prompt = prompt
+        if extra_instruction:
+            effective_prompt += "\n\n" + extra_instruction
+        body = {
+            "contents": [{"role": "user", "parts": [{"text": effective_prompt}]}],
+            "generationConfig": {
+                "temperature": 0,
+                "responseMimeType": "application/json",
+            },
+        }
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post(url, params={"key": gemini_key()}, json=body)
+            response.raise_for_status()
+            raw = response.json()
+
+        candidates = raw.get("candidates") or []
+        if not candidates:
+            raise RuntimeError("Gemini returned no candidates")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = "".join(str(part.get("text", "")) for part in parts).strip()
+        if not text:
+            raise RuntimeError("Gemini returned an empty response")
+        return raw, text
+
+    raw, text = request_once()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raw, text = request_once(
+            "IMPORTANT RETRY: Your previous response was not valid JSON. "
+            "Return ONLY one complete valid JSON object matching the requested schema. "
+            "Do not use markdown, comments, trailing commas, NaN, undefined, or explanatory text."
+        )
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as retry_exc:
+            start = max(0, retry_exc.pos - 220)
+            end = min(len(text), retry_exc.pos + 220)
+            excerpt = text[start:end].replace("\n", "\\n")
+            finish_reason = (
+                ((raw.get("candidates") or [{}])[0]).get("finishReason")
+                or ((raw.get("candidates") or [{}])[0]).get("finish_reason")
+                or ""
+            )
+            raise RuntimeError(
+                "Gemini returned invalid JSON after retry: "
+                f"{retry_exc.msg} at line {retry_exc.lineno} column {retry_exc.colno}; "
+                f"finish_reason={finish_reason or 'unknown'}; excerpt={excerpt}"
+            ) from retry_exc
+
     if not isinstance(parsed, dict) or not isinstance(parsed.get("segments"), list):
         raise RuntimeError("Gemini response does not match the expected analysis shape")
     return parsed
