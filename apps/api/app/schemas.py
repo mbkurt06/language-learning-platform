@@ -119,3 +119,25 @@ class ContentIndexResponse(BaseModel):
     ai_analyzed_segments: int = 0
     local_segments: int = 0
     segments: list[dict[str, Any]]
+
+
+class LocalAnalysisLookupRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=64)
+    external_id: str = Field(min_length=1, max_length=512)
+    source_language: str = Field(default="de", min_length=2, max_length=16)
+    target_language: str = Field(default="tr", min_length=2, max_length=16)
+    text: str = Field(min_length=1)
+
+
+class LocalAnalysisUpsertItem(BaseModel):
+    text: str = Field(min_length=1)
+    analysis: dict[str, Any]
+    source_kind: str = Field(default="german-engine", min_length=1, max_length=64)
+
+
+class LocalAnalysisBatchUpsertRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=64)
+    external_id: str = Field(min_length=1, max_length=512)
+    source_language: str = Field(default="de", min_length=2, max_length=16)
+    target_language: str = Field(default="tr", min_length=2, max_length=16)
+    items: list[LocalAnalysisUpsertItem] = Field(min_length=1, max_length=5000)
