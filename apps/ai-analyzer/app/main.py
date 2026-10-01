@@ -28,7 +28,7 @@ class AnalyzeBatchRequest(BaseModel):
 
 
 def gemini_model() -> str:
-    return os.getenv("AI_MODEL", "gemini-2.5-flash")
+    return os.getenv("AI_MODEL", "gemini-2.5-flash-lite")
 
 
 def gemini_key() -> str:
