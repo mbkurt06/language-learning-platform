@@ -1980,7 +1980,7 @@
     const apiBase=await platformApiBase();
     const local={...analysis,analysis_source:"local"};
     try{
-      await platformFetch(apiBase+"/api/v1/local-analysis/upsert-batch",{
+      const response=await platformFetch(apiBase+"/api/v1/local-analysis/upsert-batch",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -1991,6 +1991,10 @@
           items:[{text,analysis:local,source_kind:sourceKind}],
         }),
       });
+      if(response.ok){
+        state.localLookupSignature="";
+        scheduleCachedLocalLookup();
+      }
     }catch(error){
       console.warn("Local analysis persistence failed",error);
     }
