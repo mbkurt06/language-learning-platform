@@ -47,6 +47,9 @@
     aiIndexDiagnostic:null,
     aiLabDialog:null,
     aiLabCollapsed:false,
+    aiLabWidth:350,
+    aiLabHandle:null,
+    aiProgressTimer:null,
     aiCoverage:"unknown",
     aiLookupSignature:"",
     aiLookupTimer:null,
@@ -115,6 +118,22 @@
   function uiText(key){
     const lang=state.settings.interfaceLanguage||"tr";
     return UI_STRINGS[lang]?.[key] || UI_STRINGS.tr[key] || key;
+  }
+
+  function analysisSourcePriority(data){
+    if(data?.analysis_source==="ai") return 3;
+    if(data?.analysis_source==="local") return 2;
+    return 1;
+  }
+
+  function setAnalysisCache(text,data){
+    if(!text || !data) return data;
+    const current=state.cache.get(text);
+    if(!current || analysisSourcePriority(data)>=analysisSourcePriority(current)){
+      state.cache.set(text,data);
+      if(data.sentence_meaning_tr) state.panelTranslationCache.set(text,data.sentence_meaning_tr);
+    }
+    return state.cache.get(text)||data;
   }
 
   function updateSharedPanelUi(){
@@ -1326,8 +1345,7 @@
       const text=String(cue?.text||segment.text||"").trim();
       if(!text) continue;
       const analysis=indexedSegmentToAnalysis(segment);
-      state.cache.set(text,analysis);
-      if(analysis.sentence_meaning_tr) state.panelTranslationCache.set(text,analysis.sentence_meaning_tr);
+      setAnalysisCache(text,analysis);
 
       for(const token of analysis.tokens||[]){
         const lemma=String(token.lemma||token.text||"").trim();
@@ -1496,6 +1514,7 @@
     const model=response.analyzer_model||"—";
     const provider=response.analyzer_provider||"—";
     const segments=response.segments||[];
+    const progress=response.progress||diagnostic.progress||{};
     const rows=segments.length
       ? segments.map((segment,index)=>{
           const expressions=(segment.expressions||[]).map(expr=>'<span class="gle-ai-lab-expression">'+esc(expr.canonical||expr.surface||"")+'</span>').join("");
@@ -1506,8 +1525,8 @@
     dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
     const toggle=dialog.querySelector(".gle-ai-lab-toggle");
     if(toggle){
-      toggle.textContent=state.aiLabCollapsed?"▢":"−";
-      toggle.title=state.aiLabCollapsed?"AI İzleme penceresini büyüt":"AI İzleme penceresini küçült";
+      toggle.textContent="‹";
+      toggle.title="AI İzleme panelini gizle";
       toggle.setAttribute("aria-label",toggle.title);
       toggle.setAttribute("aria-expanded",state.aiLabCollapsed?"false":"true");
     }
@@ -1527,6 +1546,7 @@
           '<div><dt>Content ID</dt><dd class="mono">'+esc(String(response.content_id||"—"))+'</dd></div>'+
           '<div><dt>Content hash</dt><dd class="mono">'+esc(String(response.content_hash||"—"))+'</dd></div>'+
           '<div><dt>Şema</dt><dd>'+esc(String(response.analysis_schema_version||"—"))+'</dd></div>'+
+          '<div><dt>İlerleme</dt><dd>'+esc(String(progress.completed_segments??segments.length))+' / '+esc(String(progress.total_segments??request.segment_count??segments.length))+' cümle · '+esc(String(progress.completed_batches??0))+' / '+esc(String(progress.total_batches??0))+' batch</dd></div>'+
         '</dl>'+
         '<div class="gle-ai-lab-counts"><span><b>'+stats.segments+'</b>Cümle</span><span><b>'+stats.translated+'</b>Çeviri</span><span><b>'+stats.tokens+'</b>Kelime</span><span><b>'+stats.expressions+'</b>Yapı</span></div>'+
         (diagnostic.error?'<pre class="gle-ai-lab-error">'+esc(diagnostic.error)+'</pre>':"")+
@@ -1556,6 +1576,14 @@
     if(exportButton) exportButton.disabled=!state.aiIndexDiagnostic;
   }
 
+  function setAiLabCollapsed(collapsed){
+    state.aiLabCollapsed=Boolean(collapsed);
+    const dialog=state.aiLabDialog;
+    if(dialog) dialog.classList.toggle("collapsed",state.aiLabCollapsed);
+    if(state.aiLabHandle) state.aiLabHandle.hidden=!state.aiLabCollapsed;
+    renderAiLabDialog();
+  }
+
   function ensureAiLabDialog(){
     let dialog=document.getElementById("gle-ai-lab-dialog");
     if(dialog){
@@ -1566,15 +1594,49 @@
     }
     dialog=document.createElement("div");
     dialog.id="gle-ai-lab-dialog";
-    dialog.innerHTML='<div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div><button type="button" class="gle-ai-lab-toggle" aria-label="AI İzleme penceresini küçült" aria-expanded="true" title="AI İzleme penceresini küçült">−</button></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
+    dialog.style.width=state.aiLabWidth+"px";
+    dialog.innerHTML='<div class="gle-ai-lab-resizer" role="separator" aria-orientation="vertical" title="AI İzleme genişliğini ayarla"></div><div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div><div class="gle-ai-lab-head-actions"><button type="button" class="gle-ai-lab-reset" title="Genişliği sıfırla">↔</button><button type="button" class="gle-ai-lab-toggle" aria-label="AI İzleme panelini gizle" aria-expanded="true" title="AI İzleme panelini gizle">‹</button></div></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
     dialog.querySelector(".gle-ai-lab-run").addEventListener("click",()=>runCurrentContentAiIndex());
     dialog.querySelector(".gle-ai-lab-export").addEventListener("click",()=>downloadAiAnalysisExport());
-    dialog.querySelector(".gle-ai-lab-toggle").addEventListener("click",()=>{
-      state.aiLabCollapsed=!state.aiLabCollapsed;
-      renderAiLabDialog();
+    dialog.querySelector(".gle-ai-lab-toggle").addEventListener("click",()=>setAiLabCollapsed(true));
+    dialog.querySelector(".gle-ai-lab-reset").addEventListener("click",()=>{
+      state.aiLabWidth=350;
+      dialog.style.width="350px";
+    });
+    const resizer=dialog.querySelector(".gle-ai-lab-resizer");
+    resizer?.addEventListener("pointerdown",event=>{
+      if(event.button!==0 || state.aiLabCollapsed) return;
+      event.preventDefault();
+      const startX=event.clientX;
+      const startWidth=dialog.getBoundingClientRect().width;
+      resizer.setPointerCapture?.(event.pointerId);
+      const move=moveEvent=>{
+        state.aiLabWidth=Math.max(250,Math.min(560,startWidth+(moveEvent.clientX-startX)));
+        dialog.style.width=state.aiLabWidth+"px";
+      };
+      const finish=()=>{
+        resizer.removeEventListener("pointermove",move);
+        resizer.removeEventListener("pointerup",finish);
+        resizer.removeEventListener("pointercancel",finish);
+      };
+      resizer.addEventListener("pointermove",move);
+      resizer.addEventListener("pointerup",finish);
+      resizer.addEventListener("pointercancel",finish);
     });
     document.documentElement.appendChild(dialog);
+    let handle=document.getElementById("gle-ai-lab-edge-handle");
+    if(!handle){
+      handle=document.createElement("button");
+      handle.id="gle-ai-lab-edge-handle";
+      handle.type="button";
+      handle.textContent="AI";
+      handle.title="AI İzleme panelini aç";
+      handle.addEventListener("click",()=>setAiLabCollapsed(false));
+      document.documentElement.appendChild(handle);
+    }
+    state.aiLabHandle=handle;
     state.aiLabDialog=dialog;
+    if(state.aiLabHandle) state.aiLabHandle.hidden=!state.aiLabCollapsed;
     renderAiLabDialog();
     return dialog;
   }
@@ -1709,6 +1771,7 @@
     };
     updateSharedPanelUi();
     renderAiLabDialog();
+    pollAiProgress(request);
     try{
       const indexed=await resolveIndexedContent(request);
       state.aiIndexLastStatus=indexed?"ready":"error";
@@ -1723,6 +1786,8 @@
       };
     }finally{
       state.aiIndexBusy=false;
+      clearTimeout(state.aiProgressTimer);
+      state.aiProgressTimer=null;
       updateSharedPanelUi();
       renderSharedPanel();
       renderAiLabDialog();
@@ -1797,13 +1862,99 @@
     }
   }
 
+  function currentLocalAnalysisContext(){
+    const request=currentAiIndexRequest();
+    return {
+      provider:request?.provider||adapter.id||"web",
+      externalId:String(request?.externalId||location.href),
+    };
+  }
+
+  async function lookupLocalAnalysis(text){
+    const context=currentLocalAnalysisContext();
+    const apiBase=await platformApiBase();
+    const response=await platformFetch(apiBase+"/api/v1/local-analysis/lookup",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        provider:context.provider,
+        external_id:context.externalId,
+        source_language:"de",
+        target_language:"tr",
+        text,
+      }),
+    });
+    if(!response.ok) return null;
+    const payload=await response.json();
+    return payload?.found ? payload.analysis : null;
+  }
+
+  async function persistLocalAnalysis(text,analysis,sourceKind="german-engine"){
+    if(!text || !analysis || analysis.analysis_source==="ai") return;
+    const context=currentLocalAnalysisContext();
+    const apiBase=await platformApiBase();
+    const local={...analysis,analysis_source:"local"};
+    try{
+      await platformFetch(apiBase+"/api/v1/local-analysis/upsert-batch",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          provider:context.provider,
+          external_id:context.externalId,
+          source_language:"de",
+          target_language:"tr",
+          items:[{text,analysis:local,source_kind:sourceKind}],
+        }),
+      });
+    }catch(error){
+      console.warn("Local analysis persistence failed",error);
+    }
+  }
+
+  async function pollAiProgress(request){
+    clearTimeout(state.aiProgressTimer);
+    if(!state.aiIndexBusy || !request?.externalId) return;
+    try{
+      const apiBase=await platformApiBase();
+      const params=new URLSearchParams({
+        provider:request.provider,
+        external_id:String(request.externalId),
+        source_language:"de",
+        target_language:"tr",
+      });
+      const response=await platformFetch(apiBase+"/api/v1/content-index/status?"+params.toString());
+      if(response.ok){
+        const payload=await response.json();
+        if(Array.isArray(payload.segments) && payload.segments.length){
+          applyIndexedContentPayload(payload,request.cues,request.contentId||String(request.externalId));
+          state.aiIndexDiagnostic={
+            ...(state.aiIndexDiagnostic||{}),
+            status:payload.status==="ready"?"ready":"running",
+            source:"ai",
+            response:payload,
+            progress:payload.progress||{},
+          };
+          renderSharedPanel();
+          renderAiLabDialog();
+        }
+      }
+    }catch(_error){}
+    if(state.aiIndexBusy) state.aiProgressTimer=setTimeout(()=>pollAiProgress(request),1000);
+  }
+
   async function analyzePlatform(text){
     if(state.cache.has(text)) return state.cache.get(text);
     if(state.analysisInflight.has(text)) return state.analysisInflight.get(text);
 
     const request=(async()=>{
-      const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
-      const response=await platformFetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/analyze",{
+      const stored=await lookupLocalAnalysis(text).catch(()=>null);
+      if(stored){
+        stored.analysis_source="local";
+        return setAnalysisCache(text,stored);
+      }
+
+      const apiBase=await platformApiBase();
+      const response=await platformFetch(apiBase+"/api/v1/analyze",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -1816,8 +1967,10 @@
       const payload=await response.json();
       const data=payload.analysis;
       if(!data) throw new Error("Platform API response missing analysis");
-      state.cache.set(text,data);
-      return data;
+      const localData={...data,analysis_source:"local"};
+      const chosen=setAnalysisCache(text,localData);
+      persistLocalAnalysis(text,localData,"german-engine").catch(()=>{});
+      return chosen;
     })();
 
     state.analysisInflight.set(text,request);
@@ -1928,9 +2081,17 @@
         // authoritative. Do not let benchmark/prepared data overwrite AI
         // meanings, structures, token membership, or provenance.
         if(platform?.analysis_source==="ai") return platform;
-        return mergePreparedContextualAnalysis(prepared,platform);
+        const merged={...mergePreparedContextualAnalysis(prepared,platform),analysis_source:"local"};
+        setAnalysisCache(text,merged);
+        persistLocalAnalysis(text,merged,"prepared+german-engine").catch(()=>{});
+        return merged;
       }catch(_error){
-        if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
+        if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length){
+          const localPrepared={...prepared,analysis_source:"local"};
+          setAnalysisCache(text,localPrepared);
+          persistLocalAnalysis(text,localPrepared,"prepared").catch(()=>{});
+          return localPrepared;
+        }
       }
     }
     return analyzePlatform(text);
