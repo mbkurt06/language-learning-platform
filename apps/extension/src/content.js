@@ -63,6 +63,7 @@
     aiLookupBusy:false,
     tooltip:null,
     tooltipHideTimer:null,
+    settingsHydrated:false,
     settings:{extensionEnabled:true,systemMonitorEnabled:true,systemMonitorCollapsed:false,systemMonitorWidth:350,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
     playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:"",autoPauseTimer:null,autoPauseScheduledKey:""},
     learningItems:[],
@@ -6674,6 +6675,7 @@
   }
 
   function scan(){
+    if(!state.settingsHydrated) return;
     if(adapter.id==="web"){
       scanWebPage();
       return;
@@ -6735,6 +6737,7 @@
     delete settings.showSentenceTranslation;
     if(Object.keys(migrated).length) chrome.storage.sync.set(migrated);
     state.settings=settings;
+    state.settingsHydrated=true;
     state.aiLabCollapsed=settings.systemMonitorCollapsed===true;
     state.aiLabWidth=Math.max(250,Math.min(560,Number(settings.systemMonitorWidth)||350));
     if(adapter.id==="zdf" && Number(state.settings.germanFontSize)===100 && Number(state.settings.translationFontSize)===100){
