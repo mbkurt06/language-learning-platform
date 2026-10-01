@@ -1688,7 +1688,12 @@
   function syncSystemMonitorVisibility(){
     const enabled=state.settings.systemMonitorEnabled!==false;
     const dialog=state.aiLabDialog;
-    if(dialog) dialog.classList.toggle("system-monitor-disabled",!enabled);
+    if(dialog){
+      const hidden=!enabled || state.aiLabCollapsed===true;
+      dialog.classList.toggle("system-monitor-disabled",!enabled);
+      dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
+      dialog.style.display=hidden?"none":"block";
+    }
     if(state.aiLabHandle) state.aiLabHandle.hidden=!enabled || !state.aiLabCollapsed;
   }
 
@@ -1722,6 +1727,8 @@
     dialog=document.createElement("div");
     dialog.id="gle-ai-lab-dialog";
     dialog.style.width=state.aiLabWidth+"px";
+    const monitorInitiallyHidden=state.settings.systemMonitorEnabled===false || state.aiLabCollapsed===true;
+    dialog.style.display=monitorInitiallyHidden?"none":"block";
     dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
     dialog.classList.toggle("system-monitor-disabled",state.settings.systemMonitorEnabled===false);
     dialog.innerHTML='<div class="gle-ai-lab-resizer" role="separator" aria-orientation="vertical" title="Sistem İzleme genişliğini ayarla"></div><div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">Sistem İzleme</strong><small>Çeviri motorları, kullanım ve sistem durumları</small></div><div class="gle-ai-lab-head-actions"><button type="button" class="gle-ai-lab-reset" title="Genişliği sıfırla">↔</button><button type="button" class="gle-ai-lab-toggle" aria-label="Sistem İzleme panelini gizle" aria-expanded="true" title="Sistem İzleme panelini gizle">‹</button></div></header><div class="gle-monitor-main-tabs"><button type="button" class="active" data-monitor-main="translation">Çeviri</button></div><div class="gle-monitor-subtabs"><button type="button" class="active" data-monitor-translation="ai">AI</button><button type="button" data-monitor-translation="ge">German Engine</button></div><div class="gle-ai-lab-toolbar"></div><div class="gle-ai-lab-body"></div></div>';
