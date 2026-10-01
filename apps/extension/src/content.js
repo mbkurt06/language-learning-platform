@@ -1484,6 +1484,7 @@
         '<dl>'+
           '<div><dt>İçerik</dt><dd>'+esc(request.title||document.title||"—")+'</dd></div>'+
           '<div><dt>Kaynak</dt><dd>'+esc(request.provider||adapter.id||"—")+'</dd></div>'+
+          '<div><dt>İstek cümlesi</dt><dd>'+esc(String(request.segment_count??request.cues?.length??0))+'</dd></div>'+
           '<div><dt>Sonuç nereden?</dt><dd>'+esc(sourceLabel)+'</dd></div>'+
           '<div><dt>AI sağlayıcı</dt><dd>'+esc(provider)+'</dd></div>'+
           '<div><dt>Model</dt><dd>'+esc(model)+'</dd></div>'+
@@ -1515,9 +1516,7 @@
     }
     dialog=document.createElement("div");
     dialog.id="gle-ai-lab-dialog";
-    dialog.innerHTML='<div class="gle-ai-lab-card" role="dialog" aria-modal="true" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI Analiz Laboratuvarı</strong><small>AI / veritabanı kaynağını, çeviriyi ve dil analizini denetle</small></div><button type="button" class="gle-ai-lab-close" aria-label="Kapat">×</button></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
-    dialog.querySelector(".gle-ai-lab-close").addEventListener("click",()=>{dialog.hidden=true;});
-    dialog.addEventListener("click",event=>{if(event.target===dialog) dialog.hidden=true;});
+    dialog.innerHTML='<div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
     dialog.querySelector(".gle-ai-lab-run").addEventListener("click",()=>runCurrentContentAiIndex());
     dialog.querySelector(".gle-ai-lab-export").addEventListener("click",()=>downloadAiAnalysisExport());
     document.documentElement.appendChild(dialog);
@@ -2697,7 +2696,7 @@
       await chrome.storage.sync.set({extensionEnabled:state.settings.extensionEnabled});
       renderPlayerControls();
     });
-    panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>ensureAiLabDialog());
+    panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>runCurrentContentAiIndex());
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
     panel.querySelector(".gle-panel-size-reset").addEventListener("click",async()=>{
       state.settings.panelWidthFactor=1;
@@ -2719,6 +2718,7 @@
     document.documentElement.appendChild(panel);
     state.panel.element=panel;
     installPanelResizeHandle(panel);
+    ensureAiLabDialog();
 
     const active=state.settings.extensionEnabled!==false;
     const mainToggle=panel.querySelector(".gle-header-main-toggle");
