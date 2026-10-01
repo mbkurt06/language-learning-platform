@@ -1,9 +1,9 @@
 #gle-tooltip{position:fixed;z-index:2147483647;width:min(360px,calc(100vw - 16px));max-height:min(70vh,620px);overflow:auto;background:#111827;color:#f9fafb;border:1px solid #374151;border-radius:10px;padding:10px 14px 12px;font:14px/1.4 system-ui,-apple-system,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35);pointer-events:auto}#gle-tooltip[hidden]{display:none}
-.gle-tooltip-tools{display:flex;align-items:center;gap:6px;margin:-2px -4px 8px;padding:0 0 7px;border-bottom:1px solid rgba(148,163,184,.18);user-select:none}
+.gle-tooltip-tools{display:flex;align-items:center;gap:6px;margin:-2px -4px 8px;padding:0 0 7px;border-bottom:1px solid rgba(148,163,184,.18);user-select:none;cursor:grab;touch-action:none}
 .gle-tooltip-tools-spacer{flex:1}
 .gle-tooltip-drag-handle,.gle-tooltip-tool{appearance:none;border:1px solid #374151;border-radius:7px;background:#1f2937;color:#d1d5db;height:28px;min-width:30px;padding:0 7px;display:grid;place-items:center;cursor:pointer;font:700 13px/1 system-ui,-apple-system,sans-serif}
 .gle-tooltip-drag-handle{cursor:grab;letter-spacing:-3px;padding-right:10px;touch-action:none}
-#gle-tooltip.gle-tooltip-dragging .gle-tooltip-drag-handle{cursor:grabbing}
+#gle-tooltip.gle-tooltip-dragging .gle-tooltip-tools,#gle-tooltip.gle-tooltip-dragging .gle-tooltip-drag-handle{cursor:grabbing}
 .gle-tooltip-tool:hover,.gle-tooltip-drag-handle:hover{background:#293548;border-color:#64748b;color:#fff}
 .gle-tooltip-tool.active{background:#1d4ed8;border-color:#60a5fa;color:#fff;box-shadow:0 0 0 1px rgba(96,165,250,.2) inset}
 .gle-tooltip-hover-tool{min-width:auto;padding:0 10px;font-size:12px;letter-spacing:.01em}

@@ -308,14 +308,15 @@
 
     let drag=null;
     el.addEventListener("pointerdown",event=>{
-      const handle=event.target.closest?.(".gle-tooltip-drag-handle");
-      if(!handle) return;
+      const toolbar=event.target.closest?.(".gle-tooltip-tools");
+      if(!toolbar) return;
+      if(event.target.closest?.("button,[data-tooltip-hover-mode],[data-tooltip-position-lock],[data-tooltip-persistent]")) return;
       event.preventDefault();
       event.stopPropagation();
       const rect=el.getBoundingClientRect();
       drag={dx:event.clientX-rect.left,dy:event.clientY-rect.top,pointerId:event.pointerId};
       el.classList.add("gle-tooltip-dragging");
-      try{ handle.setPointerCapture(event.pointerId); }catch(_error){}
+      try{ toolbar.setPointerCapture(event.pointerId); }catch(_error){}
     });
     document.addEventListener("pointermove",event=>{
       if(!drag || event.pointerId!==drag.pointerId) return;
