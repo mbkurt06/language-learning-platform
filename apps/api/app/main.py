@@ -492,6 +492,118 @@ def serialize_indexed_content(content: IndexedContent):
     }
 
 
+@app.post("/api/v1/content-index/lookup")
+def lookup_content_index(payload: ContentIndexRequest, db: DbSession):
+    """Cache-only lookup. Never calls the external AI analyzer."""
+    settings = get_settings()
+    segment_payloads = [segment.model_dump() for segment in payload.segments]
+    fingerprint = content_fingerprint(segment_payloads)
+
+    exact = db.scalar(
+        select(IndexedContent).where(
+            IndexedContent.provider == payload.provider,
+            IndexedContent.external_id == payload.external_id,
+            IndexedContent.source_language == payload.source_language,
+            IndexedContent.target_language == payload.target_language,
+            IndexedContent.content_hash == fingerprint,
+            IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
+            IndexedContent.status == "ready",
+        )
+    )
+    if exact is not None:
+        result = serialize_indexed_content(exact)
+        result.update({
+            "coverage": "full",
+            "matched_segments": len(segment_payloads),
+            "total_segments": len(segment_payloads),
+            "missing_indexes": [],
+        })
+        return result
+
+    previous = db.scalar(
+        select(IndexedContent)
+        .where(
+            IndexedContent.provider == payload.provider,
+            IndexedContent.external_id == payload.external_id,
+            IndexedContent.source_language == payload.source_language,
+            IndexedContent.target_language == payload.target_language,
+            IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
+            IndexedContent.status == "ready",
+        )
+        .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
+    )
+
+    previous_by_text: dict[str, list[IndexedSegment]] = {}
+    analyzer_provider = None
+    analyzer_model = None
+    content_id = None
+    if previous is not None:
+        analyzer_provider = previous.analyzer_provider
+        analyzer_model = previous.analyzer_model
+        content_id = previous.id
+        for old_segment in previous.segments:
+            previous_by_text.setdefault(
+                _normalized_segment_text(old_segment.source_text), []
+            ).append(old_segment)
+
+    reused_segment_ids = set()
+    matched = []
+    missing_indexes = []
+    for source in segment_payloads:
+        local_analysis = _local_metadata_analysis(source, payload.target_language)
+        if local_analysis is not None:
+            matched.append({
+                "index": source["index"],
+                "start_ms": source.get("start_ms"),
+                "end_ms": source.get("end_ms"),
+                "text": source["text"],
+                "sentence_translation": local_analysis.get("sentence_translation"),
+                "tokens": local_analysis.get("tokens", []),
+                "expressions": local_analysis.get("expressions", []),
+                "analysis_source": "local",
+            })
+            continue
+
+        normalized = _normalized_segment_text(source["text"])
+        candidates = previous_by_text.get(normalized, [])
+        reused = next(
+            (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
+            None,
+        )
+        if reused is None:
+            missing_indexes.append(source["index"])
+            continue
+
+        reused_segment_ids.add(reused.id)
+        matched.append({
+            "index": source["index"],
+            "start_ms": source.get("start_ms"),
+            "end_ms": source.get("end_ms"),
+            "text": source["text"],
+            "sentence_translation": reused.translation_text,
+            "tokens": reused.analysis_json.get("tokens", []),
+            "expressions": reused.analysis_json.get("expressions", []),
+            "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
+        })
+
+    total = len(segment_payloads)
+    matched_count = len(matched)
+    coverage = "full" if matched_count == total and total else "partial" if matched_count else "none"
+    return {
+        "cached": True,
+        "coverage": coverage,
+        "matched_segments": matched_count,
+        "total_segments": total,
+        "missing_indexes": missing_indexes,
+        "content_id": content_id,
+        "content_hash": fingerprint,
+        "analyzer_provider": analyzer_provider,
+        "analyzer_model": analyzer_model,
+        "analysis_schema_version": settings.ai_analysis_schema_version,
+        "segments": matched,
+    }
+
+
 @app.post("/api/v1/content-index/resolve", response_model=ContentIndexResponse)
 def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     settings = get_settings()
