@@ -115,6 +115,33 @@ class ExampleLexemeMatch(Base):
     surface_form: Mapped[str] = mapped_column(Text)
 
 
+class LocalSentenceAnalysis(Base):
+    __tablename__ = "local_sentence_analyses"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "external_id",
+            "source_language",
+            "target_language",
+            "text_hash",
+            name="uq_local_sentence_analysis_identity",
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    external_id: Mapped[str] = mapped_column(String(512), index=True)
+    source_language: Mapped[str] = mapped_column(String(16), index=True)
+    target_language: Mapped[str] = mapped_column(String(16), index=True)
+    text_hash: Mapped[str] = mapped_column(String(64), index=True)
+    source_text: Mapped[str] = mapped_column(Text)
+    source_kind: Mapped[str] = mapped_column(String(64), default="german-engine", index=True)
+    analysis_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class IndexedContent(Base):
     __tablename__ = "indexed_contents"
     __table_args__ = (
