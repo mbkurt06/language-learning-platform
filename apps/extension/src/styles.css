@@ -300,9 +300,13 @@ html.gle-zdf-panel-open #gle-player-controls{
   background:#6d28d9!important;border-color:#8b5cf6!important;color:#fff!important;
   box-shadow:0 0 0 1px rgba(168,85,247,.18)
 }
-.gle-header-ai-analyze{min-width:42px;padding:0 7px!important;font:800 11px/1 system-ui!important;letter-spacing:.02em}
-.gle-header-ai-analyze:hover{background:rgba(124,58,237,.16)!important;color:#fff!important}
-.gle-header-ai-analyze:disabled{opacity:.5;cursor:wait!important}
+.gle-header-ai-analyze{min-width:42px;padding:0 7px!important;font:800 11px/1 system-ui!important;letter-spacing:.02em;border:1px solid transparent!important;transition:.15s}
+.gle-header-ai-analyze.ai-full{background:#14532d!important;border-color:#22c55e!important;color:#dcfce7!important}
+.gle-header-ai-analyze.ai-partial{background:#78350f!important;border-color:#f59e0b!important;color:#fef3c7!important}
+.gle-header-ai-analyze.ai-none{background:#4c1d95!important;border-color:#8b5cf6!important;color:#ede9fe!important}
+.gle-header-ai-analyze.ai-running{background:#312e81!important;border-color:#818cf8!important;color:#e0e7ff!important}
+.gle-header-ai-analyze:hover{filter:brightness(1.15)}
+.gle-header-ai-analyze:disabled{opacity:.7;cursor:wait!important}
 .gle-header-settings{width:36px;font-size:17px!important}
 .gle-panel-actions .gle-panel-toggle{width:38px!important;flex:0 0 38px!important}
 
@@ -1721,6 +1725,10 @@ html:not(.gle-web-panel-open) body{
   padding:7px 8px;font:700 11px/1 system-ui,-apple-system,sans-serif;cursor:pointer
 }
 .gle-ai-lab-toolbar .gle-ai-lab-run{background:#4c1d95;border-color:#7c3aed}
+.gle-ai-lab-toolbar .gle-ai-lab-run.ai-full{background:#14532d;border-color:#22c55e;color:#dcfce7}
+.gle-ai-lab-toolbar .gle-ai-lab-run.ai-partial{background:#78350f;border-color:#f59e0b;color:#fef3c7}
+.gle-ai-lab-toolbar .gle-ai-lab-run.ai-none{background:#4c1d95;border-color:#8b5cf6;color:#ede9fe}
+.gle-ai-lab-toolbar .gle-ai-lab-run.ai-running{background:#312e81;border-color:#818cf8;color:#e0e7ff}
 .gle-ai-lab-toolbar button:disabled{opacity:.48;cursor:default}
 .gle-ai-lab-body{flex:1;min-height:0;overflow:auto;background:#0b0b0d}
 .gle-ai-lab-summary{padding:10px;border-bottom:1px solid #292931;background:#111114}

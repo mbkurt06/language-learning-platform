@@ -47,6 +47,10 @@
     aiIndexDiagnostic:null,
     aiLabDialog:null,
     aiLabCollapsed:false,
+    aiCoverage:"unknown",
+    aiLookupSignature:"",
+    aiLookupTimer:null,
+    aiLookupBusy:false,
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
@@ -127,13 +131,31 @@
     const aiButton=panel.querySelector(".gle-header-ai-analyze");
     if(aiButton){
       aiButton.disabled=false;
+      aiButton.classList.remove("ai-full","ai-partial","ai-none","ai-running");
+      const coverage=state.aiCoverage||"unknown";
       const aiSource=state.aiIndexDiagnostic?.source||"";
-      aiButton.textContent=state.aiIndexBusy?"AI…":(state.aiIndexLastStatus==="ready"?(aiSource==="database"?"DB ✓":"AI ✓"):"AI");
-      aiButton.title=state.aiIndexBusy
-        ? "AI analizi sürüyor — ayrıntıları aç"
-        : (state.aiIndexLastStatus==="ready"
-          ? (aiSource==="database"?"Analiz veritabanından yüklendi — ayrıntıları aç":"Yeni AI analizi hazır — ayrıntıları aç")
-          : "AI Analiz Laboratuvarını aç");
+      if(state.aiIndexBusy){
+        aiButton.classList.add("ai-running");
+        aiButton.textContent="AI…";
+        aiButton.title="AI analizi sürüyor";
+      }else if(coverage==="full"){
+        aiButton.classList.add("ai-full");
+        aiButton.textContent="AI ✓";
+        aiButton.title="Bu içeriğin tüm cümleleri AI/veritabanı analiziyle hazır";
+      }else if(coverage==="partial"){
+        aiButton.classList.add("ai-partial");
+        aiButton.textContent="AI +";
+        aiButton.title="Bazı cümlelerin AI analizi hazır; yalnız eksik/değişen cümleler analiz edilecek";
+      }else{
+        aiButton.classList.add("ai-none");
+        aiButton.textContent="AI";
+        aiButton.title=state.aiLookupBusy
+          ? "Veritabanında mevcut AI analizi kontrol ediliyor"
+          : "Bu içerik için AI analizi gerekli";
+      }
+      if(state.aiIndexLastStatus==="ready" && aiSource==="database" && coverage==="full"){
+        aiButton.title="Tüm AI analizi veritabanından otomatik yüklendi";
+      }
       aiButton.setAttribute("aria-label",aiButton.title);
     }
     const settingsButton=panel.querySelector(".gle-header-settings");
@@ -1426,7 +1448,7 @@
   }
 
   function aiLabStatusLabel(status){
-    return ({ready:"Hazır",running:"Çalışıyor",error:"Hata",missing:"Eksik içerik",idle:"Bekliyor"})[status]||"Bekliyor";
+    return ({ready:"Hazır",partial:"Kısmi hazır",running:"Çalışıyor",error:"Hata",missing:"Eksik içerik",idle:"Bekliyor"})[status]||"Bekliyor";
   }
 
   function buildAiAnalysisExport(){
@@ -1514,7 +1536,21 @@
     const run=dialog.querySelector(".gle-ai-lab-run");
     if(run){
       run.disabled=state.aiIndexBusy===true;
-      run.textContent=state.aiIndexBusy?"Analiz sürüyor…":"AI Analizi Başlat";
+      run.classList.remove("ai-full","ai-partial","ai-none","ai-running");
+      const coverage=state.aiCoverage||"unknown";
+      if(state.aiIndexBusy){
+        run.classList.add("ai-running");
+        run.textContent="Analiz sürüyor…";
+      }else if(coverage==="full"){
+        run.classList.add("ai-full");
+        run.textContent="AI hazır ✓";
+      }else if(coverage==="partial"){
+        run.classList.add("ai-partial");
+        run.textContent="Eksikleri AI ile tamamla";
+      }else{
+        run.classList.add("ai-none");
+        run.textContent="AI Analizi Başlat";
+      }
     }
     const exportButton=dialog.querySelector(".gle-ai-lab-export");
     if(exportButton) exportButton.disabled=!state.aiIndexDiagnostic;
@@ -1541,6 +1577,89 @@
     state.aiLabDialog=dialog;
     renderAiLabDialog();
     return dialog;
+  }
+
+  function aiLookupSignatureFor(request){
+    if(!request?.externalId || !Array.isArray(request.cues) || !request.cues.length) return "";
+    return [
+      request.provider,
+      String(request.externalId),
+      request.cues.map(cue=>String(cue?.text||"").trim()).join("\u241e"),
+    ].join("\u241f");
+  }
+
+  function scheduleCachedAiLookup(){
+    clearTimeout(state.aiLookupTimer);
+    state.aiLookupTimer=setTimeout(()=>lookupCachedAiForCurrentContent(),120);
+  }
+
+  async function lookupCachedAiForCurrentContent(){
+    if(state.aiIndexBusy || state.aiLookupBusy) return false;
+    const request=currentAiIndexRequest();
+    const signature=aiLookupSignatureFor(request);
+    if(!signature || signature===state.aiLookupSignature) return false;
+    state.aiLookupSignature=signature;
+    state.aiLookupBusy=true;
+    updateSharedPanelUi();
+    try{
+      const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
+      const segments=request.cues.map((cue,index)=>({
+        index:Number.isInteger(cue.index)?cue.index:index,
+        text:String(cue.text||"").trim(),
+        start_ms:Number.isFinite(cue.startMs)?Math.round(cue.startMs):null,
+        end_ms:Number.isFinite(cue.endMs)?Math.round(cue.endMs):null,
+      })).filter(item=>item.text);
+      if(!segments.length) return false;
+      const response=await platformFetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/content-index/lookup",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          provider:request.provider,
+          source_type:request.sourceType,
+          external_id:String(request.externalId),
+          url:request.url||null,
+          title:request.title||null,
+          source_language:"de",
+          target_language:"tr",
+          segments,
+          metadata:{indexed_by:"browser-extension",lookup_only:true},
+        }),
+      });
+      if(!response.ok) throw new Error("content-index lookup "+response.status);
+      const payload=await response.json();
+      state.aiCoverage=payload.coverage||"none";
+      const matched=Number(payload.matched_segments||0);
+      const applied=matched>0
+        ? applyIndexedContentPayload(payload,request.cues,request.contentId||String(request.externalId))
+        : false;
+      state.aiIndexLastStatus=state.aiCoverage==="full"?"ready":state.aiCoverage==="partial"?"partial":"";
+      state.aiIndexDiagnostic={
+        status:state.aiCoverage==="full"?"ready":state.aiCoverage==="partial"?"partial":"idle",
+        source:matched>0?"database":"",
+        started_at:new Date().toISOString(),
+        completed_at:new Date().toISOString(),
+        request:{
+          provider:request.provider,
+          source_type:request.sourceType,
+          external_id:String(request.externalId),
+          title:request.title||"",
+          url:request.url||"",
+          segment_count:segments.length,
+        },
+        response:payload,
+        error:"",
+      };
+      if(applied) renderSharedPanel();
+      renderAiLabDialog();
+      return matched>0;
+    }catch(error){
+      console.warn("Cached AI lookup unavailable; keeping local fallback",error);
+      state.aiCoverage="none";
+      return false;
+    }finally{
+      state.aiLookupBusy=false;
+      updateSharedPanelUi();
+    }
   }
 
   async function runCurrentContentAiIndex(){
@@ -1652,6 +1771,8 @@
       }
       const payload=await response.json();
       const applied=applyIndexedContentPayload(payload,cues,contentId||String(externalId));
+      state.aiCoverage=applied?"full":"none";
+      state.aiLookupSignature=aiLookupSignatureFor(currentAiIndexRequest());
       state.aiIndexDiagnostic={
         ...(state.aiIndexDiagnostic||{}),
         status:applied?"ready":"error",
@@ -2787,10 +2908,12 @@
         if(row!==current) row.classList.remove("active");
       });
       current.classList.add("active");
-      const list=current.closest(".gle-transcript-list");
-      if(list){
-        const delta=current.getBoundingClientRect().top-list.getBoundingClientRect().top;
-        list.scrollTop=Math.max(0,list.scrollTop+delta-2);
+      const body=current.closest(".gle-panel-body");
+      if(body){
+        const controls=body.querySelector(".gle-transcript-controls");
+        const stickyOffset=controls?.getBoundingClientRect().height||0;
+        const delta=current.getBoundingClientRect().top-body.getBoundingClientRect().top-stickyOffset;
+        body.scrollTop=Math.max(0,body.scrollTop+delta-2);
       }else{
         current.scrollIntoView({block:"start"});
       }
@@ -5432,6 +5555,7 @@
     if(state.panel.tab==="words") renderPanelWords(body);
     else if(state.panel.tab==="saved") renderPanelSaved(body);
     else renderPanelSubtitles(body);
+    scheduleCachedAiLookup();
   }
 
   async function indexPreparedCorpusFromYouTube(cues){
