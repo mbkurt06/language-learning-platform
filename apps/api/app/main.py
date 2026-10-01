@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Annotated
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
 import re
 from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException
@@ -18,6 +20,7 @@ from .models import (
     IndexedContent,
     IndexedSegment,
     IndexedUnit,
+    LocalSentenceAnalysis,
     LearningItem,
     LearningItemTranslation,
     LearningProfile,
@@ -37,6 +40,8 @@ from .schemas import (
     LearningItemCreate,
     LearningProfileCreate,
     LearningProfileEnsure,
+    LocalAnalysisBatchUpsertRequest,
+    LocalAnalysisLookupRequest,
     UserCreate,
 )
 from .services import (
@@ -604,6 +609,147 @@ def lookup_content_index(payload: ContentIndexRequest, db: DbSession):
     }
 
 
+def _persist_indexed_segment(db: Session, content: IndexedContent, source: dict, item: dict):
+    segment = IndexedSegment(
+        content_id=content.id,
+        sequence_index=source["index"],
+        start_ms=source.get("start_ms"),
+        end_ms=source.get("end_ms"),
+        source_text=source["text"],
+        translation_text=item.get("sentence_translation"),
+        analysis_json={
+            "tokens": item.get("tokens", []),
+            "expressions": item.get("expressions", []),
+            "analysis_source": item.get("analysis_source", "ai"),
+        },
+    )
+    db.add(segment)
+    db.flush()
+
+    for token in item.get("tokens", []):
+        lemma = str(token.get("lemma") or token.get("surface") or "").strip()
+        if not lemma:
+            continue
+        db.add(IndexedUnit(
+            segment_id=segment.id,
+            kind="word",
+            canonical_form=lemma,
+            canonical_key=lemma.lower(),
+            surface_form=str(token.get("surface") or lemma),
+            language_specific_type=str(token.get("pos") or "") or None,
+            contextual_meaning=token.get("contextual_meaning_tr"),
+            token_indices_json=[token.get("i")] if token.get("i") is not None else [],
+            metadata_json={"morphology": token.get("morphology") or {}},
+        ))
+
+    for expression in item.get("expressions", []):
+        canonical = str(expression.get("canonical") or expression.get("surface") or "").strip()
+        if not canonical:
+            continue
+        expression_type = str(expression.get("type") or "FIXED_CONSTRUCTION")
+        db.add(IndexedUnit(
+            segment_id=segment.id,
+            kind="expression",
+            canonical_form=canonical,
+            canonical_key=f"{expression_type.lower()}:{canonical.lower()}",
+            surface_form=str(expression.get("surface") or canonical),
+            language_specific_type=expression_type,
+            contextual_meaning=expression.get("contextual_meaning_tr"),
+            token_indices_json=expression.get("token_indices") or [],
+            metadata_json={
+                "grammar_hint": expression.get("grammar_hint") or "",
+                "highlight_parts": expression.get("highlight_parts") or [],
+            },
+        ))
+
+
+def _text_hash(text: str) -> str:
+    normalized = _normalized_segment_text(text)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+@app.post("/api/v1/local-analysis/lookup")
+def lookup_local_analysis(payload: LocalAnalysisLookupRequest, db: DbSession):
+    row = db.scalar(
+        select(LocalSentenceAnalysis).where(
+            LocalSentenceAnalysis.provider == payload.provider,
+            LocalSentenceAnalysis.external_id == payload.external_id,
+            LocalSentenceAnalysis.source_language == payload.source_language,
+            LocalSentenceAnalysis.target_language == payload.target_language,
+            LocalSentenceAnalysis.text_hash == _text_hash(payload.text),
+        )
+    )
+    if row is None:
+        return {"found": False, "analysis": None}
+    analysis = dict(row.analysis_json or {})
+    analysis["analysis_source"] = "local"
+    analysis["local_source_kind"] = row.source_kind
+    return {"found": True, "analysis": analysis, "source_kind": row.source_kind}
+
+
+@app.post("/api/v1/local-analysis/upsert-batch")
+def upsert_local_analysis_batch(payload: LocalAnalysisBatchUpsertRequest, db: DbSession):
+    stored = 0
+    for item in payload.items:
+        text_hash = _text_hash(item.text)
+        row = db.scalar(
+            select(LocalSentenceAnalysis).where(
+                LocalSentenceAnalysis.provider == payload.provider,
+                LocalSentenceAnalysis.external_id == payload.external_id,
+                LocalSentenceAnalysis.source_language == payload.source_language,
+                LocalSentenceAnalysis.target_language == payload.target_language,
+                LocalSentenceAnalysis.text_hash == text_hash,
+            )
+        )
+        analysis = dict(item.analysis or {})
+        analysis["analysis_source"] = "local"
+        if row is None:
+            row = LocalSentenceAnalysis(
+                provider=payload.provider,
+                external_id=payload.external_id,
+                source_language=payload.source_language,
+                target_language=payload.target_language,
+                text_hash=text_hash,
+                source_text=item.text,
+                source_kind=item.source_kind,
+                analysis_json=analysis,
+            )
+            db.add(row)
+        else:
+            row.source_text = item.text
+            row.source_kind = item.source_kind
+            row.analysis_json = analysis
+        stored += 1
+    db.commit()
+    return {"stored": stored}
+
+
+@app.get("/api/v1/content-index/status")
+def content_index_status(
+    provider: str,
+    external_id: str,
+    db: DbSession,
+    source_language: str = "de",
+    target_language: str = "tr",
+):
+    content = db.scalar(
+        select(IndexedContent)
+        .where(
+            IndexedContent.provider == provider,
+            IndexedContent.external_id == external_id,
+            IndexedContent.source_language == source_language,
+            IndexedContent.target_language == target_language,
+        )
+        .order_by(IndexedContent.created_at.desc())
+    )
+    if content is None:
+        raise HTTPException(status_code=404, detail="indexed content not found")
+    result = serialize_indexed_content(content)
+    result["status"] = content.status
+    result["progress"] = (content.metadata_json or {}).get("progress", {})
+    return result
+
+
 @app.post("/api/v1/content-index/resolve", response_model=ContentIndexResponse)
 def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     settings = get_settings()
@@ -650,8 +796,6 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     db.commit()
     db.refresh(content)
 
-    analyzed_segments = {}
-
     previous = db.scalar(
         select(IndexedContent)
         .where(
@@ -679,129 +823,140 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     reused_count = 0
     local_count = 0
     pending_segments = []
-
-    for source in segment_payloads:
-        local_analysis = _local_metadata_analysis(source, payload.target_language)
-        if local_analysis is not None:
-            analyzed_segments[source["index"]] = local_analysis
-            local_count += 1
-            continue
-
-        normalized = _normalized_segment_text(source["text"])
-        candidates = previous_by_text.get(normalized, [])
-        reused = next(
-            (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
-            None,
-        )
-        if reused is not None:
-            reused_segment_ids.add(reused.id)
-            analyzed_segments[source["index"]] = {
-                "index": source["index"],
-                "sentence_translation": reused.translation_text,
-                "tokens": reused.analysis_json.get("tokens", []),
-                "expressions": reused.analysis_json.get("expressions", []),
-                "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
-            }
-            reused_count += 1
-        else:
-            pending_segments.append(source)
+    persisted_indexes = set()
 
     try:
-        # Only changed/new segments go to Gemini. Unchanged segments are reused
-        # from the latest ready version of the same content.
+        # Persist cache/local matches first so the status endpoint can expose them
+        # immediately while the external AI batches are still running.
+        for source in segment_payloads:
+            item = _local_metadata_analysis(source, payload.target_language)
+            if item is not None:
+                _persist_indexed_segment(db, content, source, item)
+                persisted_indexes.add(source["index"])
+                local_count += 1
+                continue
+
+            normalized = _normalized_segment_text(source["text"])
+            candidates = previous_by_text.get(normalized, [])
+            reused = next(
+                (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
+                None,
+            )
+            if reused is not None:
+                reused_segment_ids.add(reused.id)
+                item = {
+                    "index": source["index"],
+                    "sentence_translation": reused.translation_text,
+                    "tokens": reused.analysis_json.get("tokens", []),
+                    "expressions": reused.analysis_json.get("expressions", []),
+                    "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
+                }
+                _persist_indexed_segment(db, content, source, item)
+                persisted_indexes.add(source["index"])
+                reused_count += 1
+            else:
+                pending_segments.append(source)
+
         batch_size = max(1, min(settings.ai_batch_segments, 8))
-        total_batches = (len(pending_segments) + batch_size - 1) // batch_size
-        for batch_index, offset in enumerate(range(0, len(pending_segments), batch_size), start=1):
-            chunk = pending_segments[offset:offset + batch_size]
-            try:
-                result = analyze_content_batch(
-                    payload.source_language,
-                    payload.target_language,
-                    chunk,
-                    title=payload.title,
-                    provider=payload.provider,
-                )
-            except Exception as exc:
-                indexes = [item.get("index") for item in chunk]
-                raise RuntimeError(
-                    f"AI batch {batch_index}/{total_batches} failed "
-                    f"(segment indexes {indexes[0] if indexes else '?'}..{indexes[-1] if indexes else '?'}): {exc}"
-                ) from exc
-            analyzer_provider = result.get("provider") or analyzer_provider
-            analyzer_model = result.get("model") or analyzer_model
-            for item in result.get("analysis", {}).get("segments", []):
-                item["analysis_source"] = "ai"
-                analyzed_segments[int(item["index"])] = item
+        chunks = [
+            pending_segments[offset:offset + batch_size]
+            for offset in range(0, len(pending_segments), batch_size)
+        ]
+        total_batches = len(chunks)
+        completed_batches = 0
+        content.metadata_json = {
+            **(content.metadata_json or {}),
+            "progress": {
+                "completed_batches": 0,
+                "total_batches": total_batches,
+                "completed_segments": len(persisted_indexes),
+                "total_segments": len(segment_payloads),
+            },
+        }
+        db.commit()
+
+        concurrency = max(1, min(settings.ai_batch_concurrency, 4))
+        if chunks:
+            with ThreadPoolExecutor(max_workers=concurrency) as pool:
+                future_map = {
+                    pool.submit(
+                        analyze_content_batch,
+                        payload.source_language,
+                        payload.target_language,
+                        chunk,
+                        title=payload.title,
+                        provider=payload.provider,
+                    ): (batch_index, chunk)
+                    for batch_index, chunk in enumerate(chunks, start=1)
+                }
+                for future in as_completed(future_map):
+                    batch_index, chunk = future_map[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        indexes = [item.get("index") for item in chunk]
+                        raise RuntimeError(
+                            f"AI batch {batch_index}/{total_batches} failed "
+                            f"(segment indexes {indexes[0] if indexes else '?'}..{indexes[-1] if indexes else '?'}): {exc}"
+                        ) from exc
+
+                    analyzer_provider = result.get("provider") or analyzer_provider
+                    analyzer_model = result.get("model") or analyzer_model
+                    by_index = {
+                        int(item["index"]): item
+                        for item in result.get("analysis", {}).get("segments", [])
+                    }
+                    missing_chunk = {source["index"] for source in chunk} - set(by_index)
+                    if missing_chunk:
+                        raise RuntimeError(
+                            f"AI analyzer omitted segments in batch {batch_index}: "
+                            f"{sorted(missing_chunk)[:20]}"
+                        )
+
+                    for source in chunk:
+                        item = by_index[source["index"]]
+                        item["analysis_source"] = "ai"
+                        _persist_indexed_segment(db, content, source, item)
+                        persisted_indexes.add(source["index"])
+
+                    completed_batches += 1
+                    content.analyzer_provider = analyzer_provider
+                    content.analyzer_model = analyzer_model
+                    content.metadata_json = {
+                        **(content.metadata_json or {}),
+                        "progress": {
+                            "completed_batches": completed_batches,
+                            "total_batches": total_batches,
+                            "completed_segments": len(persisted_indexes),
+                            "total_segments": len(segment_payloads),
+                        },
+                    }
+                    # Commit every completed batch. A polling client can use these
+                    # rows immediately instead of waiting for the whole article.
+                    db.commit()
+                    db.refresh(content)
+
+        expected_indexes = {item["index"] for item in segment_payloads}
+        missing = expected_indexes - persisted_indexes
+        if missing:
+            raise RuntimeError(f"AI analyzer omitted segments: {sorted(missing)[:20]}")
 
         if analyzer_provider is None and not pending_segments:
             analyzer_provider = "local"
             analyzer_model = None
 
-        expected_indexes = {item["index"] for item in segment_payloads}
-        missing = expected_indexes - set(analyzed_segments)
-        if missing:
-            raise RuntimeError(f"AI analyzer omitted segments: {sorted(missing)[:20]}")
-
         content.analyzer_provider = analyzer_provider
         content.analyzer_model = analyzer_model
-
-        for source in segment_payloads:
-            item = analyzed_segments[source["index"]]
-            segment = IndexedSegment(
-                content_id=content.id,
-                sequence_index=source["index"],
-                start_ms=source.get("start_ms"),
-                end_ms=source.get("end_ms"),
-                source_text=source["text"],
-                translation_text=item.get("sentence_translation"),
-                analysis_json={
-                    "tokens": item.get("tokens", []),
-                    "expressions": item.get("expressions", []),
-                    "analysis_source": item.get("analysis_source", "ai"),
-                },
-            )
-            db.add(segment)
-            db.flush()
-
-            for token in item.get("tokens", []):
-                lemma = str(token.get("lemma") or token.get("surface") or "").strip()
-                if not lemma:
-                    continue
-                db.add(IndexedUnit(
-                    segment_id=segment.id,
-                    kind="word",
-                    canonical_form=lemma,
-                    canonical_key=lemma.lower(),
-                    surface_form=str(token.get("surface") or lemma),
-                    language_specific_type=str(token.get("pos") or "") or None,
-                    contextual_meaning=token.get("contextual_meaning_tr"),
-                    token_indices_json=[token.get("i")] if token.get("i") is not None else [],
-                    metadata_json={
-                        "morphology": token.get("morphology") or {},
-                    },
-                ))
-
-            for expression in item.get("expressions", []):
-                canonical = str(expression.get("canonical") or expression.get("surface") or "").strip()
-                if not canonical:
-                    continue
-                expression_type = str(expression.get("type") or "FIXED_CONSTRUCTION")
-                db.add(IndexedUnit(
-                    segment_id=segment.id,
-                    kind="expression",
-                    canonical_form=canonical,
-                    canonical_key=f"{expression_type.lower()}:{canonical.lower()}",
-                    surface_form=str(expression.get("surface") or canonical),
-                    language_specific_type=expression_type,
-                    contextual_meaning=expression.get("contextual_meaning_tr"),
-                    token_indices_json=expression.get("token_indices") or [],
-                    metadata_json={
-                        "grammar_hint": expression.get("grammar_hint") or "",
-                        "highlight_parts": expression.get("highlight_parts") or [],
-                    },
-                ))
-
         content.status = "ready"
+        content.metadata_json = {
+            **(content.metadata_json or {}),
+            "progress": {
+                "completed_batches": total_batches,
+                "total_batches": total_batches,
+                "completed_segments": len(segment_payloads),
+                "total_segments": len(segment_payloads),
+            },
+        }
         db.commit()
         db.refresh(content)
     except Exception as exc:

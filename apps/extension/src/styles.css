@@ -1695,8 +1695,18 @@ html:not(.gle-web-panel-open) body{
 
 /* AI Analysis Lab */
 #gle-ai-lab-dialog{
-  position:fixed;left:12px;top:72px;bottom:12px;z-index:2147483300;width:min(350px,calc(100vw - 24px));
+  position:fixed;left:12px;top:72px;bottom:12px;z-index:2147483300;width:350px;min-width:250px;max-width:min(560px,calc(100vw - 24px));
   display:block;background:transparent;font:13px/1.4 system-ui,-apple-system,sans-serif;pointer-events:none
+}
+#gle-ai-lab-dialog.collapsed{display:none!important}
+#gle-ai-lab-edge-handle{
+  position:fixed;left:0;top:45%;z-index:2147483301;width:40px;height:92px;border:1px solid #4c1d95;border-left:0;
+  border-radius:0 12px 12px 0;background:#17111f;color:#d8b4fe;font:800 12px/1 system-ui;cursor:pointer;
+  writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.08em
+}
+#gle-ai-lab-edge-handle[hidden]{display:none!important}
+.gle-ai-lab-resizer{
+  position:absolute;right:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;pointer-events:auto;z-index:4
 }
 #gle-ai-lab-dialog[hidden]{display:block!important}
 .gle-ai-lab-card{
@@ -1711,14 +1721,11 @@ html:not(.gle-web-panel-open) body{
 .gle-ai-lab-card>header>div{display:flex;flex-direction:column;gap:1px;min-width:0}
 .gle-ai-lab-card>header strong{font-size:15px}
 .gle-ai-lab-card>header small{color:#a1a1aa;font-size:11px}
-.gle-ai-lab-toggle{
+.gle-ai-lab-head-actions{display:flex;align-items:center;gap:5px}
+.gle-ai-lab-toggle,.gle-ai-lab-reset{
   flex:0 0 30px;width:30px;height:30px;padding:0;border:1px solid #3f3f46;border-radius:8px;
-  background:#202026;color:#f4f4f5;font:800 18px/1 system-ui,-apple-system,sans-serif;cursor:pointer
+  background:#202026;color:#f4f4f5;font:800 16px/1 system-ui,-apple-system,sans-serif;cursor:pointer
 }
-#gle-ai-lab-dialog.collapsed{bottom:auto;height:50px}
-#gle-ai-lab-dialog.collapsed .gle-ai-lab-card>header{height:50px;box-sizing:border-box;border-bottom:0}
-#gle-ai-lab-dialog.collapsed .gle-ai-lab-toolbar,
-#gle-ai-lab-dialog.collapsed .gle-ai-lab-body{display:none}
 .gle-ai-lab-toolbar{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #292931;background:#101014}
 .gle-ai-lab-toolbar button{
   flex:1;appearance:none;border:1px solid #3f3f46;border-radius:7px;background:#202026;color:#fff;

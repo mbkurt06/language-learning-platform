@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ai_analyzer_url: str = "http://ai-analyzer:8780"
     ai_analysis_schema_version: str = "v1"
     ai_batch_segments: int = 20
+    ai_batch_concurrency: int = 2
 
     def engine_urls(self) -> dict[str, str]:
         value = json.loads(self.language_engine_urls)
