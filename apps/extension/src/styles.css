@@ -1750,3 +1750,12 @@ html:not(.gle-web-panel-open) body{
 @media(max-width:900px){
   #gle-ai-lab-dialog{left:8px;top:64px;bottom:8px;width:min(320px,calc(100vw - 16px))}
 }
+
+.gle-ai-source-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:20px;height:16px;padding:0 5px;margin-left:6px;
+  border:1px solid #7c3aed;border-radius:999px;
+  background:#2e1065;color:#e9d5ff;
+  font:800 9px/1 system-ui,-apple-system,sans-serif;
+  letter-spacing:.04em;vertical-align:middle
+}

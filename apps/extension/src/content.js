@@ -1017,8 +1017,11 @@
       ? firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr,h.contextual_word_meaning_tr,dictionaryMeanings)
       : firstMeaning(h.contextual_word_meaning_tr,dictionaryMeanings);
 
+    const aiBadge=data?.analysis_source==="ai"
+      ? '<span class="gle-ai-source-badge" title="AI analizi">AI</span>'
+      : "";
     const header=primaryLabel
-      ? `<div class="gle-hover-head"><b>${esc(primaryLabel)}</b><span>${esc(primaryType)}</span></div>`
+      ? `<div class="gle-hover-head"><b>${esc(primaryLabel)}</b><span>${esc(primaryType)}</span>${aiBadge}</div>`
       : "";
     const contextual=primaryMeaning
       ? `<div class="gle-context gle-context-primary"><b>Bu cümlede:</b> ${esc(primaryMeaning)}</div>`
@@ -1285,6 +1288,7 @@
       tokens,
       expressions,
       hover,
+      analysis_source:"ai",
     };
   }
 
@@ -4378,9 +4382,12 @@
       const data=await analyze(cleaned);
       const meaning=cleanTranslationText(data?.sentence_meaning_tr||"");
       const rect=range.getBoundingClientRect();
+      const aiBadge=data?.analysis_source==="ai"
+        ? '<span class="gle-ai-source-badge" title="AI analizi">AI</span>'
+        : "";
       state.tooltip.innerHTML=
         tooltipToolbarHtml()+
-        '<div class="gle-hover-head"><b>Cümle</b><span>Seçili metin</span></div>'+
+        '<div class="gle-hover-head"><b>Cümle</b><span>Seçili metin</span>'+aiBadge+'</div>'+
         '<div class="gle-context gle-context-primary"><b>Almanca:</b> '+esc(cleaned)+'</div>'+
         (meaning?'<div class="gle-context"><b>Türkçe:</b> '+esc(meaning)+'</div>':'<div class="gle-note">Çeviri bulunamadı.</div>');
       state.tooltip.hidden=false;
