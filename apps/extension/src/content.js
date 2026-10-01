@@ -8,7 +8,7 @@
   const UI_STRINGS = {
     tr:{
       settings:"Ayarlar",close:"Kapat",general:"Genel",interfaceLanguage:"Arayüz dili",theme:"Tema",themeSystem:"Sistem",themeLight:"Açık",themeDark:"Koyu",
-      languageLearningActive:"Language Learning aktif",languageLearningActiveHelp:"Video ve panel özelliklerini birlikte açar veya kapatır.",
+      languageLearningActive:"Language Learning aktif",languageLearningActiveHelp:"Video ve panel özelliklerini birlikte açar veya kapatır.",monitoring:"İzleme",systemMonitor:"Sistem İzleme paneli",systemMonitorHelp:"Çeviri motorları, AI kullanımı ve ileride eklenecek sistem tanılamalarını sol panelde gösterir.",
       translationView:"Çeviri görünümü",videoTranslation:"Video çevirisi",videoTranslationHelp:"Videoda kaynak altyazının altında çeviriyi gösterir.",
       panelTranslation:"Panel çevirisi",panelTranslationHelp:"Cümleler sekmesindeki satırlarda çeviriyi gösterir.",
       followActiveSubtitle:"Aktif altyazıyı otomatik takip et",followActiveSubtitleHelp:"Video ilerledikçe paneli oynatılan altyazı satırına kaydırır.",playbackBehavior:"Video davranışı",pauseOnWordHover:"Altyazı alanına gelince videoyu durdur",pauseOnWordHoverHelp:"Mouse Almanca/Türkçe altyazı alanındayken videoyu durdurur. Kelime açıklama penceresine geçildiğinde de video durmaya devam eder; ikisinden de çıkınca daha önce oynuyorsa devam eder.",autoPauseAfterSentence:"Her altyazı cümlesinden sonra durdur",autoPauseAfterSentenceHelp:"Her zamanlı altyazı bölümünün sonunda videoyu otomatik durdurur.",
@@ -18,7 +18,7 @@
     },
     en:{
       settings:"Settings",close:"Close",general:"General",interfaceLanguage:"Interface language",theme:"Theme",themeSystem:"System",themeLight:"Light",themeDark:"Dark",
-      languageLearningActive:"Language Learning active",languageLearningActiveHelp:"Turns the video and panel features on or off together.",
+      languageLearningActive:"Language Learning active",languageLearningActiveHelp:"Turns the video and panel features on or off together.",monitoring:"Monitoring",systemMonitor:"System Monitor panel",systemMonitorHelp:"Shows translation engines, AI usage and future diagnostics in the left-side monitor.",
       translationView:"Translation display",videoTranslation:"Video translation",videoTranslationHelp:"Shows the translation below the source subtitle on the video.",
       panelTranslation:"Panel translation",panelTranslationHelp:"Shows translations below sentences inside the panel.",
       followActiveSubtitle:"Follow active subtitle",followActiveSubtitleHelp:"Scrolls the panel to the currently playing subtitle.",playbackBehavior:"Playback behavior",pauseOnWordHover:"Pause video while hovering subtitles",pauseOnWordHoverHelp:"Pauses while the pointer is over the source/translation subtitle card. It stays paused when moving into the word tooltip and resumes after leaving both if it was playing before.",autoPauseAfterSentence:"Pause after every subtitle sentence",autoPauseAfterSentenceHelp:"Automatically pauses at the end of each timed subtitle cue.",
@@ -28,7 +28,7 @@
     },
     de:{
       settings:"Einstellungen",close:"Schließen",general:"Allgemein",interfaceLanguage:"Oberflächensprache",theme:"Design",themeSystem:"System",themeLight:"Hell",themeDark:"Dunkel",
-      languageLearningActive:"Language Learning aktiv",languageLearningActiveHelp:"Schaltet Video- und Panel-Funktionen gemeinsam ein oder aus.",
+      languageLearningActive:"Language Learning aktiv",languageLearningActiveHelp:"Schaltet Video- und Panel-Funktionen gemeinsam ein oder aus.",monitoring:"Überwachung",systemMonitor:"Systemmonitor",systemMonitorHelp:"Zeigt Übersetzungsmotoren, AI-Nutzung und zukünftige Diagnosen im linken Monitor.",
       translationView:"Übersetzungsanzeige",videoTranslation:"Videoübersetzung",videoTranslationHelp:"Zeigt die Übersetzung unter dem Quelluntertitel im Video.",
       panelTranslation:"Panelübersetzung",panelTranslationHelp:"Zeigt Übersetzungen unter den Sätzen im Panel.",
       followActiveSubtitle:"Aktiven Untertitel automatisch verfolgen",followActiveSubtitleHelp:"Scrollt das Panel zum aktuell abgespielten Untertitel.",playbackBehavior:"Videowiedergabe",pauseOnWordHover:"Video beim Überfahren des Untertitelbereichs pausieren",pauseOnWordHoverHelp:"Pausiert, solange der Mauszeiger über dem Quell-/Übersetzungsbereich liegt. Beim Wechsel in das Wort-Popup bleibt das Video pausiert und läuft erst nach Verlassen beider Bereiche weiter, wenn es vorher lief.",autoPauseAfterSentence:"Nach jedem Untertitelsatz pausieren",autoPauseAfterSentenceHelp:"Pausiert das Video automatisch am Ende jedes zeitgesteuerten Untertitels.",
@@ -49,6 +49,9 @@
     aiLabCollapsed:false,
     aiLabWidth:350,
     aiLabHandle:null,
+    monitorMainTab:"translation",
+    monitorTranslationTab:"ai",
+    localDiagnostic:null,
     aiProgressTimer:null,
     aiCoverage:"unknown",
     localCoverage:"unknown",
@@ -60,7 +63,7 @@
     aiLookupBusy:false,
     tooltip:null,
     tooltipHideTimer:null,
-    settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
+    settings:{extensionEnabled:true,systemMonitorEnabled:true,systemMonitorCollapsed:false,systemMonitorWidth:350,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
     playback:{hoverVideo:null,hoverAnchor:null,hoverResume:false,hoverResumeTimer:null,autoPausedCueKey:"",autoPauseReleasedCueKey:"",autoPauseTimer:null,autoPauseScheduledKey:""},
     learningItems:[],
     learningProfileId:null,
@@ -152,38 +155,57 @@
       exportButton.setAttribute("aria-label",uiText("exportData"));
     }
     const aiButton=panel.querySelector(".gle-header-ai-analyze");
+    const geButton=panel.querySelector(".gle-header-ge-status");
+    const aiCoverage=state.aiCoverage||"unknown";
+    const geCoverage=state.localCoverage||"unknown";
     if(aiButton){
       aiButton.disabled=false;
-      aiButton.classList.remove("ai-full","ai-partial","ai-none","ai-running","ge-full");
-      const coverage=state.aiCoverage||"unknown";
-      const aiSource=state.aiIndexDiagnostic?.source||"";
+      aiButton.classList.remove("ai-full","ai-partial","ai-none","ai-running","source-mixed");
       if(state.aiIndexBusy){
         aiButton.classList.add("ai-running");
         aiButton.textContent="AI…";
         aiButton.title="AI analizi sürüyor";
-      }else if(coverage==="full"){
+      }else if(aiCoverage==="full"){
         aiButton.classList.add("ai-full");
         aiButton.textContent="AI ✓";
-        aiButton.title="Bu içeriğin tüm cümleleri AI/veritabanı analiziyle hazır";
-      }else if(coverage==="partial"){
-        aiButton.classList.add("ai-partial");
+        aiButton.title="Ekrandaki çevirilerin tamamı AI/AI veritabanından";
+      }else if(aiCoverage==="partial"){
+        aiButton.classList.add("source-mixed");
         aiButton.textContent="AI +";
-        aiButton.title="Bazı cümleler AI, kalanlar local; yalnız AI eksikleri analiz edilecek";
-      }else if(state.localCoverage==="full"){
-        aiButton.classList.add("ge-full");
-        aiButton.textContent="GE ✓";
-        aiButton.title="Bu sayfanın tamamı German Engine/local veritabanı ile hazır; istersen AI analizi başlat";
+        aiButton.title="Karışık kaynak: bazı cümleler AI, kalanlar German Engine/local";
       }else{
         aiButton.classList.add("ai-none");
         aiButton.textContent="AI";
         aiButton.title=state.aiLookupBusy
-          ? "Veritabanında mevcut AI analizi kontrol ediliyor"
-          : "Bu içerik için AI analizi gerekli";
-      }
-      if(state.aiIndexLastStatus==="ready" && aiSource==="database" && coverage==="full"){
-        aiButton.title="Tüm AI analizi veritabanından otomatik yüklendi";
+          ? "Mevcut AI analizi veritabanında kontrol ediliyor"
+          : "AI çevirisi yok; tıklayınca yalnız AI eksikleri analiz edilir";
       }
       aiButton.setAttribute("aria-label",aiButton.title);
+    }
+    if(geButton){
+      geButton.classList.remove("ge-full","ge-partial","source-mixed","ge-idle");
+      if(aiCoverage==="full"){
+        geButton.classList.add("ge-idle");
+        geButton.textContent="GE";
+        geButton.title="German Engine/local verisi mevcut olabilir ancak ekranda AI öncelikli";
+      }else if(aiCoverage==="partial" && geCoverage!=="none" && geCoverage!=="unknown"){
+        geButton.classList.add("source-mixed");
+        geButton.textContent="GE +";
+        geButton.title="Karışık kaynak: AI olmayan cümlelerde German Engine/local kullanılıyor";
+      }else if(geCoverage==="full"){
+        geButton.classList.add("ge-full");
+        geButton.textContent="GE ✓";
+        geButton.title="Ekrandaki çevirilerin tamamı German Engine/local veritabanından";
+      }else if(geCoverage==="partial"){
+        geButton.classList.add("ge-partial");
+        geButton.textContent="GE +";
+        geButton.title="German Engine/local analizinin bir kısmı hazır";
+      }else{
+        geButton.classList.add("ge-idle");
+        geButton.textContent="GE";
+        geButton.title="German Engine/local analiz durumu henüz tam hazır değil";
+      }
+      geButton.setAttribute("aria-label",geButton.title);
     }
     const settingsButton=panel.querySelector(".gle-header-settings");
     if(settingsButton){
@@ -233,7 +255,7 @@
     if(dialog){ dialog.hidden=false; return dialog; }
     dialog=document.createElement("div");
     dialog.id="gle-settings-dialog";
-    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · '+esc(uiText("settings"))+'</strong><button type="button" class="gle-settings-close" aria-label="'+escAttr(uiText("close"))+'">×</button></header><div class="gle-settings-body"><section class="gle-settings-section"><h3>'+esc(uiText("general"))+'</h3><label class="gle-settings-select"><span>'+esc(uiText("interfaceLanguage"))+'</span><select name="interfaceLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option></select></label><label class="gle-settings-select"><span>'+esc(uiText("theme"))+'</span><select name="theme"><option value="system">'+esc(uiText("themeSystem"))+'</option><option value="light">'+esc(uiText("themeLight"))+'</option><option value="dark">'+esc(uiText("themeDark"))+'</option></select></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("languageLearningActive"))+'</b><small>'+esc(uiText("languageLearningActiveHelp"))+'</small></span><input name="extensionEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("translationView"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("videoTranslation"))+'</b><small>'+esc(uiText("videoTranslationHelp"))+'</small></span><input name="showVideoTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("panelTranslation"))+'</b><small>'+esc(uiText("panelTranslationHelp"))+'</small></span><input name="showPanelTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("followActiveSubtitle"))+'</b><small>'+esc(uiText("followActiveSubtitleHelp"))+'</small></span><input name="followActiveSubtitle" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("playbackBehavior"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("pauseOnWordHover"))+'</b><small>'+esc(uiText("pauseOnWordHoverHelp"))+'</small></span><input name="pauseOnWordHover" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("autoPauseAfterSentence"))+'</b><small>'+esc(uiText("autoPauseAfterSentenceHelp"))+'</small></span><input name="autoPauseAfterSentence" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("textSize"))+'</h3><label>'+esc(uiText("sourceSubtitle"))+' <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>'+esc(uiText("translationSubtitle"))+' <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label></section></div></div>';
+    dialog.innerHTML='<div class="gle-settings-card" role="dialog" aria-modal="true" aria-labelledby="gle-settings-title"><header><strong id="gle-settings-title">Language Learning · '+esc(uiText("settings"))+'</strong><button type="button" class="gle-settings-close" aria-label="'+escAttr(uiText("close"))+'">×</button></header><div class="gle-settings-body"><section class="gle-settings-section"><h3>'+esc(uiText("general"))+'</h3><label class="gle-settings-select"><span>'+esc(uiText("interfaceLanguage"))+'</span><select name="interfaceLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option></select></label><label class="gle-settings-select"><span>'+esc(uiText("theme"))+'</span><select name="theme"><option value="system">'+esc(uiText("themeSystem"))+'</option><option value="light">'+esc(uiText("themeLight"))+'</option><option value="dark">'+esc(uiText("themeDark"))+'</option></select></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("languageLearningActive"))+'</b><small>'+esc(uiText("languageLearningActiveHelp"))+'</small></span><input name="extensionEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("monitoring"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("systemMonitor"))+'</b><small>'+esc(uiText("systemMonitorHelp"))+'</small></span><input name="systemMonitorEnabled" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("translationView"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("videoTranslation"))+'</b><small>'+esc(uiText("videoTranslationHelp"))+'</small></span><input name="showVideoTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("panelTranslation"))+'</b><small>'+esc(uiText("panelTranslationHelp"))+'</small></span><input name="showPanelTranslation" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("followActiveSubtitle"))+'</b><small>'+esc(uiText("followActiveSubtitleHelp"))+'</small></span><input name="followActiveSubtitle" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("playbackBehavior"))+'</h3><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("pauseOnWordHover"))+'</b><small>'+esc(uiText("pauseOnWordHoverHelp"))+'</small></span><input name="pauseOnWordHover" type="checkbox"><span class="gle-settings-track"></span></label><label class="gle-settings-toggle"><span class="gle-settings-copy"><b>'+esc(uiText("autoPauseAfterSentence"))+'</b><small>'+esc(uiText("autoPauseAfterSentenceHelp"))+'</small></span><input name="autoPauseAfterSentence" type="checkbox"><span class="gle-settings-track"></span></label></section><section class="gle-settings-section"><h3>'+esc(uiText("textSize"))+'</h3><label>'+esc(uiText("sourceSubtitle"))+' <output data-for="germanFontSize"></output><input name="germanFontSize" type="range" min="70" max="180" step="5"></label><label>'+esc(uiText("translationSubtitle"))+' <output data-for="translationFontSize"></output><input name="translationFontSize" type="range" min="70" max="180" step="5"></label></section></div></div>';
     document.documentElement.appendChild(dialog);
     const sync=()=>{
       for(const name of ["germanFontSize","translationFontSize"]){
@@ -243,7 +265,7 @@
       }
       dialog.querySelector('[name="interfaceLanguage"]').value=state.settings.interfaceLanguage||"tr";
       dialog.querySelector('[name="theme"]').value=state.settings.theme||"system";
-      for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle","pauseOnWordHover","autoPauseAfterSentence"]){
+      for(const name of ["extensionEnabled","systemMonitorEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle","pauseOnWordHover","autoPauseAfterSentence"]){
         dialog.querySelector('[name="'+name+'"]').checked=state.settings[name]!==false;
       }
     };
@@ -271,11 +293,12 @@
       await chrome.storage.sync.set({theme:state.settings.theme});
       applySharedAppearance();
     });
-    for(const name of ["extensionEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle","pauseOnWordHover","autoPauseAfterSentence"]){
+    for(const name of ["extensionEnabled","systemMonitorEnabled","showVideoTranslation","showPanelTranslation","followActiveSubtitle","pauseOnWordHover","autoPauseAfterSentence"]){
       dialog.querySelector('[name="'+name+'"]').addEventListener("change",async event=>{
         state.settings[name]=event.target.checked;
         await chrome.storage.sync.set({[name]:event.target.checked});
         if(name==="extensionEnabled") renderPlayerControls();
+        if(name==="systemMonitorEnabled") syncSystemMonitorVisibility();
         if(name==="showVideoTranslation") refreshVideoTranslations();
         if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
         if(name==="pauseOnWordHover" && !event.target.checked) finishSubtitleHoverPause();
@@ -1511,6 +1534,60 @@
   function renderAiLabDialog(){
     const dialog=state.aiLabDialog;
     if(!dialog?.isConnected) return;
+    syncSystemMonitorVisibility();
+    if(state.settings.systemMonitorEnabled===false) return;
+
+    dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
+    const toggle=dialog.querySelector(".gle-ai-lab-toggle");
+    if(toggle){
+      toggle.textContent="‹";
+      toggle.title="Sistem İzleme panelini gizle";
+      toggle.setAttribute("aria-label",toggle.title);
+      toggle.setAttribute("aria-expanded",state.aiLabCollapsed?"false":"true");
+    }
+    dialog.querySelectorAll("[data-monitor-main]").forEach(button=>
+      button.classList.toggle("active",button.dataset.monitorMain===state.monitorMainTab)
+    );
+    dialog.querySelectorAll("[data-monitor-translation]").forEach(button=>
+      button.classList.toggle("active",button.dataset.monitorTranslation===state.monitorTranslationTab)
+    );
+
+    const body=dialog.querySelector(".gle-ai-lab-body");
+    const toolbar=dialog.querySelector(".gle-ai-lab-toolbar");
+    if(!body || !toolbar) return;
+
+    if(state.monitorTranslationTab==="ge"){
+      const local=state.localDiagnostic||{};
+      const response=local.response||{};
+      const matched=Number(response.matched_segments||0);
+      const total=Number(response.total_segments||currentAiIndexRequest()?.cues?.length||0);
+      const missing=Array.isArray(response.missing_indexes)?response.missing_indexes.length:Math.max(0,total-matched);
+      const sourceKinds=[...new Set((response.segments||[]).map(item=>item.source_kind).filter(Boolean))];
+      toolbar.innerHTML='<button type="button" class="gle-monitor-refresh-ge">German Engine durumunu yenile</button>';
+      toolbar.querySelector(".gle-monitor-refresh-ge")?.addEventListener("click",()=>{
+        state.localLookupSignature="";
+        lookupCachedLocalForCurrentContent();
+      });
+      body.innerHTML=
+        '<section class="gle-ai-lab-summary">'+
+          '<div class="gle-ai-lab-status-line"><span class="gle-ai-lab-status database">German Engine / Local DB</span><b>'+esc(state.localCoverage==="full"?"Hazır":state.localCoverage==="partial"?"Kısmi":"Bekliyor")+'</b></div>'+
+          '<dl>'+
+            '<div><dt>Kapsam</dt><dd>'+esc(String(matched))+' / '+esc(String(total))+' cümle</dd></div>'+
+            '<div><dt>Eksik</dt><dd>'+esc(String(missing))+' cümle</dd></div>'+
+            '<div><dt>Kaynak türü</dt><dd>'+esc(sourceKinds.length?sourceKinds.join(", "):"german-engine / local")+'</dd></div>'+
+            '<div><dt>Son kontrol</dt><dd>'+esc(local.completed_at||"—")+'</dd></div>'+
+          '</dl>'+
+          '<div class="gle-ai-lab-counts"><span><b>'+matched+'</b>Local</span><span><b>'+missing+'</b>Eksik</span><span><b>'+esc(state.localCoverage==="full"?"100%":total?Math.round(matched/total*100)+"%":"0%")+'</b>Kapsam</span><span><b>GE</b>Motor</span></div>'+
+          (local.error?'<pre class="gle-ai-lab-error">'+esc(local.error)+'</pre>':"")+
+        '</section>'+
+        '<section class="gle-ai-lab-results"><h3>German Engine / local analiz kayıtları</h3>'+
+          ((response.segments||[]).length
+            ? (response.segments||[]).map(item=>'<article class="gle-ai-lab-segment"><div class="gle-ai-lab-segment-head"><b>#'+esc(String(Number(item.index)+1))+'</b><span>'+esc(item.source_kind||"local")+'</span></div><div class="gle-ai-lab-source">'+esc(item.text||"")+'</div><div class="gle-ai-lab-translation">'+esc(item.analysis?.sentence_meaning_tr||"Çeviri yok")+'</div></article>').join("")
+            : '<div class="gle-ai-lab-empty">Henüz bu içerik için kalıcı German Engine/local kayıt yok.</div>')+
+        '</section>';
+      return;
+    }
+
     const diagnostic=state.aiIndexDiagnostic||{status:"idle",source:"",request:null,response:null,error:""};
     const stats=aiLabStats(diagnostic);
     const response=diagnostic.response||{};
@@ -1526,19 +1603,12 @@
           const expressions=(segment.expressions||[]).map(expr=>'<span class="gle-ai-lab-expression">'+esc(expr.canonical||expr.surface||"")+'</span>').join("");
           return '<article class="gle-ai-lab-segment"><div class="gle-ai-lab-segment-head"><b>#'+esc(String(Number.isInteger(segment.index)?segment.index+1:index+1))+'</b><span>'+(segment.tokens||[]).length+' kelime · '+(segment.expressions||[]).length+' yapı</span></div><div class="gle-ai-lab-source">'+esc(segment.text||"")+'</div><div class="gle-ai-lab-translation">'+esc(segment.sentence_translation||"Çeviri yok")+'</div>'+(expressions?'<div class="gle-ai-lab-expressions">'+expressions+'</div>':"")+'</article>';
         }).join("")
-      : '<div class="gle-ai-lab-empty">Henüz AI/DB analiz sonucu yok. “AI Analizi Başlat” düğmesi Gemini çağrısını yalnızca siz bastığınızda yapar.</div>';
+      : '<div class="gle-ai-lab-empty">Henüz AI/DB analiz sonucu yok.</div>';
 
-    dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
-    const toggle=dialog.querySelector(".gle-ai-lab-toggle");
-    if(toggle){
-      toggle.textContent="‹";
-      toggle.title="AI İzleme panelini gizle";
-      toggle.setAttribute("aria-label",toggle.title);
-      toggle.setAttribute("aria-expanded",state.aiLabCollapsed?"false":"true");
-    }
+    toolbar.innerHTML='<button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button>';
+    toolbar.querySelector(".gle-ai-lab-run")?.addEventListener("click",()=>runCurrentContentAiIndex());
+    toolbar.querySelector(".gle-ai-lab-export")?.addEventListener("click",()=>downloadAiAnalysisExport());
 
-    const body=dialog.querySelector(".gle-ai-lab-body");
-    if(!body) return;
     body.innerHTML=
       '<section class="gle-ai-lab-summary">'+
         '<div class="gle-ai-lab-status-line"><span class="gle-ai-lab-status '+sourceClass+'">'+esc(sourceLabel)+'</span><b>'+esc(aiLabStatusLabel(diagnostic.status||"idle"))+'</b></div>'+
@@ -1567,37 +1637,42 @@
       '</section>'+
       '<section class="gle-ai-lab-results"><h3>AI çeviri ve dil analizi</h3>'+rows+'</section>';
 
-    const run=dialog.querySelector(".gle-ai-lab-run");
+    const run=toolbar.querySelector(".gle-ai-lab-run");
     if(run){
       run.disabled=state.aiIndexBusy===true;
       run.classList.remove("ai-full","ai-partial","ai-none","ai-running","ge-full");
       const coverage=state.aiCoverage||"unknown";
-      if(state.aiIndexBusy){
-        run.classList.add("ai-running");
-        run.textContent="Analiz sürüyor…";
-      }else if(coverage==="full"){
-        run.classList.add("ai-full");
-        run.textContent="AI hazır ✓";
-      }else if(coverage==="partial"){
-        run.classList.add("ai-partial");
-        run.textContent="Eksikleri AI ile tamamla";
-      }else if(state.localCoverage==="full"){
-        run.classList.add("ge-full");
-        run.textContent="GE hazır · AI çalıştır";
-      }else{
-        run.classList.add("ai-none");
-        run.textContent="AI Analizi Başlat";
-      }
+      if(state.aiIndexBusy){run.classList.add("ai-running");run.textContent="Analiz sürüyor…";}
+      else if(coverage==="full"){run.classList.add("ai-full");run.textContent="AI hazır ✓";}
+      else if(coverage==="partial"){run.classList.add("ai-partial");run.textContent="Eksikleri AI ile tamamla";}
+      else{run.classList.add("ai-none");run.textContent="AI Analizi Başlat";}
     }
-    const exportButton=dialog.querySelector(".gle-ai-lab-export");
+    const exportButton=toolbar.querySelector(".gle-ai-lab-export");
     if(exportButton) exportButton.disabled=!state.aiIndexDiagnostic;
+  }
+
+  function syncSystemMonitorVisibility(){
+    const enabled=state.settings.systemMonitorEnabled!==false;
+    const dialog=state.aiLabDialog;
+    if(dialog) dialog.classList.toggle("system-monitor-disabled",!enabled);
+    if(state.aiLabHandle) state.aiLabHandle.hidden=!enabled || !state.aiLabCollapsed;
   }
 
   function setAiLabCollapsed(collapsed){
     state.aiLabCollapsed=Boolean(collapsed);
+    state.settings.systemMonitorCollapsed=state.aiLabCollapsed;
+    chrome.storage.sync.set({systemMonitorCollapsed:state.aiLabCollapsed});
     const dialog=state.aiLabDialog;
     if(dialog) dialog.classList.toggle("collapsed",state.aiLabCollapsed);
-    if(state.aiLabHandle) state.aiLabHandle.hidden=!state.aiLabCollapsed;
+    syncSystemMonitorVisibility();
+    renderAiLabDialog();
+  }
+
+  function openSystemMonitor(tab="ai"){
+    if(state.settings.systemMonitorEnabled===false) return;
+    state.monitorMainTab="translation";
+    state.monitorTranslationTab=tab==="ge"?"ge":"ai";
+    setAiLabCollapsed(false);
     renderAiLabDialog();
   }
 
@@ -1612,13 +1687,21 @@
     dialog=document.createElement("div");
     dialog.id="gle-ai-lab-dialog";
     dialog.style.width=state.aiLabWidth+"px";
-    dialog.innerHTML='<div class="gle-ai-lab-resizer" role="separator" aria-orientation="vertical" title="AI İzleme genişliğini ayarla"></div><div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div><div class="gle-ai-lab-head-actions"><button type="button" class="gle-ai-lab-reset" title="Genişliği sıfırla">↔</button><button type="button" class="gle-ai-lab-toggle" aria-label="AI İzleme panelini gizle" aria-expanded="true" title="AI İzleme panelini gizle">‹</button></div></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
-    dialog.querySelector(".gle-ai-lab-run").addEventListener("click",()=>runCurrentContentAiIndex());
-    dialog.querySelector(".gle-ai-lab-export").addEventListener("click",()=>downloadAiAnalysisExport());
+    dialog.innerHTML='<div class="gle-ai-lab-resizer" role="separator" aria-orientation="vertical" title="Sistem İzleme genişliğini ayarla"></div><div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">Sistem İzleme</strong><small>Çeviri motorları, kullanım ve sistem durumları</small></div><div class="gle-ai-lab-head-actions"><button type="button" class="gle-ai-lab-reset" title="Genişliği sıfırla">↔</button><button type="button" class="gle-ai-lab-toggle" aria-label="Sistem İzleme panelini gizle" aria-expanded="true" title="Sistem İzleme panelini gizle">‹</button></div></header><div class="gle-monitor-main-tabs"><button type="button" class="active" data-monitor-main="translation">Çeviri</button></div><div class="gle-monitor-subtabs"><button type="button" class="active" data-monitor-translation="ai">AI</button><button type="button" data-monitor-translation="ge">German Engine</button></div><div class="gle-ai-lab-toolbar"></div><div class="gle-ai-lab-body"></div></div>';
     dialog.querySelector(".gle-ai-lab-toggle").addEventListener("click",()=>setAiLabCollapsed(true));
+    dialog.querySelectorAll("[data-monitor-main]").forEach(button=>button.addEventListener("click",()=>{
+      state.monitorMainTab=button.dataset.monitorMain||"translation";
+      renderAiLabDialog();
+    }));
+    dialog.querySelectorAll("[data-monitor-translation]").forEach(button=>button.addEventListener("click",()=>{
+      state.monitorTranslationTab=button.dataset.monitorTranslation||"ai";
+      renderAiLabDialog();
+    }));
     dialog.querySelector(".gle-ai-lab-reset").addEventListener("click",()=>{
       state.aiLabWidth=350;
+      state.settings.systemMonitorWidth=350;
       dialog.style.width="350px";
+      chrome.storage.sync.set({systemMonitorWidth:350});
     });
     const resizer=dialog.querySelector(".gle-ai-lab-resizer");
     resizer?.addEventListener("pointerdown",event=>{
@@ -1632,6 +1715,8 @@
         dialog.style.width=state.aiLabWidth+"px";
       };
       const finish=()=>{
+        state.settings.systemMonitorWidth=state.aiLabWidth;
+        chrome.storage.sync.set({systemMonitorWidth:state.aiLabWidth});
         resizer.removeEventListener("pointermove",move);
         resizer.removeEventListener("pointerup",finish);
         resizer.removeEventListener("pointercancel",finish);
@@ -1646,14 +1731,14 @@
       handle=document.createElement("button");
       handle.id="gle-ai-lab-edge-handle";
       handle.type="button";
-      handle.textContent="AI";
-      handle.title="AI İzleme panelini aç";
+      handle.textContent="İzle";
+      handle.title="Sistem İzleme panelini aç";
       handle.addEventListener("click",()=>setAiLabCollapsed(false));
       document.documentElement.appendChild(handle);
     }
     state.aiLabHandle=handle;
     state.aiLabDialog=dialog;
-    if(state.aiLabHandle) state.aiLabHandle.hidden=!state.aiLabCollapsed;
+    syncSystemMonitorVisibility();
     renderAiLabDialog();
     refreshAiUsageSummary();
     return dialog;
@@ -1695,6 +1780,11 @@
       if(!response.ok) return false;
       const payload=await response.json();
       state.localCoverage=payload.coverage||"none";
+      state.localDiagnostic={
+        completed_at:new Date().toISOString(),
+        request:{provider:request.provider,external_id:String(request.externalId),title:request.title||"",segment_count:segments.length},
+        response:payload,
+      };
       for(const segment of payload.segments||[]){
         const analysis={...(segment.analysis||{}),analysis_source:"local"};
         setAnalysisCache(String(segment.text||""),analysis);
@@ -1705,6 +1795,7 @@
     }catch(error){
       console.warn("Local analysis lookup failed",error);
       state.localCoverage="none";
+      state.localDiagnostic={completed_at:new Date().toISOString(),error:String(error?.message||error),response:null};
       updateSharedPanelUi();
       return false;
     }
@@ -3069,7 +3160,7 @@
     const panel=document.createElement("aside");
     panel.id="gle-shared-panel";
     panel.className="gle-shared-panel";
-    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><button type="button" class="gle-panel-size-reset" aria-label="Panel genişliğini varsayılana getir" title="Panel genişliğini varsayılana getir"><span aria-hidden="true"></span></button><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-ai-analyze" aria-label="Bu içeriği AI ile analiz et" title="Bu içeriği AI ile analiz et">AI</button><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
+    panel.innerHTML='<div class="gle-panel-resizer" role="separator" aria-orientation="vertical" title="Panel genişliğini ayarla"></div><button type="button" class="gle-panel-size-reset" aria-label="Panel genişliğini varsayılana getir" title="Panel genişliğini varsayılana getir"><span aria-hidden="true"></span></button><div class="gle-panel-productbar"><strong>Language Learning</strong><div class="gle-panel-actions"><label class="gle-master-switch" title="Language Learning"><input class="gle-header-main-toggle" type="checkbox"><span></span><em>'+esc(uiText("active"))+'</em></label><button type="button" class="gle-header-ai-analyze" aria-label="Bu içeriği AI ile analiz et" title="Bu içeriği AI ile analiz et">AI</button><button type="button" class="gle-header-ge-status" aria-label="German Engine durumu" title="German Engine durumu">GE</button><button type="button" class="gle-header-export" aria-label="'+escAttr(uiText("exportData"))+'" title="'+escAttr(uiText("exportData"))+'">⇩</button><button type="button" class="gle-header-settings" aria-label="'+escAttr(uiText("settings"))+'" title="'+escAttr(uiText("settings"))+'">⚙</button></div></div><div class="gle-panel-head"><div class="gle-panel-tabs"><button type="button" data-tab="subtitles">'+esc(uiText("subtitles"))+'</button><button type="button" data-tab="words">'+esc(uiText("words"))+'</button><button type="button" data-tab="saved">'+esc(uiText("saved"))+'</button></div></div><div class="gle-panel-body"></div>';
 
     let handle=state.panel.handle;
     if(!handle?.isConnected){
@@ -3090,6 +3181,7 @@
       renderPlayerControls();
     });
     panel.querySelector(".gle-header-ai-analyze").addEventListener("click",()=>runCurrentContentAiIndex());
+    panel.querySelector(".gle-header-ge-status").addEventListener("click",()=>openSystemMonitor("ge"));
     panel.querySelector(".gle-header-export").addEventListener("click",()=>ensureExportDialog());
     panel.querySelector(".gle-panel-size-reset").addEventListener("click",async()=>{
       state.settings.panelWidthFactor=1;
@@ -3112,6 +3204,7 @@
     state.panel.element=panel;
     installPanelResizeHandle(panel);
     ensureAiLabDialog();
+    syncSystemMonitorVisibility();
 
     const active=state.settings.extensionEnabled!==false;
     const mainToggle=panel.querySelector(".gle-header-main-toggle");
@@ -6560,6 +6653,9 @@
 
   chrome.storage.sync.get({
     extensionEnabled:true,
+    systemMonitorEnabled:true,
+    systemMonitorCollapsed:false,
+    systemMonitorWidth:350,
     showSentenceTranslation:null,
     showVideoTranslation:null,
     showPanelTranslation:null,
@@ -6592,6 +6688,8 @@
     delete settings.showSentenceTranslation;
     if(Object.keys(migrated).length) chrome.storage.sync.set(migrated);
     state.settings=settings;
+    state.aiLabCollapsed=settings.systemMonitorCollapsed===true;
+    state.aiLabWidth=Math.max(250,Math.min(560,Number(settings.systemMonitorWidth)||350));
     if(adapter.id==="zdf" && Number(state.settings.germanFontSize)===100 && Number(state.settings.translationFontSize)===100){
       state.settings.germanFontSize=115;
       state.settings.translationFontSize=115;
@@ -6612,6 +6710,20 @@
     }
     if(area!=="sync") return;
     if(changes.extensionEnabled) state.settings.extensionEnabled=changes.extensionEnabled.newValue;
+    if(changes.systemMonitorEnabled){
+      state.settings.systemMonitorEnabled=changes.systemMonitorEnabled.newValue!==false;
+      syncSystemMonitorVisibility();
+    }
+    if(changes.systemMonitorCollapsed){
+      state.settings.systemMonitorCollapsed=changes.systemMonitorCollapsed.newValue===true;
+      state.aiLabCollapsed=state.settings.systemMonitorCollapsed;
+      syncSystemMonitorVisibility();
+    }
+    if(changes.systemMonitorWidth){
+      state.settings.systemMonitorWidth=Math.max(250,Math.min(560,Number(changes.systemMonitorWidth.newValue)||350));
+      state.aiLabWidth=state.settings.systemMonitorWidth;
+      if(state.aiLabDialog) state.aiLabDialog.style.width=state.aiLabWidth+"px";
+    }
     if(changes.showVideoTranslation) state.settings.showVideoTranslation=changes.showVideoTranslation.newValue;
     if(changes.showPanelTranslation) state.settings.showPanelTranslation=changes.showPanelTranslation.newValue;
     if(changes.followActiveSubtitle) state.settings.followActiveSubtitle=changes.followActiveSubtitle.newValue;
