@@ -1789,6 +1789,10 @@
       const prepared=buildPreparedSentenceAnalysis(preparedFixture,text);
       try{
         const platform=await analyzePlatform(text);
+        // Once persistent AI analysis is loaded for this exact sentence, it is
+        // authoritative. Do not let benchmark/prepared data overwrite AI
+        // meanings, structures, token membership, or provenance.
+        if(platform?.analysis_source==="ai") return platform;
         return mergePreparedContextualAnalysis(prepared,platform);
       }catch(_error){
         if(prepared.sentence_meaning_tr || prepared.expressions.length || Object.keys(prepared.hover||{}).length) return prepared;
