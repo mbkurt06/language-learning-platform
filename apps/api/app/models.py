@@ -113,3 +113,71 @@ class ExampleLexemeMatch(Base):
     )
     lemma: Mapped[str] = mapped_column(String(255), index=True)
     surface_form: Mapped[str] = mapped_column(Text)
+
+
+class IndexedContent(Base):
+    __tablename__ = "indexed_contents"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "external_id",
+            "source_language",
+            "target_language",
+            "content_hash",
+            "analysis_schema_version",
+            name="uq_indexed_content_identity",
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    source_type: Mapped[str] = mapped_column(String(64), index=True)
+    external_id: Mapped[str] = mapped_column(String(512), index=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_language: Mapped[str] = mapped_column(String(16), index=True)
+    target_language: Mapped[str] = mapped_column(String(16), index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    analysis_schema_version: Mapped[str] = mapped_column(String(32), default="v1")
+    analyzer_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    analyzer_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="ready", index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    segments: Mapped[list["IndexedSegment"]] = relationship(
+        cascade="all, delete-orphan", order_by="IndexedSegment.sequence_index"
+    )
+
+
+class IndexedSegment(Base):
+    __tablename__ = "indexed_segments"
+    __table_args__ = (
+        UniqueConstraint("content_id", "sequence_index", name="uq_indexed_segment_sequence"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("indexed_contents.id", ondelete="CASCADE"), index=True
+    )
+    sequence_index: Mapped[int] = mapped_column(index=True)
+    start_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    end_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source_text: Mapped[str] = mapped_column(Text)
+    translation_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    analysis_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    units: Mapped[list["IndexedUnit"]] = relationship(cascade="all, delete-orphan")
+
+
+class IndexedUnit(Base):
+    __tablename__ = "indexed_units"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("indexed_segments.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    canonical_form: Mapped[str] = mapped_column(Text)
+    canonical_key: Mapped[str] = mapped_column(String(512), index=True)
+    surface_form: Mapped[str] = mapped_column(Text)
+    language_specific_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    contextual_meaning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_indices_json: Mapped[list] = mapped_column(JSONB, default=list)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
