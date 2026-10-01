@@ -46,6 +46,7 @@
     aiIndexLastStatus:"",
     aiIndexDiagnostic:null,
     aiLabDialog:null,
+    aiLabCollapsed:false,
     tooltip:null,
     tooltipHideTimer:null,
     settings:{extensionEnabled:true,showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,pauseOnWordHover:false,autoPauseAfterSentence:false,interfaceLanguage:"tr",theme:"dark",panelWidthFactor:1,germanFontSize:100,translationFontSize:100,youtubeSubtitlePositionY:82,zdfSubtitlePositionY:88,tooltipPositionLocked:false,tooltipPersistent:false,tooltipHoverMode:false,tooltipLeft:null,tooltipTop:null},
@@ -1288,7 +1289,7 @@
       tokens,
       expressions,
       hover,
-      analysis_source:"ai",
+      analysis_source:segment.analysis_source==="local"?"local":"ai",
     };
   }
 
@@ -1480,6 +1481,15 @@
         }).join("")
       : '<div class="gle-ai-lab-empty">Henüz AI/DB analiz sonucu yok. “AI Analizi Başlat” düğmesi Gemini çağrısını yalnızca siz bastığınızda yapar.</div>';
 
+    dialog.classList.toggle("collapsed",state.aiLabCollapsed===true);
+    const toggle=dialog.querySelector(".gle-ai-lab-toggle");
+    if(toggle){
+      toggle.textContent=state.aiLabCollapsed?"▢":"−";
+      toggle.title=state.aiLabCollapsed?"AI İzleme penceresini büyüt":"AI İzleme penceresini küçült";
+      toggle.setAttribute("aria-label",toggle.title);
+      toggle.setAttribute("aria-expanded",state.aiLabCollapsed?"false":"true");
+    }
+
     const body=dialog.querySelector(".gle-ai-lab-body");
     if(!body) return;
     body.innerHTML=
@@ -1520,9 +1530,13 @@
     }
     dialog=document.createElement("div");
     dialog.id="gle-ai-lab-dialog";
-    dialog.innerHTML='<div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
+    dialog.innerHTML='<div class="gle-ai-lab-card" role="complementary" aria-labelledby="gle-ai-lab-title"><header><div><strong id="gle-ai-lab-title">AI İzleme</strong><small>AI / veritabanı kaynağını ve sonucu canlı izle</small></div><button type="button" class="gle-ai-lab-toggle" aria-label="AI İzleme penceresini küçült" aria-expanded="true" title="AI İzleme penceresini küçült">−</button></header><div class="gle-ai-lab-toolbar"><button type="button" class="gle-ai-lab-run">AI Analizi Başlat</button><button type="button" class="gle-ai-lab-export">JSON Dışa Aktar</button></div><div class="gle-ai-lab-body"></div></div>';
     dialog.querySelector(".gle-ai-lab-run").addEventListener("click",()=>runCurrentContentAiIndex());
     dialog.querySelector(".gle-ai-lab-export").addEventListener("click",()=>downloadAiAnalysisExport());
+    dialog.querySelector(".gle-ai-lab-toggle").addEventListener("click",()=>{
+      state.aiLabCollapsed=!state.aiLabCollapsed;
+      renderAiLabDialog();
+    });
     document.documentElement.appendChild(dialog);
     state.aiLabDialog=dialog;
     renderAiLabDialog();
@@ -2766,17 +2780,26 @@
       updatePanelActiveCue();
     }
 
-    requestAnimationFrame(()=>{
+    const alignCurrentToTop=()=>{
       const current=state.panel.element?.querySelector('[data-cue-index="'+index+'"]');
       if(!current) return;
+      state.panel.element?.querySelectorAll(".gle-transcript-row.active").forEach(row=>{
+        if(row!==current) row.classList.remove("active");
+      });
       current.classList.add("active");
       const list=current.closest(".gle-transcript-list");
       if(list){
-        const top=Math.max(0,current.offsetTop-4);
-        list.scrollTop=top;
+        const delta=current.getBoundingClientRect().top-list.getBoundingClientRect().top;
+        list.scrollTop=Math.max(0,list.scrollTop+delta-2);
       }else{
         current.scrollIntoView({block:"start"});
       }
+    };
+    requestAnimationFrame(()=>{
+      alignCurrentToTop();
+      // Rendering/translation insertion can move rows after the first frame.
+      // Align once more so hover focus consistently lands at the panel top.
+      requestAnimationFrame(alignCurrentToTop);
     });
   }
 
