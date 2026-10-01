@@ -87,3 +87,32 @@ class ExampleCorpusIndexRequest(BaseModel):
     target_lemmas: list[str] = Field(default_factory=list)
     index_all: bool = False
     cues: list[ExampleCue] = Field(min_length=1)
+
+
+class ContentSegmentInput(BaseModel):
+    index: int
+    text: str = Field(min_length=1)
+    start_ms: int | None = None
+    end_ms: int | None = None
+
+
+class ContentIndexRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=64)
+    source_type: str = Field(min_length=1, max_length=64)
+    external_id: str = Field(min_length=1, max_length=512)
+    url: str | None = None
+    title: str | None = None
+    source_language: str = Field(default="de", min_length=2, max_length=16)
+    target_language: str = Field(default="tr", min_length=2, max_length=16)
+    segments: list[ContentSegmentInput] = Field(min_length=1, max_length=5000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContentIndexResponse(BaseModel):
+    cached: bool
+    content_id: UUID
+    content_hash: str
+    analyzer_provider: str | None = None
+    analyzer_model: str | None = None
+    analysis_schema_version: str
+    segments: list[dict[str, Any]]

@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3001,http://localhost:5173"
     cors_origin_regex: str = r"^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$"
     environment: str = "local"
+    ai_analyzer_url: str = "http://ai-analyzer:8780"
+    ai_analysis_schema_version: str = "v1"
+    ai_batch_segments: int = 20
 
     def engine_urls(self) -> dict[str, str]:
         value = json.loads(self.language_engine_urls)

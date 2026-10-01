@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Any
+import hashlib
+import json
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -95,3 +97,41 @@ def analyze_learning_units_batch(source_language: str, texts: list[str]) -> list
         response.raise_for_status()
         payload = response.json()
         return payload.get("items", [])
+
+
+def content_fingerprint(segments: list[dict[str, Any]]) -> str:
+    payload = [
+        {
+            "index": int(item.get("index", 0)),
+            "text": " ".join(str(item.get("text", "")).split()),
+            "start_ms": item.get("start_ms"),
+            "end_ms": item.get("end_ms"),
+        }
+        for item in segments
+    ]
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def analyze_content_batch(
+    source_language: str,
+    target_language: str,
+    segments: list[dict[str, Any]],
+    *,
+    title: str | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    settings = get_settings()
+    with httpx.Client(timeout=150.0) as client:
+        response = client.post(
+            f"{settings.ai_analyzer_url.rstrip('/')}/analyze-batch",
+            json={
+                "source_language": source_language,
+                "target_language": target_language,
+                "segments": segments,
+                "context_title": title,
+                "context_provider": provider,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
