@@ -143,6 +143,22 @@
     return state.cache.get(text)||data;
   }
 
+  function activeTranslationSourceSummary(){
+    const request=currentAiIndexRequest();
+    const cues=Array.isArray(request?.cues)?request.cues:[];
+    let ai=0, local=0, other=0, total=0;
+    for(const cue of cues){
+      const text=String(cue?.text||"").trim();
+      if(!text) continue;
+      total+=1;
+      const source=state.cache.get(text)?.analysis_source||"";
+      if(source==="ai") ai+=1;
+      else if(source==="local") local+=1;
+      else other+=1;
+    }
+    return {ai,local,other,total};
+  }
+
   function updateSharedPanelUi(){
     const panel=state.panel.element;
     if(!panel) return;
@@ -154,10 +170,17 @@
       exportButton.title=uiText("exportData");
       exportButton.setAttribute("aria-label",uiText("exportData"));
     }
+
     const aiButton=panel.querySelector(".gle-header-ai-analyze");
     const geButton=panel.querySelector(".gle-header-ge-status");
-    const aiCoverage=state.aiCoverage||"unknown";
-    const geCoverage=state.localCoverage||"unknown";
+    const sourceSummary=activeTranslationSourceSummary();
+    const hasActiveSources=sourceSummary.total>0;
+    const allAi=hasActiveSources && sourceSummary.ai===sourceSummary.total;
+    const allGe=hasActiveSources && sourceSummary.local===sourceSummary.total;
+    const mixedAiGe=sourceSummary.ai>0 && sourceSummary.local>0;
+    const partialAi=sourceSummary.ai>0 && !allAi;
+    const partialGe=sourceSummary.local>0 && !allGe;
+
     if(aiButton){
       aiButton.disabled=false;
       aiButton.classList.remove("ai-full","ai-partial","ai-none","ai-running","source-mixed");
@@ -165,48 +188,52 @@
         aiButton.classList.add("ai-running");
         aiButton.textContent="AI…";
         aiButton.title="AI analizi sürüyor";
-      }else if(aiCoverage==="full"){
+      }else if(allAi){
         aiButton.classList.add("ai-full");
         aiButton.textContent="AI ✓";
         aiButton.title="Ekrandaki çevirilerin tamamı AI/AI veritabanından";
-      }else if(aiCoverage==="partial"){
-        aiButton.classList.add("source-mixed");
+      }else if(partialAi){
+        aiButton.classList.add(mixedAiGe?"source-mixed":"ai-partial");
         aiButton.textContent="AI +";
-        aiButton.title="Karışık kaynak: bazı cümleler AI, kalanlar German Engine/local";
+        aiButton.title=mixedAiGe
+          ? "Karışık kaynak: bazı cümleler AI, bazıları German Engine/local"
+          : "Bazı cümleler AI; kalan cümlelerde başka/fallback kaynak kullanılıyor";
       }else{
         aiButton.classList.add("ai-none");
         aiButton.textContent="AI";
         aiButton.title=state.aiLookupBusy
           ? "Mevcut AI analizi veritabanında kontrol ediliyor"
-          : "AI çevirisi yok; tıklayınca yalnız AI eksikleri analiz edilir";
+          : "Ekranda aktif AI çevirisi yok; tıklayınca yalnız AI eksikleri analiz edilir";
       }
       aiButton.setAttribute("aria-label",aiButton.title);
     }
+
     if(geButton){
       geButton.classList.remove("ge-full","ge-partial","source-mixed","ge-idle");
-      if(aiCoverage==="full"){
+      if(allAi){
         geButton.classList.add("ge-idle");
         geButton.textContent="GE";
-        geButton.title="German Engine/local verisi mevcut olabilir ancak ekranda AI öncelikli";
-      }else if(aiCoverage==="partial" && geCoverage!=="none" && geCoverage!=="unknown"){
+        geButton.title="German Engine/local verisi saklı olabilir ancak ekranda aktif kaynak AI";
+      }else if(mixedAiGe){
         geButton.classList.add("source-mixed");
         geButton.textContent="GE +";
-        geButton.title="Karışık kaynak: AI olmayan cümlelerde German Engine/local kullanılıyor";
-      }else if(geCoverage==="full"){
+        geButton.title="Karışık kaynak: AI olmayan cümlelerde German Engine/local aktif";
+      }else if(allGe){
         geButton.classList.add("ge-full");
         geButton.textContent="GE ✓";
-        geButton.title="Ekrandaki çevirilerin tamamı German Engine/local veritabanından";
-      }else if(geCoverage==="partial"){
+        geButton.title="Ekrandaki çevirilerin tamamı German Engine/local kaynağından";
+      }else if(partialGe){
         geButton.classList.add("ge-partial");
         geButton.textContent="GE +";
-        geButton.title="German Engine/local analizinin bir kısmı hazır";
+        geButton.title="Ekrandaki cümlelerin bir kısmında German Engine/local aktif";
       }else{
         geButton.classList.add("ge-idle");
         geButton.textContent="GE";
-        geButton.title="German Engine/local analiz durumu henüz tam hazır değil";
+        geButton.title="Ekranda aktif German Engine/local çevirisi yok";
       }
       geButton.setAttribute("aria-label",geButton.title);
     }
+
     const settingsButton=panel.querySelector(".gle-header-settings");
     if(settingsButton){
       settingsButton.title=uiText("settings");
@@ -1427,6 +1454,7 @@
       .sort((a,b)=>b.count-a.count || a.canonical.localeCompare(b.canonical,"de"));
     state.youtube.expressionGroupsVideoId=contentId;
     renderSharedPanel();
+    updateSharedPanelUi();
     refreshLearningHighlights();
     if(adapter.id==="web") scheduleWebLearningAnnotations();
     return true;
