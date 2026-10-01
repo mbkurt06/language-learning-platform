@@ -77,6 +77,9 @@ services:
       AI_BATCH_CONCURRENCY: ${AI_BATCH_CONCURRENCY:-2}
       GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
       GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON: ${GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/root/.config/gcloud/application_default_credentials.json}
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     ports:
       - "8000:8000"
     depends_on:
