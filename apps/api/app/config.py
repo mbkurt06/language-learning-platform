@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     ai_analysis_schema_version: str = "v1"
     ai_batch_segments: int = 20
     ai_batch_concurrency: int = 2
+    google_cloud_project: str = ""
+    google_cloud_service_account_json: str = ""
 
     def engine_urls(self) -> dict[str, str]:
         value = json.loads(self.language_engine_urls)
