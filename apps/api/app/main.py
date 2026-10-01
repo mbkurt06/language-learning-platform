@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+import re
 from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -406,6 +407,67 @@ def ensure_profile(payload: LearningProfileEnsure, db: DbSession):
     }
 
 
+def _normalized_segment_text(text: str) -> str:
+    return " ".join(str(text or "").split())
+
+
+_STAND_LINE_RE = re.compile(
+    r"^Stand:\s*(\d{1,2}\.\d{1,2}\.\d{4})\s*[•·]\s*(\d{1,2}:\d{2})\s*Uhr$",
+    re.IGNORECASE,
+)
+
+
+def _local_metadata_analysis(segment: dict, target_language: str) -> dict | None:
+    """Handle mechanical article metadata without spending an AI request."""
+    if target_language != "tr":
+        return None
+    text = _normalized_segment_text(segment.get("text", ""))
+    match = _STAND_LINE_RE.match(text)
+    if not match:
+        return None
+    date_text, time_text = match.groups()
+    return {
+        "index": int(segment["index"]),
+        "sentence_translation": f"Güncelleme: {date_text} • {time_text}",
+        "tokens": [
+            {
+                "i": 0,
+                "pos": "NOUN",
+                "lemma": "Stand",
+                "surface": "Stand",
+                "morphology": {},
+                "contextual_meaning_tr": "güncelleme / durum itibarıyla",
+            },
+            {
+                "i": 1,
+                "pos": "NUM",
+                "lemma": date_text,
+                "surface": date_text,
+                "morphology": {},
+                "contextual_meaning_tr": date_text,
+            },
+            {
+                "i": 2,
+                "pos": "NUM",
+                "lemma": time_text,
+                "surface": time_text,
+                "morphology": {},
+                "contextual_meaning_tr": time_text,
+            },
+            {
+                "i": 3,
+                "pos": "NOUN",
+                "lemma": "Uhr",
+                "surface": "Uhr",
+                "morphology": {},
+                "contextual_meaning_tr": "saat",
+            },
+        ],
+        "expressions": [],
+        "analysis_source": "local",
+    }
+
+
 def serialize_indexed_content(content: IndexedContent):
     return {
         "cached": True,
@@ -423,6 +485,7 @@ def serialize_indexed_content(content: IndexedContent):
                 "sentence_translation": segment.translation_text,
                 "tokens": segment.analysis_json.get("tokens", []),
                 "expressions": segment.analysis_json.get("expressions", []),
+                "analysis_source": segment.analysis_json.get("analysis_source", "ai"),
             }
             for segment in content.segments
         ],
@@ -476,16 +539,68 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     db.refresh(content)
 
     analyzed_segments = {}
-    analyzer_provider = None
-    analyzer_model = None
+
+    previous = db.scalar(
+        select(IndexedContent)
+        .where(
+            IndexedContent.provider == payload.provider,
+            IndexedContent.external_id == payload.external_id,
+            IndexedContent.source_language == payload.source_language,
+            IndexedContent.target_language == payload.target_language,
+            IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
+            IndexedContent.status == "ready",
+            IndexedContent.id != content.id,
+        )
+        .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
+    )
+
+    analyzer_provider = previous.analyzer_provider if previous is not None else None
+    analyzer_model = previous.analyzer_model if previous is not None else None
+    reused_segment_ids = set()
+    previous_by_text: dict[str, list[IndexedSegment]] = {}
+    if previous is not None:
+        for old_segment in previous.segments:
+            previous_by_text.setdefault(
+                _normalized_segment_text(old_segment.source_text), []
+            ).append(old_segment)
+
+    reused_count = 0
+    local_count = 0
+    pending_segments = []
+
+    for source in segment_payloads:
+        local_analysis = _local_metadata_analysis(source, payload.target_language)
+        if local_analysis is not None:
+            analyzed_segments[source["index"]] = local_analysis
+            local_count += 1
+            continue
+
+        normalized = _normalized_segment_text(source["text"])
+        candidates = previous_by_text.get(normalized, [])
+        reused = next(
+            (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
+            None,
+        )
+        if reused is not None:
+            reused_segment_ids.add(reused.id)
+            analyzed_segments[source["index"]] = {
+                "index": source["index"],
+                "sentence_translation": reused.translation_text,
+                "tokens": reused.analysis_json.get("tokens", []),
+                "expressions": reused.analysis_json.get("expressions", []),
+                "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
+            }
+            reused_count += 1
+        else:
+            pending_segments.append(source)
 
     try:
-        # Rich linguistic JSON grows quickly; keep batches small enough to avoid
-        # malformed/truncated model output even when local env still says 20.
+        # Only changed/new segments go to Gemini. Unchanged segments are reused
+        # from the latest ready version of the same content.
         batch_size = max(1, min(settings.ai_batch_segments, 8))
-        total_batches = (len(segment_payloads) + batch_size - 1) // batch_size
-        for batch_index, offset in enumerate(range(0, len(segment_payloads), batch_size), start=1):
-            chunk = segment_payloads[offset:offset + batch_size]
+        total_batches = (len(pending_segments) + batch_size - 1) // batch_size
+        for batch_index, offset in enumerate(range(0, len(pending_segments), batch_size), start=1):
+            chunk = pending_segments[offset:offset + batch_size]
             try:
                 result = analyze_content_batch(
                     payload.source_language,
@@ -503,7 +618,12 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
             analyzer_provider = result.get("provider") or analyzer_provider
             analyzer_model = result.get("model") or analyzer_model
             for item in result.get("analysis", {}).get("segments", []):
+                item["analysis_source"] = "ai"
                 analyzed_segments[int(item["index"])] = item
+
+        if analyzer_provider is None and not pending_segments:
+            analyzer_provider = "local"
+            analyzer_model = None
 
         expected_indexes = {item["index"] for item in segment_payloads}
         missing = expected_indexes - set(analyzed_segments)
@@ -525,6 +645,7 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
                 analysis_json={
                     "tokens": item.get("tokens", []),
                     "expressions": item.get("expressions", []),
+                    "analysis_source": item.get("analysis_source", "ai"),
                 },
             )
             db.add(segment)
@@ -584,7 +705,10 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
         raise HTTPException(status_code=502, detail=f"content AI analysis failed: {exc}") from exc
 
     result = serialize_indexed_content(content)
-    result["cached"] = False
+    result["cached"] = len(pending_segments) == 0
+    result["reused_segments"] = reused_count
+    result["ai_analyzed_segments"] = len(pending_segments)
+    result["local_segments"] = local_count
     return result
 
 
