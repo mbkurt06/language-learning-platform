@@ -74,6 +74,7 @@ services:
       AI_ANALYZER_URL: ${AI_ANALYZER_URL:-http://ai-analyzer:8780}
       AI_ANALYSIS_SCHEMA_VERSION: ${AI_ANALYSIS_SCHEMA_VERSION:-v1}
       AI_BATCH_SEGMENTS: ${AI_BATCH_SEGMENTS:-20}
+      AI_BATCH_CONCURRENCY: ${AI_BATCH_CONCURRENCY:-2}
     ports:
       - "8000:8000"
     depends_on:
