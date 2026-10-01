@@ -728,9 +728,9 @@ def upsert_local_analysis_batch(payload: LocalAnalysisBatchUpsertRequest, db: Db
 def content_index_status(
     provider: str,
     external_id: str,
+    db: DbSession,
     source_language: str = "de",
     target_language: str = "tr",
-    db: DbSession = None,
 ):
     content = db.scalar(
         select(IndexedContent)
