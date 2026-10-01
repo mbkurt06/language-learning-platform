@@ -14,6 +14,9 @@ from .models import (
     ExampleLexemeMatch,
     ExampleSentence,
     ExampleSource,
+    IndexedContent,
+    IndexedSegment,
+    IndexedUnit,
     LearningItem,
     LearningItemTranslation,
     LearningProfile,
@@ -25,6 +28,8 @@ from .schemas import (
     AnalyzeAndMatchResponse,
     AnalyzeRequest,
     AnalyzeResponse,
+    ContentIndexRequest,
+    ContentIndexResponse,
     TokenBatchRequest,
     EncounterCreate,
     ExampleCorpusIndexRequest,
@@ -33,7 +38,16 @@ from .schemas import (
     LearningProfileEnsure,
     UserCreate,
 )
-from .services import UnsupportedLanguageError, analyze_text, analyze_tokens_batch, analyze_expression_groups_batch, analyze_learning_units_batch, match_learning_items
+from .services import (
+    UnsupportedLanguageError,
+    analyze_content_batch,
+    analyze_expression_groups_batch,
+    analyze_learning_units_batch,
+    analyze_text,
+    analyze_tokens_batch,
+    content_fingerprint,
+    match_learning_items,
+)
 
 
 def get_db():
@@ -390,6 +404,186 @@ def ensure_profile(payload: LearningProfileEnsure, db: DbSession):
         "target_language": profile.target_language,
         "level": profile.level,
     }
+
+
+def serialize_indexed_content(content: IndexedContent):
+    return {
+        "cached": True,
+        "content_id": content.id,
+        "content_hash": content.content_hash,
+        "analyzer_provider": content.analyzer_provider,
+        "analyzer_model": content.analyzer_model,
+        "analysis_schema_version": content.analysis_schema_version,
+        "segments": [
+            {
+                "index": segment.sequence_index,
+                "start_ms": segment.start_ms,
+                "end_ms": segment.end_ms,
+                "text": segment.source_text,
+                "sentence_translation": segment.translation_text,
+                "tokens": segment.analysis_json.get("tokens", []),
+                "expressions": segment.analysis_json.get("expressions", []),
+            }
+            for segment in content.segments
+        ],
+    }
+
+
+@app.post("/api/v1/content-index/resolve", response_model=ContentIndexResponse)
+def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
+    settings = get_settings()
+    segment_payloads = [segment.model_dump() for segment in payload.segments]
+    fingerprint = content_fingerprint(segment_payloads)
+
+    identity = (
+        IndexedContent.provider == payload.provider,
+        IndexedContent.external_id == payload.external_id,
+        IndexedContent.source_language == payload.source_language,
+        IndexedContent.target_language == payload.target_language,
+        IndexedContent.content_hash == fingerprint,
+        IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
+    )
+    existing = db.scalar(select(IndexedContent).where(*identity))
+    if existing is not None and existing.status == "ready":
+        return serialize_indexed_content(existing)
+    if existing is not None and existing.status == "processing":
+        raise HTTPException(status_code=409, detail="content analysis is already in progress")
+
+    if existing is None:
+        content = IndexedContent(
+            provider=payload.provider,
+            source_type=payload.source_type,
+            external_id=payload.external_id,
+            url=payload.url,
+            title=payload.title,
+            source_language=payload.source_language,
+            target_language=payload.target_language,
+            content_hash=fingerprint,
+            analysis_schema_version=settings.ai_analysis_schema_version,
+            status="processing",
+            metadata_json=payload.metadata,
+        )
+        db.add(content)
+    else:
+        content = existing
+        content.status = "processing"
+        content.url = payload.url or content.url
+        content.title = payload.title or content.title
+        content.metadata_json = payload.metadata
+        for old_segment in list(content.segments):
+            db.delete(old_segment)
+    db.commit()
+    db.refresh(content)
+
+    analyzed_segments = {}
+    analyzer_provider = None
+    analyzer_model = None
+
+    try:
+        batch_size = max(1, min(settings.ai_batch_segments, 40))
+        for offset in range(0, len(segment_payloads), batch_size):
+            chunk = segment_payloads[offset:offset + batch_size]
+            result = analyze_content_batch(
+                payload.source_language,
+                payload.target_language,
+                chunk,
+                title=payload.title,
+                provider=payload.provider,
+            )
+            analyzer_provider = result.get("provider") or analyzer_provider
+            analyzer_model = result.get("model") or analyzer_model
+            for item in result.get("analysis", {}).get("segments", []):
+                analyzed_segments[int(item["index"])] = item
+
+        expected_indexes = {item["index"] for item in segment_payloads}
+        missing = expected_indexes - set(analyzed_segments)
+        if missing:
+            raise RuntimeError(f"AI analyzer omitted segments: {sorted(missing)[:20]}")
+
+        content.analyzer_provider = analyzer_provider
+        content.analyzer_model = analyzer_model
+
+        for source in segment_payloads:
+            item = analyzed_segments[source["index"]]
+            segment = IndexedSegment(
+                content_id=content.id,
+                sequence_index=source["index"],
+                start_ms=source.get("start_ms"),
+                end_ms=source.get("end_ms"),
+                source_text=source["text"],
+                translation_text=item.get("sentence_translation"),
+                analysis_json={
+                    "tokens": item.get("tokens", []),
+                    "expressions": item.get("expressions", []),
+                },
+            )
+            db.add(segment)
+            db.flush()
+
+            for token in item.get("tokens", []):
+                lemma = str(token.get("lemma") or token.get("surface") or "").strip()
+                if not lemma:
+                    continue
+                db.add(IndexedUnit(
+                    segment_id=segment.id,
+                    kind="word",
+                    canonical_form=lemma,
+                    canonical_key=lemma.lower(),
+                    surface_form=str(token.get("surface") or lemma),
+                    language_specific_type=str(token.get("pos") or "") or None,
+                    contextual_meaning=token.get("contextual_meaning_tr"),
+                    token_indices_json=[token.get("i")] if token.get("i") is not None else [],
+                    metadata_json={
+                        "morphology": token.get("morphology") or {},
+                    },
+                ))
+
+            for expression in item.get("expressions", []):
+                canonical = str(expression.get("canonical") or expression.get("surface") or "").strip()
+                if not canonical:
+                    continue
+                expression_type = str(expression.get("type") or "FIXED_CONSTRUCTION")
+                db.add(IndexedUnit(
+                    segment_id=segment.id,
+                    kind="expression",
+                    canonical_form=canonical,
+                    canonical_key=f"{expression_type.lower()}:{canonical.lower()}",
+                    surface_form=str(expression.get("surface") or canonical),
+                    language_specific_type=expression_type,
+                    contextual_meaning=expression.get("contextual_meaning_tr"),
+                    token_indices_json=expression.get("token_indices") or [],
+                    metadata_json={
+                        "grammar_hint": expression.get("grammar_hint") or "",
+                        "highlight_parts": expression.get("highlight_parts") or [],
+                    },
+                ))
+
+        content.status = "ready"
+        db.commit()
+        db.refresh(content)
+    except Exception as exc:
+        db.rollback()
+        failed = db.get(IndexedContent, content.id)
+        if failed is not None:
+            failed.status = "failed"
+            failed.metadata_json = {
+                **(failed.metadata_json or {}),
+                "analysis_error": str(exc)[:2000],
+            }
+            db.commit()
+        raise HTTPException(status_code=502, detail=f"content AI analysis failed: {exc}") from exc
+
+    result = serialize_indexed_content(content)
+    result["cached"] = False
+    return result
+
+
+@app.get("/api/v1/content-index/{content_id}", response_model=ContentIndexResponse)
+def get_content_index(content_id: UUID, db: DbSession):
+    content = db.get(IndexedContent, content_id)
+    if content is None or content.status != "ready":
+        raise HTTPException(status_code=404, detail="indexed content not found")
+    return serialize_indexed_content(content)
 
 
 @app.post("/api/v1/analyze", response_model=AnalyzeResponse)
