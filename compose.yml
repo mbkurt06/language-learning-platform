@@ -45,6 +45,22 @@ services:
       retries: 12
     restart: unless-stopped
 
+  ai-analyzer:
+    build:
+      context: ./apps/ai-analyzer
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      AI_MODEL: ${AI_MODEL:-gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8780:8780"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8780/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   api:
     build:
       context: ./apps/api
@@ -55,6 +71,9 @@ services:
       TRANSLATION_URL: ${TRANSLATION_URL:-http://translation:5000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
       CORS_ORIGIN_REGEX: '${CORS_ORIGIN_REGEX:-^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$}'
+      AI_ANALYZER_URL: ${AI_ANALYZER_URL:-http://ai-analyzer:8780}
+      AI_ANALYSIS_SCHEMA_VERSION: ${AI_ANALYSIS_SCHEMA_VERSION:-v1}
+      AI_BATCH_SEGMENTS: ${AI_BATCH_SEGMENTS:-20}
     ports:
       - "8000:8000"
     depends_on:
@@ -63,6 +82,8 @@ services:
       translation:
         condition: service_started
       german-engine:
+        condition: service_healthy
+      ai-analyzer:
         condition: service_healthy
     restart: unless-stopped
 
