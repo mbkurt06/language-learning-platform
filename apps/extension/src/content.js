@@ -249,7 +249,6 @@
     const persistent=state.settings.tooltipPersistent===true;
     const hoverMode=state.settings.tooltipHoverMode===true;
     return '<div class="gle-tooltip-tools">'+
-      '<button type="button" class="gle-tooltip-drag-handle" title="Popup\'ı sürükle" aria-label="Popup\'ı sürükle">⋮⋮</button>'+
       '<span class="gle-tooltip-tools-spacer"></span>'+
       '<button type="button" class="gle-tooltip-tool gle-tooltip-hover-tool '+(hoverMode?'active':'')+'" data-tooltip-hover-mode title="Hover modu: kelimenin üstüne gelince analiz et" aria-label="Hover modu">Hover</button>'+
       '<button type="button" class="gle-tooltip-tool '+(locked?'active':'')+'" data-tooltip-position-lock title="Konumu sabitle" aria-label="Konumu sabitle">📌</button>'+
