@@ -2065,7 +2065,7 @@
       while(cursor<texts.length){
         const index=cursor++;
         const text=texts[index];
-        try{ await analyzePlatform(text); }catch(_error){}
+        try{ await analyze(text); }catch(_error){}
       }
     };
     await Promise.all([worker(),worker(),worker()]);
