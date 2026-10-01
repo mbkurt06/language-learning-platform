@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from google.auth import default as google_auth_default
 from google.auth.exceptions import DefaultCredentialsError
 from google.auth.transport.requests import AuthorizedSession
+from google.oauth2 import service_account
 
 
 MONITORING_SCOPE = "https://www.googleapis.com/auth/monitoring.read"
@@ -85,7 +87,7 @@ def _time_series(
     return response.json().get("timeSeries") or []
 
 
-def fetch_gemini_quota(project_id: str, model: str) -> dict[str, Any]:
+def fetch_gemini_quota(project_id: str, model: str, service_account_json: str = "") -> dict[str, Any]:
     project_id = str(project_id or "").strip()
     if not project_id:
         return {
@@ -96,9 +98,18 @@ def fetch_gemini_quota(project_id: str, model: str) -> dict[str, Any]:
             "note": "GOOGLE_CLOUD_PROJECT is not configured.",
         }
 
+    detected_project = None
     try:
-        credentials, detected_project = google_auth_default(scopes=[MONITORING_SCOPE])
-    except DefaultCredentialsError as exc:
+        if service_account_json.strip():
+            info = json.loads(service_account_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                info,
+                scopes=[MONITORING_SCOPE],
+            )
+            detected_project = info.get("project_id")
+        else:
+            credentials, detected_project = google_auth_default(scopes=[MONITORING_SCOPE])
+    except (DefaultCredentialsError, ValueError, json.JSONDecodeError) as exc:
         return {
             "status": "not_authorized",
             "project_id": project_id,
