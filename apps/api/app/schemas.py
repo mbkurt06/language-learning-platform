@@ -115,4 +115,7 @@ class ContentIndexResponse(BaseModel):
     analyzer_provider: str | None = None
     analyzer_model: str | None = None
     analysis_schema_version: str
+    reused_segments: int = 0
+    ai_analyzed_segments: int = 0
+    local_segments: int = 0
     segments: list[dict[str, Any]]
