@@ -122,7 +122,23 @@ INPUT SEGMENTS:
 """.strip()
 
 
-def call_gemini(payload: AnalyzeBatchRequest) -> dict[str, Any]:
+def _usage_from_response(raw: dict[str, Any]) -> dict[str, int]:
+    usage = raw.get("usageMetadata") or raw.get("usage_metadata") or {}
+    return {
+        "request_count": 1,
+        "input_tokens": int(usage.get("promptTokenCount") or usage.get("prompt_token_count") or 0),
+        "output_tokens": int(usage.get("candidatesTokenCount") or usage.get("candidates_token_count") or 0),
+        "total_tokens": int(usage.get("totalTokenCount") or usage.get("total_token_count") or 0),
+        "cached_tokens": int(usage.get("cachedContentTokenCount") or usage.get("cached_content_token_count") or 0),
+    }
+
+
+def _sum_usage(*items: dict[str, int]) -> dict[str, int]:
+    keys=("request_count","input_tokens","output_tokens","total_tokens","cached_tokens")
+    return {key: sum(int(item.get(key, 0)) for item in items) for key in keys}
+
+
+def call_gemini(payload: AnalyzeBatchRequest) -> tuple[dict[str, Any], dict[str, int]]:
     model = gemini_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     prompt = analyzer_prompt(payload)
@@ -153,14 +169,17 @@ def call_gemini(payload: AnalyzeBatchRequest) -> dict[str, Any]:
         return raw, text
 
     raw, text = request_once()
+    usage = _usage_from_response(raw)
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError as exc:
-        raw, text = request_once(
+        retry_raw, text = request_once(
             "IMPORTANT RETRY: Your previous response was not valid JSON. "
             "Return ONLY one complete valid JSON object matching the requested schema. "
             "Do not use markdown, comments, trailing commas, NaN, undefined, or explanatory text."
         )
+        usage = _sum_usage(usage, _usage_from_response(retry_raw))
+        raw = retry_raw
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError as retry_exc:
@@ -180,7 +199,7 @@ def call_gemini(payload: AnalyzeBatchRequest) -> dict[str, Any]:
 
     if not isinstance(parsed, dict) or not isinstance(parsed.get("segments"), list):
         raise RuntimeError("Gemini response does not match the expected analysis shape")
-    return parsed
+    return parsed, usage
 
 
 @app.get("/health")
@@ -199,7 +218,7 @@ def analyze_batch(payload: AnalyzeBatchRequest):
     if provider != "gemini":
         raise HTTPException(status_code=422, detail=f"unsupported AI provider: {provider}")
     try:
-        analysis = call_gemini(payload)
+        analysis, usage = call_gemini(payload)
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text[:1000]
         raise HTTPException(status_code=502, detail=f"Gemini request failed: {detail}") from exc
@@ -209,4 +228,5 @@ def analyze_batch(payload: AnalyzeBatchRequest):
         "provider": provider,
         "model": gemini_model(),
         "analysis": analysis,
+        "usage": usage,
     }
