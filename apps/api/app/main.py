@@ -480,7 +480,9 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     analyzer_model = None
 
     try:
-        batch_size = max(1, min(settings.ai_batch_segments, 40))
+        # Rich linguistic JSON grows quickly; keep batches small enough to avoid
+        # malformed/truncated model output even when local env still says 20.
+        batch_size = max(1, min(settings.ai_batch_segments, 8))
         total_batches = (len(segment_payloads) + batch_size - 1) // batch_size
         for batch_index, offset in enumerate(range(0, len(segment_payloads), batch_size), start=1):
             chunk = segment_payloads[offset:offset + batch_size]
