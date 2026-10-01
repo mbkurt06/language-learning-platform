@@ -481,15 +481,23 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
 
     try:
         batch_size = max(1, min(settings.ai_batch_segments, 40))
-        for offset in range(0, len(segment_payloads), batch_size):
+        total_batches = (len(segment_payloads) + batch_size - 1) // batch_size
+        for batch_index, offset in enumerate(range(0, len(segment_payloads), batch_size), start=1):
             chunk = segment_payloads[offset:offset + batch_size]
-            result = analyze_content_batch(
-                payload.source_language,
-                payload.target_language,
-                chunk,
-                title=payload.title,
-                provider=payload.provider,
-            )
+            try:
+                result = analyze_content_batch(
+                    payload.source_language,
+                    payload.target_language,
+                    chunk,
+                    title=payload.title,
+                    provider=payload.provider,
+                )
+            except Exception as exc:
+                indexes = [item.get("index") for item in chunk]
+                raise RuntimeError(
+                    f"AI batch {batch_index}/{total_batches} failed "
+                    f"(segment indexes {indexes[0] if indexes else '?'}..{indexes[-1] if indexes else '?'}): {exc}"
+                ) from exc
             analyzer_provider = result.get("provider") or analyzer_provider
             analyzer_model = result.get("model") or analyzer_model
             for item in result.get("analysis", {}).get("segments", []):
