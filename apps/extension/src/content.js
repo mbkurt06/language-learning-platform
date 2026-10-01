@@ -1235,6 +1235,149 @@
     CSS.highlights.delete("gle-benchmark-expression");
   }
 
+  function indexedSegmentToAnalysis(segment){
+    const tokens=(segment?.tokens||[]).map((token,index)=>({
+      i:Number.isInteger(token?.i)?token.i:index,
+      text:String(token?.surface||token?.text||""),
+      lemma:String(token?.lemma||token?.surface||token?.text||""),
+      pos:String(token?.pos||"X"),
+      morphology:token?.morphology||{},
+    }));
+    const expressions=(segment?.expressions||[]).map(expression=>({
+      canonical:String(expression?.canonical||expression?.surface||""),
+      surface:String(expression?.surface||expression?.canonical||""),
+      type:String(expression?.type||"FIXED_CONSTRUCTION"),
+      pattern_id:String(expression?.pattern_id||("ai:"+String(expression?.type||"FIXED_CONSTRUCTION").toLowerCase()+":"+String(expression?.canonical||expression?.surface||"").toLocaleLowerCase("de-DE"))),
+      contextual_meaning_tr:String(expression?.contextual_meaning_tr||""),
+      meaning_tr:expression?.contextual_meaning_tr?[String(expression.contextual_meaning_tr)]:[],
+      grammar_hint:String(expression?.grammar_hint||""),
+      token_indices:[...(expression?.token_indices||[])],
+      highlight_parts:[...(expression?.highlight_parts||[])],
+    }));
+    const hover={};
+    for(const token of segment?.tokens||[]){
+      const i=Number.isInteger(token?.i)?token.i:(segment.tokens||[]).indexOf(token);
+      hover[String(i)]={
+        contextual_word_meaning_tr:String(token?.contextual_meaning_tr||""),
+        dictionary_meanings_tr:[],
+        primary_expressions:expressions.filter(expr=>(expr.token_indices||[]).includes(i)),
+        usage_notes:[],
+      };
+    }
+    return {
+      sentence_meaning_tr:String(segment?.sentence_translation||""),
+      tokens,
+      expressions,
+      hover,
+    };
+  }
+
+  function applyIndexedContentPayload(payload,cues,contentId){
+    if(!payload?.segments?.length) return false;
+    const cueByIndex=new Map((cues||[]).map((cue,index)=>[Number.isInteger(cue.index)?cue.index:index,cue]));
+    const words=new Map();
+    const expressions=new Map();
+
+    for(const segment of payload.segments){
+      const cue=cueByIndex.get(segment.index);
+      const text=String(cue?.text||segment.text||"").trim();
+      if(!text) continue;
+      const analysis=indexedSegmentToAnalysis(segment);
+      state.cache.set(text,analysis);
+      if(analysis.sentence_meaning_tr) state.panelTranslationCache.set(text,analysis.sentence_meaning_tr);
+
+      for(const token of analysis.tokens||[]){
+        const lemma=String(token.lemma||token.text||"").trim();
+        if(!lemma) continue;
+        const key=lemma.toLocaleLowerCase("de-DE");
+        let entry=words.get(key);
+        if(!entry){
+          entry={lemma,pos:token.pos||"",count:0,forms:new Set(),occurrences:[],article:"",singular:"",plural:"",meaningTr:""};
+          words.set(key,entry);
+        }
+        entry.count+=1;
+        entry.forms.add(token.text||lemma);
+        if(!entry.occurrences.includes(segment.index)) entry.occurrences.push(segment.index);
+        const h=analysis.hover?.[String(token.i)]||{};
+        if(!entry.meaningTr && h.contextual_word_meaning_tr) entry.meaningTr=h.contextual_word_meaning_tr;
+      }
+
+      for(const expr of analysis.expressions||[]){
+        const canonical=String(expr.canonical||expr.surface||"").trim();
+        if(!canonical) continue;
+        const key=String(expr.type||"FIXED_CONSTRUCTION")+"|"+canonical.toLocaleLowerCase("de-DE");
+        let entry=expressions.get(key);
+        if(!entry){
+          entry={
+            key,
+            type:expr.type||"FIXED_CONSTRUCTION",
+            patternId:expr.pattern_id||"",
+            canonical,
+            count:0,
+            forms:new Set(),
+            occurrences:[],
+            meaningTr:expr.contextual_meaning_tr||"",
+            grammarHint:expr.grammar_hint||"",
+          };
+          expressions.set(key,entry);
+        }
+        entry.count+=1;
+        if(expr.surface) entry.forms.add(expr.surface);
+        if(!entry.occurrences.includes(segment.index)) entry.occurrences.push(segment.index);
+        if(!entry.meaningTr && expr.contextual_meaning_tr) entry.meaningTr=expr.contextual_meaning_tr;
+      }
+    }
+
+    state.youtube.transcriptAnalysis=[...words.values()]
+      .map(entry=>({...entry,forms:[...entry.forms]}))
+      .sort((a,b)=>b.count-a.count || a.lemma.localeCompare(b.lemma,"de"));
+    state.youtube.transcriptAnalysisVideoId=contentId;
+    state.youtube.expressionGroupsAnalysis=[...expressions.values()]
+      .map(entry=>({...entry,forms:[...entry.forms]}))
+      .sort((a,b)=>b.count-a.count || a.canonical.localeCompare(b.canonical,"de"));
+    state.youtube.expressionGroupsVideoId=contentId;
+    renderSharedPanel();
+    refreshLearningHighlights();
+    if(adapter.id==="web") scheduleWebLearningAnnotations();
+    return true;
+  }
+
+  async function resolveIndexedContent({provider,sourceType,externalId,title,url,cues,contentId}){
+    if(!Array.isArray(cues) || !cues.length || !externalId) return false;
+    try{
+      const {platformApiUrl="http://127.0.0.1:8000"}=await chrome.storage.sync.get("platformApiUrl");
+      const segments=cues.map((cue,index)=>({
+        index:Number.isInteger(cue.index)?cue.index:index,
+        text:String(cue.text||"").trim(),
+        start_ms:Number.isFinite(cue.startMs)?Math.round(cue.startMs):null,
+        end_ms:Number.isFinite(cue.endMs)?Math.round(cue.endMs):null,
+      })).filter(item=>item.text);
+      if(!segments.length) return false;
+      const response=await platformFetch(platformApiUrl.replace(/\/$/,"")+"/api/v1/content-index/resolve",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          provider,
+          source_type:sourceType,
+          external_id:String(externalId),
+          url:url||null,
+          title:title||null,
+          source_language:"de",
+          target_language:"tr",
+          segments,
+          metadata:{indexed_by:"browser-extension"},
+        }),
+      });
+      if(response.status===409) return false;
+      if(!response.ok) throw new Error("content-index "+response.status);
+      const payload=await response.json();
+      return applyIndexedContentPayload(payload,cues,contentId||String(externalId));
+    }catch(error){
+      console.warn("Persistent AI content index unavailable; using local analysis fallback",error);
+      return false;
+    }
+  }
+
   async function analyzePlatform(text){
     if(state.cache.has(text)) return state.cache.get(text);
     if(state.analysisInflight.has(text)) return state.analysisInflight.get(text);
@@ -5173,7 +5316,20 @@
         refreshLearningHighlights();
       });
       renderSharedPanel();
-      analyzeWholeYouTubeTranscript();
+      resolveIndexedContent({
+        provider:"youtube",
+        sourceType:"video",
+        externalId:state.youtube.videoId||message.videoId||currentYouTubeVideoId(),
+        title:currentYouTubeTitle(),
+        url:location.href,
+        cues,
+        contentId:state.youtube.videoId||message.videoId||currentYouTubeVideoId(),
+      }).then(indexed=>{
+        if(!indexed){
+          analyzeWholeYouTubeTranscript();
+          analyzeWholeYouTubeExpressionGroups();
+        }
+      });
       bindYouTubeVideo();
       const video=state.youtube.video || document.querySelector("video.html5-main-video") || document.querySelector("video");
       const currentCue=video ? globalThis.GLEYoutubeCues.cueAtTime(cues,video.currentTime*1000) : cues[0];
@@ -5524,8 +5680,20 @@
         refreshLearningHighlights();
       });
       renderSharedPanel();
-      analyzeWholeYouTubeTranscript();
-      analyzeWholeYouTubeExpressionGroups();
+      resolveIndexedContent({
+        provider:"zdf",
+        sourceType:"video",
+        externalId:videoId,
+        title:document.title||null,
+        url:location.href,
+        cues,
+        contentId:videoId,
+      }).then(indexed=>{
+        if(!indexed){
+          analyzeWholeYouTubeTranscript();
+          analyzeWholeYouTubeExpressionGroups();
+        }
+      });
       renderZdfCue();
     }catch(error){
       state.zdf.error=String(error?.message||error);
@@ -5675,10 +5843,28 @@
       state.youtube.expressionGroupsAnalysis=preparedExpressionAnalysis(preparedFixture);
       state.youtube.expressionGroupsVideoId=contentId;
       requestAnimationFrame(()=>refreshPreparedBenchmarkHighlights(preparedFixture));
-      warmPreparedContextualMeanings().catch(()=>{});
-    }else if(segments.length){
-      Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
-        .finally(()=>scheduleWebLearningAnnotations());
+    }
+    if(segments.length){
+      let pageUrl;
+      try{ pageUrl=new URL(location.href); pageUrl.hash=""; }catch(_error){ pageUrl=null; }
+      const stableUrl=pageUrl?.toString()||location.href;
+      resolveIndexedContent({
+        provider:"web",
+        sourceType:"article",
+        externalId:stableUrl,
+        title:document.title||null,
+        url:stableUrl,
+        cues:segments,
+        contentId,
+      }).then(indexed=>{
+        if(indexed) return;
+        if(preparedFixture){
+          warmPreparedContextualMeanings().catch(()=>{});
+        }else{
+          Promise.all([analyzeWholeYouTubeTranscript(),analyzeWholeYouTubeExpressionGroups()])
+            .finally(()=>scheduleWebLearningAnnotations());
+        }
+      });
     }
     renderSharedPanel();
     scheduleWebLearningAnnotations();
