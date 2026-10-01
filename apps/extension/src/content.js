@@ -1533,6 +1533,31 @@
     return ({ready:"Hazır",partial:"Kısmi hazır",running:"Çalışıyor",error:"Hata",missing:"Eksik içerik",idle:"Bekliyor"})[status]||"Bekliyor";
   }
 
+  function renderGeminiQuotaRows(summary){
+    const quota=summary?.official_quota;
+    if(!quota) return '<div><span>Resmî Google kotası</span><b>Yüklenmedi</b></div>';
+    if(quota.status!=="available" || !Array.isArray(quota.limits) || !quota.limits.length){
+      const statusLabel=quota.status==="not_configured"
+        ? "Cloud proje ayarı yok"
+        : quota.status==="not_authorized"
+          ? "Cloud Monitoring yetkisi yok"
+          : "Kota verisi alınamadı";
+      return '<div><span>Resmî Google kotası</span><b>'+esc(statusLabel)+'</b></div>'+
+        (quota.note?'<small class="gle-ai-quota-note">'+esc(String(quota.note))+'</small>':"");
+    }
+    const rows=quota.limits.map(item=>{
+      const name=String(item.limit_name||"").toLowerCase();
+      const windowLabel=name.includes("day")?"günlük":name.includes("minute")?"dakikalık":name.includes("hour")?"saatlik":"kota";
+      const kindLabel=item.kind==="input_tokens"?"Input token":"İstek";
+      return '<div><span>'+esc(kindLabel+" · "+windowLabel)+'</span><b>'+
+        esc(String(item.used??0))+' / '+esc(String(item.limit??0))+
+        ' · '+esc(String(item.remaining??0))+' kaldı</b></div>';
+    }).join("");
+    return '<div class="gle-ai-quota-title"><span>Google Cloud kota</span><b>'+esc(String(quota.model||summary?.latest_model||""))+'</b></div>'+
+      rows+
+      (quota.note?'<small class="gle-ai-quota-note">'+esc(String(quota.note))+'</small>':"");
+  }
+
   function buildAiAnalysisExport(){
     const diagnostic=state.aiIndexDiagnostic||{
       status:"idle",
@@ -1665,7 +1690,7 @@
               '<div><span>Google günü</span><b>'+esc(String(state.aiUsageSummary.google_day?.requests||0))+' istek · '+esc(String(state.aiUsageSummary.google_day?.total_tokens||0))+' token</b></div>'+
               '<div><span>Son 7 gün</span><b>'+esc(String(state.aiUsageSummary.last_7_days?.requests||0))+' istek · '+esc(String(state.aiUsageSummary.last_7_days?.total_tokens||0))+' token</b></div>'+
               '<div><span>Bu ay</span><b>'+esc(String(state.aiUsageSummary.month_to_date?.requests||0))+' istek · '+esc(String(state.aiUsageSummary.month_to_date?.total_tokens||0))+' token</b></div>'+
-              '<div><span>Resmî kalan kota</span><b>Cloud Quotas bağlı değil</b></div>'+
+              renderGeminiQuotaRows(state.aiUsageSummary)+
             '</div>'
           : '<div class="gle-ai-usage gle-ai-usage-empty">Gemini kullanım sayacı yükleniyor…</div>')+
         (diagnostic.error?'<pre class="gle-ai-lab-error">'+esc(diagnostic.error)+'</pre>':"")+
