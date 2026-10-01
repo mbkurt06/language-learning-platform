@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import SessionLocal
+from .google_quota import fetch_gemini_quota
 from .models import (
     AiUsageEvent,
     ContentSource,
@@ -859,6 +860,22 @@ def ai_usage_summary(db: DbSession):
     google_day_start = now_pt.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     latest = db.scalar(select(AiUsageEvent).order_by(AiUsageEvent.created_at.desc()).limit(1))
+    settings = get_settings()
+    latest_model = latest.model if latest else "gemini-2.5-flash-lite"
+    try:
+        official_quota = fetch_gemini_quota(
+            settings.google_cloud_project,
+            latest_model,
+            settings.google_cloud_service_account_json,
+        )
+    except Exception as exc:
+        official_quota = {
+            "status": "error",
+            "project_id": settings.google_cloud_project or None,
+            "model": latest_model,
+            "limits": [],
+            "note": f"Google Cloud quota lookup failed: {exc}",
+        }
     return {
         "google_day": _usage_window(db, google_day_start),
         "last_7_days": _usage_window(db, now - timedelta(days=7)),
@@ -868,13 +885,9 @@ def ai_usage_summary(db: DbSession):
             .astimezone(timezone.utc)
             .isoformat()
         ),
-        "latest_model": latest.model if latest else None,
+        "latest_model": latest_model,
         "latest_provider": latest.provider if latest else None,
-        "official_quota_remaining": None,
-        "official_quota_note": (
-            "Google remaining quota is not available through the Gemini API key alone; "
-            "Cloud Monitoring/Cloud Quotas authorization is required."
-        ),
+        "official_quota": official_quota,
     }
 
 
