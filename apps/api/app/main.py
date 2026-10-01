@@ -500,6 +500,48 @@ def serialize_indexed_content(content: IndexedContent):
     }
 
 
+def _historical_ai_segments_by_text(
+    db: Session,
+    payload: ContentIndexRequest,
+    schema_version: str,
+) -> tuple[dict[str, list[dict]], IndexedContent | None]:
+    """Collect reusable AI segments from both complete and partial prior runs.
+
+    A failed progressive content run can still contain many successfully
+    committed AI segments. Those segments are valid sentence-level cache and
+    must survive/reuse across retries and small page DOM changes.
+    """
+    contents = list(db.scalars(
+        select(IndexedContent)
+        .where(
+            IndexedContent.provider == payload.provider,
+            IndexedContent.external_id == payload.external_id,
+            IndexedContent.source_language == payload.source_language,
+            IndexedContent.target_language == payload.target_language,
+            IndexedContent.analysis_schema_version == schema_version,
+            IndexedContent.status.in_(["ready", "failed"]),
+        )
+        .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
+    ))
+
+    by_text: dict[str, list[dict]] = {}
+    latest = contents[0] if contents else None
+    for indexed_content in contents:
+        for segment in indexed_content.segments:
+            source = str((segment.analysis_json or {}).get("analysis_source", "ai"))
+            if source != "ai":
+                continue
+            key = _normalized_segment_text(segment.source_text)
+            by_text.setdefault(key, []).append({
+                "segment_id": str(segment.id),
+                "translation_text": segment.translation_text,
+                "tokens": (segment.analysis_json or {}).get("tokens", []),
+                "expressions": (segment.analysis_json or {}).get("expressions", []),
+                "analysis_source": "ai",
+            })
+    return by_text, latest
+
+
 @app.post("/api/v1/content-index/lookup")
 def lookup_content_index(payload: ContentIndexRequest, db: DbSession):
     """Cache-only lookup. Never calls the external AI analyzer."""
@@ -528,31 +570,12 @@ def lookup_content_index(payload: ContentIndexRequest, db: DbSession):
         })
         return result
 
-    previous = db.scalar(
-        select(IndexedContent)
-        .where(
-            IndexedContent.provider == payload.provider,
-            IndexedContent.external_id == payload.external_id,
-            IndexedContent.source_language == payload.source_language,
-            IndexedContent.target_language == payload.target_language,
-            IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
-            IndexedContent.status == "ready",
-        )
-        .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
+    previous_by_text, previous = _historical_ai_segments_by_text(
+        db, payload, settings.ai_analysis_schema_version
     )
-
-    previous_by_text: dict[str, list[IndexedSegment]] = {}
-    analyzer_provider = None
-    analyzer_model = None
-    content_id = None
-    if previous is not None:
-        analyzer_provider = previous.analyzer_provider
-        analyzer_model = previous.analyzer_model
-        content_id = previous.id
-        for old_segment in previous.segments:
-            previous_by_text.setdefault(
-                _normalized_segment_text(old_segment.source_text), []
-            ).append(old_segment)
+    analyzer_provider = previous.analyzer_provider if previous is not None else None
+    analyzer_model = previous.analyzer_model if previous is not None else None
+    content_id = previous.id if previous is not None else None
 
     reused_segment_ids = set()
     matched = []
@@ -575,23 +598,23 @@ def lookup_content_index(payload: ContentIndexRequest, db: DbSession):
         normalized = _normalized_segment_text(source["text"])
         candidates = previous_by_text.get(normalized, [])
         reused = next(
-            (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
+            (candidate for candidate in candidates if candidate["segment_id"] not in reused_segment_ids),
             None,
         )
         if reused is None:
             missing_indexes.append(source["index"])
             continue
 
-        reused_segment_ids.add(reused.id)
+        reused_segment_ids.add(reused["segment_id"])
         matched.append({
             "index": source["index"],
             "start_ms": source.get("start_ms"),
             "end_ms": source.get("end_ms"),
             "text": source["text"],
-            "sentence_translation": reused.translation_text,
-            "tokens": reused.analysis_json.get("tokens", []),
-            "expressions": reused.analysis_json.get("expressions", []),
-            "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
+            "sentence_translation": reused["translation_text"],
+            "tokens": reused["tokens"],
+            "expressions": reused["expressions"],
+            "analysis_source": "ai",
         })
 
     total = len(segment_payloads)
@@ -875,6 +898,12 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     if existing is not None and existing.status == "processing":
         raise HTTPException(status_code=409, detail="content analysis is already in progress")
 
+    # Snapshot sentence-level AI cache before a failed exact-hash record is
+    # cleared for retry. This preserves successfully committed earlier batches.
+    previous_by_text, previous = _historical_ai_segments_by_text(
+        db, payload, settings.ai_analysis_schema_version
+    )
+
     if existing is None:
         content = IndexedContent(
             provider=payload.provider,
@@ -901,29 +930,9 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
     db.commit()
     db.refresh(content)
 
-    previous = db.scalar(
-        select(IndexedContent)
-        .where(
-            IndexedContent.provider == payload.provider,
-            IndexedContent.external_id == payload.external_id,
-            IndexedContent.source_language == payload.source_language,
-            IndexedContent.target_language == payload.target_language,
-            IndexedContent.analysis_schema_version == settings.ai_analysis_schema_version,
-            IndexedContent.status == "ready",
-            IndexedContent.id != content.id,
-        )
-        .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
-    )
-
     analyzer_provider = previous.analyzer_provider if previous is not None else None
     analyzer_model = previous.analyzer_model if previous is not None else None
     reused_segment_ids = set()
-    previous_by_text: dict[str, list[IndexedSegment]] = {}
-    if previous is not None:
-        for old_segment in previous.segments:
-            previous_by_text.setdefault(
-                _normalized_segment_text(old_segment.source_text), []
-            ).append(old_segment)
 
     reused_count = 0
     local_count = 0
@@ -944,17 +953,17 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
             normalized = _normalized_segment_text(source["text"])
             candidates = previous_by_text.get(normalized, [])
             reused = next(
-                (candidate for candidate in candidates if candidate.id not in reused_segment_ids),
+                (candidate for candidate in candidates if candidate["segment_id"] not in reused_segment_ids),
                 None,
             )
             if reused is not None:
-                reused_segment_ids.add(reused.id)
+                reused_segment_ids.add(reused["segment_id"])
                 item = {
                     "index": source["index"],
-                    "sentence_translation": reused.translation_text,
-                    "tokens": reused.analysis_json.get("tokens", []),
-                    "expressions": reused.analysis_json.get("expressions", []),
-                    "analysis_source": reused.analysis_json.get("analysis_source", "ai"),
+                    "sentence_translation": reused["translation_text"],
+                    "tokens": reused["tokens"],
+                    "expressions": reused["expressions"],
+                    "analysis_source": "ai",
                 }
                 _persist_indexed_segment(db, content, source, item)
                 persisted_indexes.add(source["index"])
