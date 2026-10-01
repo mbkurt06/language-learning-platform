@@ -2305,6 +2305,8 @@
   function resetYouTube(videoId=""){
     state.aiIndexLastStatus="";
     state.aiIndexBusy=false;
+    state.aiIndexDiagnostic=null;
+    renderAiLabDialog();
     clearTimeout(state.youtube.domTimer);
     clearTimeout(state.youtube.hideTimer);
     state.youtube.domTimer=null;
@@ -6036,6 +6038,8 @@
     if(state.youtube.videoId===contentId) return;
     state.aiIndexLastStatus="";
     state.aiIndexBusy=false;
+    state.aiIndexDiagnostic=null;
+    renderAiLabDialog();
     state.youtube.videoId=contentId;
     state.youtube.cueIndex=-1;
     state.youtube.transcriptAnalysis=null;
