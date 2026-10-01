@@ -133,5 +133,10 @@ def analyze_content_batch(
                 "context_provider": provider,
             },
         )
-        response.raise_for_status()
+        if not response.is_success:
+            detail = response.text.strip()
+            raise RuntimeError(
+                f"AI analyzer HTTP {response.status_code}"
+                + (f": {detail[:4000]}" if detail else "")
+            )
         return response.json()
