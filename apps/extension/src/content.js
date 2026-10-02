@@ -1093,18 +1093,23 @@
       const aTokens=(a.token_indices||[]).length;
       const bTokens=(b.token_indices||[]).length;
       if(aTokens!==bTokens) return bTokens-aTokens;
-      const aSpecific=(String(a.canonical||"").match(/\betwas\b/gu)||[]).length;
-      const bSpecific=(String(b.canonical||"").match(/\betwas\b/gu)||[]).length;
-      if(aSpecific!==bSpecific) return bSpecific-aSpecific;
-      return String(b.canonical||"").length-String(a.canonical||"").length;
+      return String(b.surface||b.canonical||"").length-String(a.surface||a.canonical||"").length;
     });
-    const expr=expressions[0];
+    const expr=expressions[0]||null;
     const lexical=h.lexical_form;
     const notes=h.usage_notes||[];
     const dictionaryMeanings=meaningValues(h.dictionary_meanings_tr);
     const sourceToken=(data.tokens||[]).find(token=>token.i===tokenIndex);
     const lemma=sourceToken?.lemma||sourceToken?.text||"";
-    if(!expr && lexical?.article){
+    const nounLabel=lexical?.article
+      ? sanitizeLearningText(lexical.article+" "+(lexical.singular||lemma))
+      : lemma;
+    const wordMeaning=firstMeaning(h.contextual_word_meaning_tr,dictionaryMeanings);
+    const exprMeaning=expr
+      ? firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr)
+      : "";
+
+    if(lexical?.article){
       const entry=(state.youtube.transcriptAnalysis||[]).find(item=>
         String(item.lemma||"").toLocaleLowerCase("de-DE")===String(lemma||"").toLocaleLowerCase("de-DE")
       );
@@ -1115,53 +1120,53 @@
       }
     }
 
-    const nounLabel=lexical?.article
-      ? sanitizeLearningText(lexical.singular||lemma).replace(/^./u,ch=>ch.toLocaleUpperCase("de-DE"))
-      : lemma;
-    const primaryLabel=expr ? expr.canonical : nounLabel;
-    const primaryType=expr ? expressionTypeLabel(expr.type) : posLabel(sourceToken?.pos);
-    const primaryMeaning=expr
-      ? firstMeaning(expr.contextual_meaning_tr,expr.meaning_tr,h.contextual_word_meaning_tr,dictionaryMeanings)
-      : firstMeaning(h.contextual_word_meaning_tr,dictionaryMeanings);
-
     const aiBadge=data?.analysis_source==="ai"
       ? '<span class="gle-ai-source-badge" title="AI analizi">AI</span>'
       : "";
-    const header=primaryLabel
-      ? `<div class="gle-hover-head"><b>${esc(primaryLabel)}</b><span>${esc(primaryType)}</span>${aiBadge}</div>`
+    const header=nounLabel
+      ? '<div class="gle-hover-head"><b>'+esc(nounLabel)+'</b><span>'+esc(posLabel(sourceToken?.pos))+'</span>'+aiBadge+'</div>'
       : "";
-    const contextual=primaryMeaning
-      ? `<div class="gle-context gle-context-primary"><b>Bu cümlede:</b> ${esc(primaryMeaning)}</div>`
+    const contextual=wordMeaning
+      ? '<div class="gle-context gle-context-primary">'+esc(wordMeaning)+'</div>'
       : '<div class="gle-note">Türkçe anlam bulunamadı.</div>';
 
-    const usage=notes.filter(note=>note.kind!=="GRAMMAR_ROLE")
-      .map(note=>`<div class="gle-note"><b>${esc(note.label)}</b> · ${esc(note.explanation_tr)}</div>`)
-      .join("");
+    const plural=lexical?.article && lexical?.plural
+      ? '<div class="gle-note"><b>Çoğul:</b> '+esc(lexical.article==="der"||lexical.article==="das"||lexical.article==="die"?"die ":"")+esc(lexical.plural)+'</div>'
+      : "";
 
-    const grammarHint=expr?.grammar_hint
-      ? `<div class="gle-note"><b>Yapı:</b> ${esc(expr.grammar_hint)}</div>`
+    const exprSurface=expr ? sanitizeLearningText(expr.surface||expr.canonical||"") : "";
+    const exprCanonical=expr ? sanitizeLearningText(expr.canonical||"") : "";
+    const expressionBlock=expr
+      ? '<div class="gle-note"><b>Bağlı ifade:</b> '+esc(exprSurface)+'</div>'+
+        (exprMeaning?'<div class="gle-context">'+esc(exprMeaning)+'</div>':'')+
+        (exprCanonical && normalizeLearningIdentity(exprCanonical)!==normalizeLearningIdentity(exprSurface)
+          ? '<div class="gle-note"><b>Yapı:</b> '+esc(exprCanonical)+'</div>'
+          : '')+
+        (expr.grammar_hint?'<div class="gle-note"><b>Gramer:</b> '+esc(expr.grammar_hint)+'</div>':'')
       : "";
-    const noun=lexical?.article
-      ? `<div class="gle-lexical"><b>${esc(lexical.article)} ${esc(lexical.singular)}</b> · die ${esc(lexical.plural)}</div>`
+
+    const otherMeanings=dictionaryMeanings.filter(value=>
+      normalizeLearningIdentity(value)!==normalizeLearningIdentity(wordMeaning)
+    );
+    const standalone=otherMeanings.length
+      ? '<div class="gle-standalone"><b>Diğer yaygın anlam:</b> '+esc(otherMeanings.join(", "))+'</div>'
       : "";
-    const standalone=expr && dictionaryMeanings.length
-      ? `<div class="gle-standalone"><b>${esc(lemma)} tek başına:</b> ${esc(dictionaryMeanings.join(", "))}</div>`
-      : "";
-    const dictionary=!expr && dictionaryMeanings.length>1
-      ? `<details><summary>Diğer sözlük anlamları</summary><div>${esc(dictionaryMeanings.join(", "))}</div></details>`
-      : "";
+
+    const usage=notes.filter(note=>note.kind!=="GRAMMAR_ROLE")
+      .map(note=>'<div class="gle-note"><b>'+esc(note.label)+'</b> · '+esc(note.explanation_tr)+'</div>')
+      .join("");
 
     const learnTarget=expr ? {
       kind:"expression",
       key:expr.pattern_id||expr.canonical,
-      label:expr.canonical,
-      meaning:primaryMeaning,
-      surface:expr.surface||primaryLabel,
+      label:expr.canonical||expr.surface,
+      meaning:exprMeaning||wordMeaning,
+      surface:expr.surface||expr.canonical||sourceToken?.text||lemma,
     } : {
       kind:"word",
       key:lemma,
       label:nounLabel,
-      meaning:primaryMeaning,
+      meaning:wordMeaning,
       surface:sourceToken?.text||lemma,
     };
     const encounterSnapshot=currentContentEncounter(learnTarget.surface);
@@ -1176,7 +1181,7 @@
         '</div>'
       : "";
 
-    state.tooltip.innerHTML=tooltipToolbarHtml()+(header+contextual+grammarHint+noun+standalone+usage+dictionary+learnAction || "<div>Henüz analiz yok.</div>");
+    state.tooltip.innerHTML=tooltipToolbarHtml()+(header+contextual+plural+expressionBlock+standalone+usage+learnAction || "<div>Henüz analiz yok.</div>");
     const bindTooltipStatus=(selector,status)=>state.tooltip.querySelector(selector)?.addEventListener("click",async event=>{
       event.stopPropagation();
       const button=event.currentTarget;
@@ -1377,15 +1382,17 @@
       grammar_hint:String(expression?.grammar_hint||""),
       token_indices:[...(expression?.token_indices||[])],
       highlight_parts:[...(expression?.highlight_parts||[])],
+      highlight_exclude_parts:[...(expression?.highlight_exclude_parts||[])],
     }));
     const hover={};
     for(const token of segment?.tokens||[]){
       const i=Number.isInteger(token?.i)?token.i:(segment.tokens||[]).indexOf(token);
       hover[String(i)]={
         contextual_word_meaning_tr:String(token?.contextual_meaning_tr||""),
-        dictionary_meanings_tr:[],
+        dictionary_meanings_tr:[...(token?.dictionary_meanings_tr||[])],
+        lexical_form:token?.lexical_form||null,
         primary_expressions:expressions.filter(expr=>(expr.token_indices||[]).includes(i)),
-        usage_notes:[],
+        usage_notes:[...(token?.usage_notes||[])],
       };
     }
     return {
