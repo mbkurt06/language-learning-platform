@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Seed one curated AI article analysis into indexed_contents.
 
@@ -9,6 +7,8 @@ stored with analysis_source="ai" so /api/v1/content-index/lookup returns them th
 exactly the same path as normal AI results.  The analyzer metadata remains explicit
 that this is an assistant-curated fixture rather than a Gemini call.
 """
+
+from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
