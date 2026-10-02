@@ -139,7 +139,7 @@ def fetch_gemini_quota(project_id: str, model: str, service_account_json: str = 
                 session,
                 effective_project,
                 metric_type=limit_type,
-                start=now - timedelta(minutes=10),
+                start=now - timedelta(hours=24),
                 end=now,
             )
         except Exception as exc:
