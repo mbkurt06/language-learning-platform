@@ -1,0 +1,166 @@
+- id: promoted.parseme.a.es_gibt
+  canonical: "es gibt"
+  type: FIXED_CONSTRUCTION
+  head_lemma: geben
+  priority: 92
+  meaning_tr: ["var", "mevcut"]
+  grammar_hint: "es gibt + Akk."
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+
+- id: promoted.parseme.a.es_heisst
+  canonical: "es heißt"
+  type: FIXED_CONSTRUCTION
+  head_lemma: heißen
+  priority: 92
+  meaning_tr: ["deniyor", "anlamına geliyor"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+
+- id: promoted.parseme.a.stattfinden
+  canonical: "stattfinden"
+  type: PARTICLE_VERB
+  head_lemma: finden
+  priority: 87
+  meaning_tr: ["gerçekleşmek", "yapılmak"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: statt, type: PARTICLE, lemma: statt}
+
+- id: promoted.parseme.a.sich_befinden
+  canonical: "sich befinden"
+  type: REFLEXIVE_VERB
+  head_lemma: befinden
+  priority: 77
+  meaning_tr: ["bulunmak", "bir yerde olmak"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: reflexive, type: REFLEXIVE}
+
+- id: promoted.parseme.a.es_kommt_zu_etwas
+  canonical: "es kommt zu etwas"
+  type: FIXED_CONSTRUCTION
+  head_lemma: kommen
+  priority: 73
+  meaning_tr: ["bir şey meydana gelmek", "bir durum ortaya çıkmak"]
+  grammar_hint: "zu + Dat."
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+    - {id: zu, type: PREPOSITION, prep: zu, case: [Dat]}
+
+- id: promoted.parseme.a.ausgehen
+  canonical: "ausgehen"
+  type: PARTICLE_VERB
+  head_lemma: gehen
+  priority: 80
+  meaning_tr: ["dışarı çıkmak", "tükenmek", "sona ermek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence; meaning is context-dependent."
+  slots:
+    - {id: aus, type: PARTICLE, lemma: aus}
+
+- id: promoted.parseme.a.mitteilen
+  canonical: "mitteilen"
+  type: PARTICLE_VERB
+  head_lemma: teilen
+  priority: 80
+  meaning_tr: ["bildirmek", "iletmek", "haber vermek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: mit, type: PARTICLE, lemma: mit}
+
+- id: promoted.parseme.a.ankuendigen
+  canonical: "ankündigen"
+  type: PARTICLE_VERB
+  head_lemma: kündigen
+  priority: 78
+  meaning_tr: ["duyurmak", "ilan etmek", "haber vermek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: an, type: PARTICLE, lemma: an}
+
+- id: promoted.parseme.a.davon_ausgehen
+  canonical: "davon ausgehen"
+  type: FIXED_CONSTRUCTION
+  head_lemma: gehen
+  priority: 74
+  meaning_tr: ["varsaymak", "öyle kabul etmek", "bir şeyden yola çıkmak"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: davon, type: LEMMA, lemma: davon}
+    - {id: aus, type: PARTICLE, lemma: aus}
+
+- id: promoted.parseme.a.anbieten
+  canonical: "anbieten"
+  type: PARTICLE_VERB
+  head_lemma: bieten
+  priority: 71
+  meaning_tr: ["sunmak", "teklif etmek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: an, type: PARTICLE, lemma: an}
+
+- id: promoted.parseme.a.feststehen
+  canonical: "feststehen"
+  type: PARTICLE_VERB
+  head_lemma: stehen
+  priority: 67
+  meaning_tr: ["belli olmak", "kesin olmak", "kesinleşmiş olmak"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: fest, type: PARTICLE, lemma: fest}
+
+- id: promoted.parseme.a.es_handelt_sich_um_etwas
+  canonical: "es handelt sich um etwas"
+  type: FIXED_CONSTRUCTION
+  head_lemma: handeln
+  priority: 66
+  meaning_tr: ["söz konusu olmak", "konu ... olmak"]
+  grammar_hint: "um + Akk."
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: es, type: LEMMA, lemma: es}
+    - {id: reflexive, type: REFLEXIVE}
+    - {id: um, type: PREPOSITION, prep: um, case: [Acc]}
+
+- id: promoted.parseme.a.einraeumen
+  canonical: "einräumen"
+  type: PARTICLE_VERB
+  head_lemma: räumen
+  priority: 70
+  meaning_tr: ["kabul etmek", "itiraf etmek", "yerleştirmek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence; meaning is context-dependent."
+  slots:
+    - {id: ein, type: PARTICLE, lemma: ein}
+
+- id: promoted.parseme.a.feststellen
+  canonical: "feststellen"
+  type: PARTICLE_VERB
+  head_lemma: stellen
+  priority: 70
+  meaning_tr: ["tespit etmek", "saptamak", "fark etmek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: fest, type: PARTICLE, lemma: fest}
+
+- id: promoted.parseme.a.teilnehmen
+  canonical: "teilnehmen"
+  type: PARTICLE_VERB
+  head_lemma: nehmen
+  priority: 70
+  meaning_tr: ["katılmak", "iştirak etmek"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence."
+  slots:
+    - {id: teil, type: PARTICLE, lemma: teil}
+
+- id: promoted.parseme.a.vorstellen
+  canonical: "vorstellen"
+  type: PARTICLE_VERB
+  head_lemma: stellen
+  priority: 70
+  meaning_tr: ["tanıtmak", "takdim etmek", "sunmak"]
+  notes: "Curated from PARSEME 1.2 German A-tier evidence; reflexive 'sich vorstellen' is a separate usage."
+  slots:
+    - {id: vor, type: PARTICLE, lemma: vor}
