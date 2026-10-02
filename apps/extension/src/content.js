@@ -5507,6 +5507,93 @@
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
 
+  function diagnosticResolvedExpressionIndices(data,expr){
+    const tokens=data?.tokens||[];
+    const prepared=String(expr?.pattern_id||expr?.patternId||"").startsWith("prepared:");
+    const semanticParts=expr?.highlight_parts||expr?.highlightParts||[];
+    const indices=(prepared || semanticParts.length)
+      ? [...(expr?.token_indices||[])]
+      : supplementalExpressionTokenIndices(
+          tokens,
+          expr?.canonical||expr?.surface||"",
+          expr?.token_indices||[]
+        );
+    return [...new Set(indices.filter(index=>Number.isInteger(index)))];
+  }
+
+  function diagnosticExpressionPriority(data,expressions){
+    return [...(expressions||[])].sort((a,b)=>{
+      const aTokens=diagnosticResolvedExpressionIndices(data,a).length;
+      const bTokens=diagnosticResolvedExpressionIndices(data,b).length;
+      if(aTokens!==bTokens) return bTokens-aTokens;
+      const aSpecific=(String(a?.canonical||"").match(/\betwas\b/gu)||[]).length;
+      const bSpecific=(String(b?.canonical||"").match(/\betwas\b/gu)||[]).length;
+      if(aSpecific!==bSpecific) return bSpecific-aSpecific;
+      return String(b?.canonical||"").length-String(a?.canonical||"").length;
+    });
+  }
+
+  function diagnosticGroupRecord(data,expr){
+    const tokens=data?.tokens||[];
+    const rawIndices=[...(expr?.token_indices||[])];
+    const resolvedIndices=diagnosticResolvedExpressionIndices(data,expr);
+    const tokenRecord=index=>{
+      const token=tokens.find(item=>item?.i===index) || tokens[index] || {};
+      return {
+        i:index,
+        text:token.text||"",
+        lemma:token.lemma||"",
+        pos:token.pos||"",
+      };
+    };
+    return {
+      canonical:expr?.canonical||"",
+      surface:expr?.surface||"",
+      type:expr?.type||"",
+      pattern_id:expr?.pattern_id||expr?.patternId||"",
+      contextual_meaning_tr:expr?.contextual_meaning_tr||"",
+      meaning_tr:firstMeaning(expr?.contextual_meaning_tr,expr?.meaning_tr)||"",
+      grammar_hint:expr?.grammar_hint||"",
+      raw_token_indices:rawIndices,
+      resolved_highlight_token_indices:resolvedIndices,
+      members:resolvedIndices.map(tokenRecord),
+      highlight_parts:[...(expr?.highlight_parts||expr?.highlightParts||[])],
+      highlight_exclude_parts:[...(expr?.highlight_exclude_parts||expr?.highlightExcludeParts||[])],
+    };
+  }
+
+  function diagnosticHoverTargets(data){
+    const tokens=data?.tokens||[];
+    return tokens.map(token=>{
+      const hover=data?.hover?.[String(token.i)]||data?.hover?.[token.i]||{};
+      const seen=new Set();
+      const candidates=[];
+      const add=expr=>{
+        if(!expr) return;
+        const indices=diagnosticResolvedExpressionIndices(data,expr);
+        if(!indices.includes(token.i)) return;
+        const key=normalizeLearningIdentity(expr.pattern_id||expr.patternId||expr.canonical||expr.surface||"");
+        if(key && seen.has(key)) return;
+        if(key) seen.add(key);
+        candidates.push(expr);
+      };
+      for(const expr of hover.primary_expressions||[]) add(expr);
+      for(const expr of data?.expressions||[]) add(expr);
+      const ordered=diagnosticExpressionPriority(data,candidates);
+      const primary=ordered[0]||null;
+      const primaryRecord=primary?diagnosticGroupRecord(data,primary):null;
+      return {
+        token_index:token.i,
+        token:token.text||"",
+        lemma:token.lemma||"",
+        primary_group:primaryRecord,
+        candidate_groups:ordered.map(expr=>diagnosticGroupRecord(data,expr)),
+        highlight_token_indices:primaryRecord?.resolved_highlight_token_indices||[token.i],
+        highlight_tokens:primaryRecord?.members?.map(member=>member.text).filter(Boolean)||[token.text||""],
+      };
+    }).filter(item=>item.primary_group);
+  }
+
   async function buildPanelDiagnosticExport(){
     if(!state.youtube.transcriptAnalysis) await analyzeWholeYouTubeTranscript().catch(()=>{});
     if(!state.youtube.expressionGroupsAnalysis) await analyzeWholeYouTubeExpressionGroups().catch(()=>{});
@@ -5516,14 +5603,28 @@
 
     const cues=state.youtube.cues||[];
     const sentences=[];
+    const hoverWordGroups=[];
     for(let index=0;index<cues.length;index++){
       const cue=cues[index];
+      let analysis=null;
+      try{ analysis=await analyze(cue.text); }catch(_error){}
+      const linkedWordGroups=(analysis?.expressions||[]).map(expr=>diagnosticGroupRecord(analysis,expr));
+      const hoverTargets=analysis?diagnosticHoverTargets(analysis):[];
+      for(const target of hoverTargets){
+        hoverWordGroups.push({
+          sentence_index:index+1,
+          source:cue.text||"",
+          ...target,
+        });
+      }
       sentences.push({
         index:index+1,
         start_ms:Number.isFinite(cue.startMs)?cue.startMs:null,
         end_ms:Number.isFinite(cue.endMs)?cue.endMs:null,
         source:cue.text||"",
-        translation_tr:await translationForCue(cue),
+        translation_tr:cleanTranslationText(analysis?.sentence_meaning_tr||"") || await translationForCue(cue),
+        linked_word_groups:linkedWordGroups,
+        hover_targets:hoverTargets,
       });
     }
 
@@ -5668,6 +5769,7 @@
         groups:groups.length,
         senses:senses.length,
         saved:saved.length,
+        hover_word_groups:hoverWordGroups.length,
       },
       sentences,
       words,
@@ -5685,6 +5787,7 @@
         from_current_content:saved.filter(item=>item.saved_from_current_content),
         present_in_current_content:saved.filter(item=>item.present_in_current_content),
       },
+      hover_word_groups:hoverWordGroups,
     };
   }
 
