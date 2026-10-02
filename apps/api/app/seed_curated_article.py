@@ -39,16 +39,10 @@ def E(surface: str, canonical: str, meaning: str, grammar: str = "", type_: str 
 
 SEGMENTS = [
     {
-        "text": "Melonis umstrittenes Dekret",
-        "tr": "Meloni'nin tartışmalı kararnamesi",
+        "text": "Melonis umstrittenes Dekret Wahlkampf mit Schulpolitik?",
+        "tr": "Meloni'nin tartışmalı kararnamesi: Okul politikasıyla seçim kampanyası mı?",
         "expressions": [
             E("Melonis umstrittenes Dekret", "jemandes umstrittenes Dekret", "birinin tartışmalı kararnamesi"),
-        ],
-    },
-    {
-        "text": "Wahlkampf mit Schulpolitik?",
-        "tr": "Okul politikasıyla seçim kampanyası mı?",
-        "expressions": [
             E("Wahlkampf mit Schulpolitik", "Wahlkampf mit etwas", "bir şey üzerinden / bir şeyle seçim kampanyası", "mit + Dativ"),
         ],
     },
