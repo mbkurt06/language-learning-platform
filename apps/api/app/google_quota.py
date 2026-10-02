@@ -119,6 +119,13 @@ def fetch_gemini_quota(project_id: str, model: str, service_account_json: str = 
         }
 
     effective_project = project_id or detected_project
+    # ADC created by gcloud can carry a quota_project_id. google-auth then adds
+    # x-goog-user-project to Monitoring requests, which makes this read-only
+    # quota lookup require billing on that quota project. The same Monitoring
+    # endpoint works with the user's OAuth credentials when that header is
+    # omitted, so explicitly strip quota-project attribution here.
+    if hasattr(credentials, "with_quota_project"):
+        credentials = credentials.with_quota_project(None)
     session = AuthorizedSession(credentials)
     now = datetime.now(timezone.utc)
     limits: list[dict[str, Any]] = []
