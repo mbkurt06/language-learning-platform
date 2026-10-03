@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any
 import hashlib
 import json
+import time
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -122,21 +123,44 @@ def analyze_content_batch(
     provider: str | None = None,
 ) -> dict[str, Any]:
     settings = get_settings()
-    with httpx.Client(timeout=150.0) as client:
-        response = client.post(
-            f"{settings.ai_analyzer_url.rstrip('/')}/analyze-batch",
-            json={
-                "source_language": source_language,
-                "target_language": target_language,
-                "segments": segments,
-                "context_title": title,
-                "context_provider": provider,
-            },
+    payload = {
+        "source_language": source_language,
+        "target_language": target_language,
+        "segments": segments,
+        "context_title": title,
+        "context_provider": provider,
+    }
+    retryable_statuses = {429, 500, 502, 503, 504}
+    last_error = ""
+
+    # Gemini occasionally returns a transient gateway/JSON-generation failure.
+    # Retrying the same deterministic batch is cheaper than aborting a long
+    # transcript after many already-successful batches.
+    for attempt in range(1, 4):
+        try:
+            with httpx.Client(timeout=150.0) as client:
+                response = client.post(
+                    f"{settings.ai_analyzer_url.rstrip('/')}/analyze-batch",
+                    json=payload,
+                )
+        except httpx.RequestError as exc:
+            last_error = f"AI analyzer request error: {exc}"
+            if attempt < 3:
+                time.sleep(attempt)
+                continue
+            raise RuntimeError(last_error) from exc
+
+        if response.is_success:
+            return response.json()
+
+        detail = response.text.strip()
+        last_error = (
+            f"AI analyzer HTTP {response.status_code}"
+            + (f": {detail[:4000]}" if detail else "")
         )
-        if not response.is_success:
-            detail = response.text.strip()
-            raise RuntimeError(
-                f"AI analyzer HTTP {response.status_code}"
-                + (f": {detail[:4000]}" if detail else "")
-            )
-        return response.json()
+        if response.status_code in retryable_statuses and attempt < 3:
+            time.sleep(attempt)
+            continue
+        raise RuntimeError(last_error)
+
+    raise RuntimeError(last_error or "AI analyzer request failed")
