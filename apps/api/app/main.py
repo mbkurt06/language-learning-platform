@@ -1228,6 +1228,7 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
     canonical_key = str(item.canonical_key or "").strip().lower()
     canonical_form = str(item.canonical_form or "").strip().lower()
     existing_sentences = {str(encounter.sentence or "").strip() for encounter in encounters}
+    recovered_sentences: set[str] = set()
     recovered = []
 
     for provider, external_id in descriptors:
@@ -1243,7 +1244,7 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
         for content in contents:
             for segment in content.segments:
                 sentence = str(segment.source_text or "").strip()
-                if not sentence or sentence in existing_sentences:
+                if not sentence or sentence in recovered_sentences:
                     continue
                 analysis = segment.analysis_json or {}
                 matched_surface = ""
@@ -1271,13 +1272,20 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                                 ]
                             break
 
-                    # Older saves sometimes categorized a single canonical verb
-                    # as an expression. Fall back to the token lemma so those
-                    # items still recover the real sentence and contextual meaning.
-                    if not matched_surface and " " not in canonical_form:
+                    # Older saves can store an expression by a broad canonical
+                    # form while the indexed segment only exposes its verb lemma
+                    # (for example: "etwas vorsehen" -> "sieht ... vor").
+                    # Prefer the last canonical word as the lexical head fallback.
+                    if not matched_surface:
+                        canonical_words = [
+                            part.strip(".,;:!?()[]{}\"'").lower()
+                            for part in canonical_form.split()
+                            if part.strip(".,;:!?()[]{}\"'")
+                        ]
+                        head_lemma = canonical_words[-1] if canonical_words else canonical_form
                         for token in analysis.get("tokens", []):
                             lemma = str(token.get("lemma") or "").strip().lower()
-                            if lemma and lemma in {canonical_key, canonical_form}:
+                            if lemma and lemma in {canonical_key, canonical_form, head_lemma}:
                                 matched_surface = str(
                                     token.get("surface")
                                     or token.get("text")
@@ -1337,7 +1345,7 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                         "title": content.title,
                     },
                 })
-                existing_sentences.add(sentence)
+                recovered_sentences.add(sentence)
                 if len(recovered) >= 3:
                     return recovered
 
