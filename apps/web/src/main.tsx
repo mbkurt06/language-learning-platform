@@ -42,6 +42,50 @@ type LearningItem = {
   encounters: Encounter[];
 };
 
+type IndexedToken = {
+  i: number;
+  surface?: string;
+  text?: string;
+  lemma?: string;
+  pos?: string;
+  morphology?: Record<string, unknown>;
+  contextual_meaning_tr?: string;
+  dictionary_meanings_tr?: string[];
+  lexical_form?: {
+    article?: string;
+    singular?: string;
+    plural?: string;
+  } | null;
+  usage_notes?: { kind?: string; label?: string; explanation_tr?: string }[];
+};
+
+type IndexedExpression = {
+  type?: string;
+  surface?: string;
+  canonical?: string;
+  contextual_meaning_tr?: string;
+  grammar_hint?: string;
+  token_indices?: number[];
+  highlight_parts?: string[];
+  highlight_exclude_parts?: string[];
+};
+
+type IndexedSegment = {
+  index: number;
+  text: string;
+  sentence_translation?: string;
+  tokens: IndexedToken[];
+  expressions: IndexedExpression[];
+  analysis_source?: string;
+};
+
+type ContentIndexResult = {
+  cached?: boolean;
+  analyzer_provider?: string | null;
+  analyzer_model?: string | null;
+  segments?: IndexedSegment[];
+};
+
 function seconds(ms?: number | null) {
   return Math.max(0, Math.floor((ms || 0) / 1000));
 }
@@ -413,6 +457,225 @@ function ExamplePlaylist({ item, onClose }: { item: LearningItem; onClose: () =>
   </div>;
 }
 
+
+function splitReaderSentences(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  if ("Segmenter" in Intl) {
+    try {
+      const SegmenterCtor = Intl.Segmenter as unknown as new (
+        locale: string,
+        options: { granularity: "sentence" },
+      ) => { segment: (value: string) => Iterable<{ segment: string }> };
+      return [...new SegmenterCtor("de", { granularity: "sentence" }).segment(normalized)]
+        .map(part => part.segment.trim())
+        .filter(Boolean);
+    } catch {
+      // Fall through to punctuation-based splitting.
+    }
+  }
+  return normalized.match(/[^.!?…]+(?:[.!?…]+|$)/g)?.map(part => part.trim()).filter(Boolean) || [normalized];
+}
+
+function readerTextId(text: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return "web-reader:" + (hash >>> 0).toString(16);
+}
+
+function tokenLabel(token: IndexedToken) {
+  return token.surface || token.text || token.lemma || "";
+}
+
+function expressionMembers(expression: IndexedExpression) {
+  return new Set(expression.token_indices || []);
+}
+
+function SemanticReader() {
+  const [text, setText] = useState("");
+  const [segments, setSegments] = useState<IndexedSegment[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [provider, setProvider] = useState("");
+  const [model, setModel] = useState("");
+  const [active, setActive] = useState<{ segmentIndex: number; tokenIndex: number } | null>(null);
+
+  const activeSegment = active ? segments.find(segment => segment.index === active.segmentIndex) || null : null;
+  const activeToken = activeSegment?.tokens.find(token => token.i === active?.tokenIndex) || null;
+  const linkedExpressions = activeSegment && activeToken
+    ? (activeSegment.expressions || [])
+        .filter(expression => expressionMembers(expression).has(activeToken.i))
+        .sort((left, right) => (left.token_indices?.length || 0) - (right.token_indices?.length || 0))
+    : [];
+  const primaryExpression = linkedExpressions[0] || null;
+  const primaryMembers = primaryExpression ? expressionMembers(primaryExpression) : new Set<number>();
+
+  async function analyzeText() {
+    const sentences = splitReaderSentences(text);
+    if (!sentences.length) return;
+    setBusy(true);
+    setError("");
+    setActive(null);
+    try {
+      const payload = {
+        provider: "web-app",
+        source_type: "text",
+        external_id: readerTextId(text),
+        title: "Web metin analizi",
+        source_language: "de",
+        target_language: "tr",
+        segments: sentences.map((sentence, index) => ({
+          index,
+          text: sentence,
+          start_ms: index * 1000,
+          end_ms: index * 1000 + 900,
+        })),
+        metadata: { source: "apps/web", purpose: "semantic-reader" },
+      };
+      const response = await fetch(apiBase + "/api/v1/content-index/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Metin analiz edilemedi.");
+      }
+      const result = await response.json() as ContentIndexResult;
+      setSegments(result.segments || []);
+      setProvider(result.analyzer_provider || "");
+      setModel(result.analyzer_model || "");
+    } catch (reason) {
+      setSegments([]);
+      setError(reason instanceof Error ? reason.message : "Metin analiz edilemedi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="reader-page">
+    <header className="page-head">
+      <div>
+        <p className="eyebrow">SEMANTİK OKUMA</p>
+        <h1>Metin Analizi</h1>
+        <p className="subtitle">
+          Almanca metni cümle ve kelime listesine ayırmak yerine, cümlede birlikte anlam taşıyan yapılara göre incele.
+        </p>
+      </div>
+    </header>
+
+    <section className="reader-input-card">
+      <textarea
+        value={text}
+        onChange={event => setText(event.target.value)}
+        placeholder="Buraya Almanca bir metin yapıştır…"
+        rows={8}
+      />
+      <div className="reader-input-actions">
+        <span>{splitReaderSentences(text).length} cümle</span>
+        <button className="reader-analyze" onClick={analyzeText} disabled={busy || !text.trim()}>
+          {busy ? "AI analiz ediyor…" : "AI ile analiz et"}
+        </button>
+      </div>
+    </section>
+
+    {error && <div className="reader-error">{error}</div>}
+
+    {segments.length > 0 && <div className="reader-result-head">
+      <div>
+        <strong>{segments.length} cümle</strong>
+        <span>{provider || "AI"}{model ? " · " + model : ""}</span>
+      </div>
+      <small>Kelimenin üzerine gel: önce kelime anlamı, sonra bağlı anlam grubu ve yapılar gösterilir.</small>
+    </div>}
+
+    <section className="reader-segments">
+      {segments.map(segment => <article className="reader-sentence" key={segment.index}>
+        <div className="reader-sentence-number">{segment.index + 1}</div>
+        <div className="reader-sentence-body">
+          <div className="reader-token-line">
+            {segment.tokens.map(token => {
+              const selected = active?.segmentIndex === segment.index && active.tokenIndex === token.i;
+              const grouped = active?.segmentIndex === segment.index && primaryMembers.has(token.i);
+              const punctuation = /^[^\p{L}\p{N}]+$/u.test(tokenLabel(token));
+              return <span
+                key={token.i}
+                className={[
+                  "reader-token",
+                  selected ? "selected" : "",
+                  grouped ? "grouped" : "",
+                  punctuation ? "punctuation" : "",
+                ].filter(Boolean).join(" ")}
+                onMouseEnter={() => !punctuation && setActive({ segmentIndex: segment.index, tokenIndex: token.i })}
+                onFocus={() => !punctuation && setActive({ segmentIndex: segment.index, tokenIndex: token.i })}
+                tabIndex={punctuation ? -1 : 0}
+              >
+                {tokenLabel(token)}
+              </span>;
+            })}
+          </div>
+          {segment.sentence_translation && <div className="reader-translation">{segment.sentence_translation}</div>}
+
+          {active?.segmentIndex === segment.index && activeToken && <div className="reader-popover">
+            <div className="reader-word-head">
+              <div>
+                <strong>
+                  {activeToken.lexical_form?.article ? activeToken.lexical_form.article + " " : ""}
+                  {activeToken.lexical_form?.singular || activeToken.lemma || tokenLabel(activeToken)}
+                </strong>
+                <span>{activeToken.pos || "Kelime"}</span>
+              </div>
+              {segment.analysis_source === "ai" && <em>AI</em>}
+            </div>
+
+            <div className="reader-word-meaning">
+              {activeToken.contextual_meaning_tr || activeToken.dictionary_meanings_tr?.[0] || "Türkçe anlam bulunamadı."}
+            </div>
+
+            {activeToken.lexical_form?.plural && <div className="reader-detail">
+              <b>Çoğul:</b> die {activeToken.lexical_form.plural}
+            </div>}
+
+            {(activeToken.dictionary_meanings_tr || []).filter(meaning =>
+              meaning !== activeToken.contextual_meaning_tr
+            ).length > 0 && <div className="reader-detail">
+              <b>Diğer yaygın anlam:</b>{" "}
+              {(activeToken.dictionary_meanings_tr || []).filter(meaning =>
+                meaning !== activeToken.contextual_meaning_tr
+              ).join(", ")}
+            </div>}
+
+            {linkedExpressions.length > 0 && <div className="reader-expression-stack">
+              {linkedExpressions.map((expression, expressionIndex) => <div className="reader-expression" key={
+                (expression.canonical || expression.surface || "expression") + ":" + expressionIndex
+              }>
+                <div className="reader-expression-kicker">
+                  {expressionIndex === 0 ? "BAĞLI ANLAM GRUBU" : "İÇ YAPI / BAĞLI YAPI"}
+                </div>
+                <strong>{expression.surface || expression.canonical}</strong>
+                {expression.contextual_meaning_tr && <p>{expression.contextual_meaning_tr}</p>}
+                {expression.canonical && expression.canonical !== expression.surface && <div className="reader-detail">
+                  <b>Yapı:</b> {expression.canonical}
+                </div>}
+                {expression.grammar_hint && <div className="reader-detail">
+                  <b>Gramer:</b> {expression.grammar_hint}
+                </div>}
+              </div>)}
+            </div>}
+
+            {linkedExpressions.length === 0 && <div className="reader-no-expression">
+              Bu kelime için bağlı bir anlam grubu bulunmadı.
+            </div>}
+          </div>}
+        </div>
+      </article>)}
+    </section>
+  </div>;
+}
+
 function App() {
   const [status, setStatus] = useState("bağlanıyor");
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -423,6 +686,7 @@ function App() {
   const [playlistItemId, setPlaylistItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState<"words" | "reader">("words");
 
   useEffect(() => {
     fetch(apiBase + "/health")
@@ -507,7 +771,8 @@ function App() {
         </div>
       </div>
       <nav>
-        <button className="nav-item active"><span>◫</span>Kelimelerim</button>
+        <button className={"nav-item " + (activeView === "words" ? "active" : "")} onClick={() => setActiveView("words")}><span>◫</span>Kelimelerim</button>
+        <button className={"nav-item " + (activeView === "reader" ? "active" : "")} onClick={() => setActiveView("reader")}><span>⌁</span>Metin Analizi</button>
         <button className="nav-item" disabled><span>▶</span>Karşılaşmalar</button>
         <button className="nav-item" disabled><span>✓</span>Tekrar</button>
       </nav>
@@ -518,6 +783,7 @@ function App() {
     </aside>
 
     <main className="content">
+      {activeView === "reader" ? <SemanticReader /> : <>
       <header className="page-head">
         <div>
           <p className="eyebrow">ÖĞRENME KÜTÜPHANESİ</p>
@@ -616,6 +882,7 @@ function App() {
           </article>;
         })}
       </section>
+      </>}
     </main>
   </div>;
 }
