@@ -500,6 +500,34 @@ function learningMeaning(item: LearningItem) {
     || "";
 }
 
+function encounterContextualMeaning(encounter?: Encounter | null) {
+  const value = encounter?.context?.contextual_meaning_tr;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function encounterDictionaryMeanings(encounter?: Encounter | null) {
+  const value = encounter?.context?.dictionary_meanings_tr;
+  return Array.isArray(value) ? value.map(item => String(item).trim()).filter(Boolean) : [];
+}
+
+function itemContextualMeaning(item: LearningItem) {
+  for (const encounter of item.encounters) {
+    const meaning = encounterContextualMeaning(encounter);
+    if (meaning) return meaning;
+  }
+  return learningMeaning(item);
+}
+
+function alternateMeanings(item: LearningItem, encounter?: Encounter | null) {
+  const primary = (encounter ? encounterContextualMeaning(encounter) : itemContextualMeaning(item))
+    .toLocaleLowerCase("tr-TR");
+  const values = [
+    ...encounterDictionaryMeanings(encounter),
+    ...item.translations.map(translation => translation.meaning),
+  ].map(value => value.trim()).filter(Boolean);
+  return [...new Set(values)].filter(value => value.toLocaleLowerCase("tr-TR") !== primary);
+}
+
 function itemStatus(item?: LearningItem | null) {
   return item?.status === "learned" || item?.status === "known" ? "learned" : "learning";
 }
@@ -855,7 +883,7 @@ function EncountersPage({
             <div>
               <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
               <strong>{item.canonical_form}</strong>
-              <small>{learningMeaning(item) || "Anlam henüz yok"}</small>
+              <small>{encounterContextualMeaning(encounter) || itemContextualMeaning(item) || "Anlam henüz yok"}</small>
             </div>
             <span className={"learning-status " + itemStatus(item)}>
               {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
@@ -911,6 +939,11 @@ function ReviewPage({
       }) || null
     : null;
 
+  const reviewMeaning = item
+    ? (encounterContextualMeaning(example) || itemContextualMeaning(item) || "Anlam henüz yok")
+    : "";
+  const reviewOtherMeanings = item ? alternateMeanings(item, example) : [];
+
   async function mark(status: "learning" | "learned") {
     if (!item) return;
     setBusy(true);
@@ -945,7 +978,11 @@ function ReviewPage({
       <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
       <h2>{item.canonical_form}</h2>
       {!revealed ? <button className="review-reveal" onClick={() => setRevealed(true)}>Anlamı göster</button> : <>
-        <div className="review-answer">{learningMeaning(item) || "Anlam henüz yok"}</div>
+        <div className="review-answer">{reviewMeaning}</div>
+        {reviewOtherMeanings.length > 0 && <details className="review-other-meanings">
+          <summary>Diğer anlamlar</summary>
+          <div>{reviewOtherMeanings.join(" · ")}</div>
+        </details>}
         {example && <blockquote>{example.sentence}</blockquote>}
         <div className="review-actions">
           <button disabled={busy} onClick={() => mark("learning")}>↻ Tekrar et</button>
@@ -1132,13 +1169,18 @@ function App() {
 
       <section className="word-list">
         {filtered.map(item => {
-          const meaning = item.translations.find(t => t.language === "tr")?.meaning || item.translations[0]?.meaning || "Anlam henüz yok";
+          const meaning = itemContextualMeaning(item) || "Anlam henüz yok";
+          const otherMeanings = alternateMeanings(item);
           return <article className="word-card" key={item.id}>
             <div className="word-head">
               <div>
                 <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
                 <h2>{item.canonical_form}</h2>
                 <p className="meaning">{meaning}</p>
+                {otherMeanings.length > 0 && <details className="other-meanings">
+                  <summary>Diğer anlamlar</summary>
+                  <div>{otherMeanings.join(" · ")}</div>
+                </details>}
                 <span className={"learning-status " + itemStatus(item)}>
                   {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
                 </span>
