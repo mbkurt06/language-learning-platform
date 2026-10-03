@@ -494,10 +494,89 @@ function expressionMembers(expression: IndexedExpression) {
   return new Set(expression.token_indices || []);
 }
 
-function SemanticReader() {
+function learningMeaning(item: LearningItem) {
+  return item.translations.find(translation => translation.language === "tr")?.meaning
+    || item.translations[0]?.meaning
+    || "";
+}
+
+function itemStatus(item?: LearningItem | null) {
+  return item?.status === "learned" || item?.status === "known" ? "learned" : "learning";
+}
+
+async function persistLearningStatus(
+  profileId: string,
+  target: {
+    kind: "word" | "expression";
+    key: string;
+    label: string;
+    meaning: string;
+    surface: string;
+    languageSpecificType?: string | null;
+  },
+  status: "learning" | "learned",
+  encounter?: {
+    sentence: string;
+    externalId: string;
+    segmentIndex: number;
+  },
+) {
+  if (!profileId) throw new Error("Önce bir öğrenme profili seç.");
+  const response = await fetch(apiBase + "/api/v1/learning-items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      profile_id: profileId,
+      canonical_form: target.label,
+      canonical_key: target.key.toLocaleLowerCase("de-DE"),
+      category: target.kind,
+      language_specific_type: target.languageSpecificType || null,
+      status,
+      meaning: target.meaning || null,
+      meaning_language: target.meaning ? "tr" : null,
+      metadata: { source: "web-app", saved: status === "learning" },
+    }),
+  });
+  if (!response.ok) throw new Error("Öğrenme durumu kaydedilemedi.");
+  const item = await response.json() as LearningItem;
+
+  if (encounter?.sentence) {
+    const encounterResponse = await fetch(apiBase + "/api/v1/encounters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        learning_item_id: item.id,
+        surface_form: target.surface,
+        sentence: encounter.sentence,
+        provider: "web-app",
+        source_type: "text",
+        external_id: encounter.externalId,
+        url: window.location.href,
+        title: "Web metin analizi",
+        media_timestamp_ms: null,
+        media_end_timestamp_ms: null,
+        context: { segment_index: encounter.segmentIndex, source: "semantic-reader" },
+      }),
+    });
+    if (!encounterResponse.ok) throw new Error("Kelime kaydedildi fakat karşılaşma kaydedilemedi.");
+  }
+
+  return item;
+}
+
+function SemanticReader({
+  profileId,
+  items,
+  onItemsChanged,
+}: {
+  profileId: string;
+  items: LearningItem[];
+  onItemsChanged: () => Promise<void>;
+}) {
   const [text, setText] = useState("");
   const [segments, setSegments] = useState<IndexedSegment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState<"learning" | "learned" | "">("");
   const [error, setError] = useState("");
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
@@ -512,6 +591,25 @@ function SemanticReader() {
     : [];
   const primaryExpression = linkedExpressions[0] || null;
   const primaryMembers = primaryExpression ? expressionMembers(primaryExpression) : new Set<number>();
+
+  const learnTarget = activeToken ? {
+    kind: (primaryExpression ? "expression" : "word") as "word" | "expression",
+    key: primaryExpression?.canonical || activeToken.lemma || tokenLabel(activeToken),
+    label: primaryExpression?.canonical || activeToken.lexical_form?.singular || activeToken.lemma || tokenLabel(activeToken),
+    meaning: primaryExpression?.contextual_meaning_tr
+      || activeToken.contextual_meaning_tr
+      || activeToken.dictionary_meanings_tr?.[0]
+      || "",
+    surface: primaryExpression?.surface || tokenLabel(activeToken),
+    languageSpecificType: primaryExpression?.type || activeToken.pos || null,
+  } : null;
+
+  const existingTarget = learnTarget
+    ? items.find(item =>
+        item.category === learnTarget.kind
+        && item.canonical_key.toLocaleLowerCase("de-DE") === learnTarget.key.toLocaleLowerCase("de-DE")
+      ) || null
+    : null;
 
   async function analyzeText() {
     const sentences = splitReaderSentences(text);
@@ -553,6 +651,24 @@ function SemanticReader() {
       setError(reason instanceof Error ? reason.message : "Metin analiz edilemedi.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveActive(status: "learning" | "learned") {
+    if (!learnTarget || !activeSegment) return;
+    setSaving(status);
+    setError("");
+    try {
+      await persistLearningStatus(profileId, learnTarget, status, {
+        sentence: activeSegment.text,
+        externalId: readerTextId(text),
+        segmentIndex: activeSegment.index,
+      });
+      await onItemsChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Kayıt başarısız.");
+    } finally {
+      setSaving("");
     }
   }
 
@@ -669,10 +785,168 @@ function SemanticReader() {
             {linkedExpressions.length === 0 && <div className="reader-no-expression">
               Bu kelime için bağlı bir anlam grubu bulunmadı.
             </div>}
+
+            {learnTarget && <div className="reader-learn-actions">
+              <button
+                className={existingTarget && itemStatus(existingTarget) === "learning" ? "active" : ""}
+                disabled={!profileId || Boolean(saving)}
+                onClick={() => saveActive("learning")}
+              >
+                {saving === "learning" ? "Kaydediliyor…" : "☆ Öğreniyorum"}
+              </button>
+              <button
+                className={"known " + (existingTarget && itemStatus(existingTarget) === "learned" ? "active" : "")}
+                disabled={!profileId || Boolean(saving)}
+                onClick={() => saveActive("learned")}
+              >
+                {saving === "learned" ? "Kaydediliyor…" : "✓ Biliyorum"}
+              </button>
+              {existingTarget && <span>
+                Kayıtlı · {itemStatus(existingTarget) === "learned" ? "Biliyorum" : "Öğreniyorum"}
+              </span>}
+            </div>}
           </div>}
         </div>
       </article>)}
     </section>
+  </div>;
+}
+
+function EncountersPage({
+  items,
+  playingEncounter,
+  onTogglePlay,
+}: {
+  items: LearningItem[];
+  playingEncounter: string | null;
+  onTogglePlay: (id: string | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const rows = useMemo(() => items.flatMap(item =>
+    item.encounters.map(encounter => ({ item, encounter }))
+  ).sort((left, right) =>
+    new Date(right.encounter.encountered_at).getTime() - new Date(left.encounter.encountered_at).getTime()
+  ), [items]);
+  const needle = query.trim().toLocaleLowerCase("de-DE");
+  const filtered = needle ? rows.filter(({ item, encounter }) =>
+    (item.canonical_form + " " + learningMeaning(item) + " " + encounter.sentence + " " + (encounter.source?.title || ""))
+      .toLocaleLowerCase("de-DE").includes(needle)
+  ) : rows;
+
+  return <div>
+    <header className="page-head">
+      <div>
+        <p className="eyebrow">GERÇEK BAĞLAMLAR</p>
+        <h1>Karşılaşmalar</h1>
+        <p className="subtitle">Kaydettiğin kelime ve kalıpların videolarda ve metinlerde karşılaştığın gerçek cümlelerini tek yerde gör.</p>
+      </div>
+    </header>
+    <section className="toolbar">
+      <input placeholder="Kelime, kaynak veya cümlede ara…" value={query} onChange={event => setQuery(event.target.value)} />
+      <span>{filtered.length} karşılaşma</span>
+    </section>
+    {filtered.length === 0 && <div className="empty">Henüz eşleşen bir karşılaşma yok.</div>}
+    <section className="encounter-library">
+      {filtered.map(({ item, encounter }) => {
+        const isYouTube = encounter.source?.provider === "youtube";
+        const isPlaying = playingEncounter === encounter.id;
+        return <article className="encounter-library-card" key={encounter.id}>
+          <div className="encounter-library-head">
+            <div>
+              <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
+              <strong>{item.canonical_form}</strong>
+              <small>{learningMeaning(item) || "Anlam henüz yok"}</small>
+            </div>
+            <span className={"learning-status " + itemStatus(item)}>
+              {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
+            </span>
+          </div>
+          <div className="source-row">
+            <span className="source-pill">{encounter.source?.provider || "Kaynak"}</span>
+            <strong>{encounter.source?.title || encounter.source?.url || "Kaynak"}</strong>
+            {encounter.media_timestamp_ms != null && <span className="timestamp">{clock(encounter.media_timestamp_ms)}</span>}
+          </div>
+          <blockquote>{encounter.sentence}</blockquote>
+          <div className="actions">
+            {isYouTube && <button className="primary" onClick={() => onTogglePlay(isPlaying ? null : encounter.id)}>
+              {isPlaying ? "Durdur" : "▶ Cümleyi dinle"}
+            </button>}
+            {encounter.source?.url && <a href={youtubeWatchUrl(encounter)} target="_blank" rel="noreferrer">Kaynakta aç ↗</a>}
+          </div>
+          {isPlaying && isYouTube && <SentencePlayer encounter={encounter} />}
+        </article>;
+      })}
+    </section>
+  </div>;
+}
+
+function ReviewPage({
+  profileId,
+  items,
+  onItemsChanged,
+}: {
+  profileId: string;
+  items: LearningItem[];
+  onItemsChanged: () => Promise<void>;
+}) {
+  const reviewItems = useMemo(() => items.filter(item => item.status !== "archived"), [items]);
+  const [index, setIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (index >= reviewItems.length) setIndex(0);
+  }, [index, reviewItems.length]);
+
+  const item = reviewItems[index] || null;
+  const example = item?.encounters[0] || item?.examples[0] || null;
+
+  async function mark(status: "learning" | "learned") {
+    if (!item) return;
+    setBusy(true);
+    try {
+      await persistLearningStatus(profileId, {
+        kind: item.category === "expression" ? "expression" : "word",
+        key: item.canonical_key,
+        label: item.canonical_form,
+        meaning: learningMeaning(item),
+        surface: item.canonical_form,
+        languageSpecificType: item.language_specific_type,
+      }, status);
+      await onItemsChanged();
+      setRevealed(false);
+      setIndex(current => reviewItems.length ? (current + 1) % reviewItems.length : 0);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div>
+    <header className="page-head">
+      <div>
+        <p className="eyebrow">AKTİF TEKRAR</p>
+        <h1>Tekrar</h1>
+        <p className="subtitle">Kelimeyi önce hatırlamaya çalış; sonra anlamı ve gerçek örnek cümleyi açıp durumunu güncelle.</p>
+      </div>
+    </header>
+    {!item && <div className="empty">Tekrar edilecek bir öğe yok.</div>}
+    {item && <section className="review-card">
+      <div className="review-progress">{index + 1} / {reviewItems.length}</div>
+      <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
+      <h2>{item.canonical_form}</h2>
+      {!revealed ? <button className="review-reveal" onClick={() => setRevealed(true)}>Anlamı göster</button> : <>
+        <div className="review-answer">{learningMeaning(item) || "Anlam henüz yok"}</div>
+        {example && <blockquote>{example.sentence}</blockquote>}
+        <div className="review-actions">
+          <button disabled={busy} onClick={() => mark("learning")}>↻ Tekrar et</button>
+          <button className="known" disabled={busy} onClick={() => mark("learned")}>✓ Biliyorum</button>
+        </div>
+      </>}
+      <div className="review-nav">
+        <button onClick={() => { setRevealed(false); setIndex(current => Math.max(0, current - 1)); }} disabled={index === 0}>← Önceki</button>
+        <button onClick={() => { setRevealed(false); setIndex(current => Math.min(reviewItems.length - 1, current + 1)); }} disabled={index >= reviewItems.length - 1}>Sonraki →</button>
+      </div>
+    </section>}
   </div>;
 }
 
@@ -686,7 +960,9 @@ function App() {
   const [playlistItemId, setPlaylistItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"words" | "reader">("words");
+  const [activeView, setActiveView] = useState<"words" | "reader" | "encounters" | "review">("words");
+  const [statusFilter, setStatusFilter] = useState<"all" | "learning" | "learned">("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "word" | "expression">("all");
 
   useEffect(() => {
     fetch(apiBase + "/health")
@@ -710,7 +986,7 @@ function App() {
       .catch(() => setProfiles([]));
   }, []);
 
-  useEffect(() => {
+  async function refreshItems() {
     if (!profileId) {
       setItems([]);
       setLoading(false);
@@ -718,14 +994,20 @@ function App() {
     }
     setLoading(true);
     localStorage.setItem("learningProfileId", profileId);
-    fetch(apiBase + "/api/v1/learning-items?profile_id=" + encodeURIComponent(profileId))
-      .then(r => {
-        if (!r.ok) throw new Error("learning-items");
-        return r.json();
-      })
-      .then(data => setItems(data.items || []))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+    try {
+      const response = await fetch(apiBase + "/api/v1/learning-items?profile_id=" + encodeURIComponent(profileId));
+      if (!response.ok) throw new Error("learning-items");
+      const data = await response.json();
+      setItems(data.items || []);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshItems();
   }, [profileId]);
 
   async function removeLearningItem(item: LearningItem) {
@@ -751,13 +1033,16 @@ function App() {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("de-DE");
-    if (!needle) return items;
     return items.filter(item => {
+      if (statusFilter !== "all" && itemStatus(item) !== statusFilter) return false;
+      const normalizedKind = item.category === "expression" ? "expression" : "word";
+      if (kindFilter !== "all" && normalizedKind !== kindFilter) return false;
+      if (!needle) return true;
       const meaning = item.translations.map(t => t.meaning).join(" ");
       const sentences = [...item.encounters, ...item.examples].map(e => e.sentence).join(" ");
       return `${item.canonical_form} ${meaning} ${sentences}`.toLocaleLowerCase("de-DE").includes(needle);
     });
-  }, [items, query]);
+  }, [items, query, statusFilter, kindFilter]);
 
   const encounterCount = items.reduce((total, item) => total + item.encounters.length, 0);
 
@@ -773,8 +1058,8 @@ function App() {
       <nav>
         <button className={"nav-item " + (activeView === "words" ? "active" : "")} onClick={() => setActiveView("words")}><span>◫</span>Kelimelerim</button>
         <button className={"nav-item " + (activeView === "reader" ? "active" : "")} onClick={() => setActiveView("reader")}><span>⌁</span>Metin Analizi</button>
-        <button className="nav-item" disabled><span>▶</span>Karşılaşmalar</button>
-        <button className="nav-item" disabled><span>✓</span>Tekrar</button>
+        <button className={"nav-item " + (activeView === "encounters" ? "active" : "")} onClick={() => setActiveView("encounters")}><span>▶</span>Karşılaşmalar</button>
+        <button className={"nav-item " + (activeView === "review" ? "active" : "")} onClick={() => setActiveView("review")}><span>✓</span>Tekrar</button>
       </nav>
       <div className="sidebar-foot">
         <span className={"status-dot " + (status === "çalışıyor" ? "ok" : "")}></span>
@@ -783,7 +1068,10 @@ function App() {
     </aside>
 
     <main className="content">
-      {activeView === "reader" ? <SemanticReader /> : <>
+      {activeView === "reader" ? <SemanticReader profileId={profileId} items={items} onItemsChanged={refreshItems} />
+        : activeView === "encounters" ? <EncountersPage items={items} playingEncounter={playingEncounter} onTogglePlay={setPlayingEncounter} />
+        : activeView === "review" ? <ReviewPage profileId={profileId} items={items} onItemsChanged={refreshItems} />
+        : <>
       <header className="page-head">
         <div>
           <p className="eyebrow">ÖĞRENME KÜTÜPHANESİ</p>
@@ -808,13 +1096,23 @@ function App() {
         <article><strong>{items.filter(item => item.category === "expression").length}</strong><span>Kalıp / ifade</span></article>
       </section>
 
-      <section className="toolbar">
+      <section className="toolbar library-toolbar">
         <input
           aria-label="Kelimelerde ara"
           placeholder="Kelime, anlam veya cümlede ara…"
           value={query}
           onChange={event => setQuery(event.target.value)}
         />
+        <select value={statusFilter} onChange={event => setStatusFilter(event.target.value as "all" | "learning" | "learned")}>
+          <option value="all">Tüm durumlar</option>
+          <option value="learning">Öğreniyorum</option>
+          <option value="learned">Biliyorum</option>
+        </select>
+        <select value={kindFilter} onChange={event => setKindFilter(event.target.value as "all" | "word" | "expression")}>
+          <option value="all">Kelime + kalıp</option>
+          <option value="word">Kelimeler</option>
+          <option value="expression">Kalıplar</option>
+        </select>
         <span>{filtered.length} öğe</span>
       </section>
 
@@ -831,6 +1129,9 @@ function App() {
                 <span className={"kind " + item.category}>{item.category === "expression" ? "KALIP" : "KELİME"}</span>
                 <h2>{item.canonical_form}</h2>
                 <p className="meaning">{meaning}</p>
+                <span className={"learning-status " + itemStatus(item)}>
+                  {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
+                </span>
               </div>
               <div className="word-actions">
                 <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
