@@ -1303,12 +1303,19 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                         matched_content_words = {
                             word for word in content_words if word in segment_lexemes
                         }
-                        minimum_evidence = 1 if len(content_words) <= 1 else 2
+
+                        # Require the complete meaningful canonical skeleton.
+                        # Partial overlap such as "auf" + "bringen" must not
+                        # recover "etwas auf den Weg bringen" from an unrelated
+                        # sentence containing "auf ... brachte".
+                        has_full_canonical_evidence = bool(content_words) and (
+                            len(matched_content_words) == len(set(content_words))
+                        )
 
                         if (
                             lexical_head
                             and lexical_head in segment_lexemes
-                            and len(matched_content_words) >= minimum_evidence
+                            and has_full_canonical_evidence
                         ):
                             for token in analysis.get("tokens", []):
                                 lemma = str(token.get("lemma") or "").strip().lower()
@@ -1320,21 +1327,12 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                                     or token.get("lemma")
                                     or item.canonical_form
                                 ).strip()
-                                # For a multiword expression, the lexical head's
-                                # token meaning is not the expression meaning.
-                                # Keep the saved item translation as primary unless
-                                # we found an exact expression match above.
-                                if len(content_words) <= 1:
-                                    matched_contextual_meaning = str(
-                                        token.get("contextual_meaning_tr") or ""
-                                    ).strip()
-                                    raw_meanings = token.get("dictionary_meanings_tr") or []
-                                    if isinstance(raw_meanings, list):
-                                        matched_dictionary_meanings = [
-                                            str(value).strip()
-                                            for value in raw_meanings
-                                            if str(value).strip()
-                                        ]
+                                # This is only a lexical recovery aid. A token
+                                # meaning (for example separable particle "vor")
+                                # is not the meaning of the saved whole
+                                # expression ("etwas vorsehen"), so leave the
+                                # expression meaning empty and let the saved
+                                # learning-unit translation remain primary.
                                 break
                 else:
                     for token in analysis.get("tokens", []):

@@ -624,10 +624,14 @@ function mergeLearningItems(items: LearningItem[]) {
   return [...groups.values()].map(group => {
     if (group.length === 1) return { ...group[0], merged_ids: [group[0].id] };
 
-    const primary = group[0];
+    const primary = group.find(item => item.canonical_key.toLocaleLowerCase("de-DE").startsWith("prepared:"))
+      || group[0];
     const encounterMap = new Map<string, Encounter>();
     const exampleMap = new Map<string, Encounter>();
     const translationMap = new Map<string, { language: string; meaning: string }>();
+    const primaryHasTurkishMeaning = primary.translations.some(
+      translation => translation.language === "tr" && translation.meaning.trim()
+    );
 
     for (const item of group) {
       for (const encounter of item.encounters) {
@@ -646,6 +650,11 @@ function mergeLearningItems(items: LearningItem[]) {
         if (!exampleMap.has(key)) exampleMap.set(key, example);
       }
       for (const translation of item.translations) {
+        if (
+          primaryHasTurkishMeaning
+          && item.id !== primary.id
+          && translation.language === "tr"
+        ) continue;
         const key = translation.language + ":" + translation.meaning.trim().toLocaleLowerCase("tr-TR");
         if (!translationMap.has(key)) translationMap.set(key, translation);
       }
@@ -1569,7 +1578,14 @@ function App() {
     downloadJsonFile(`Language-Learning-Web-Diagnostic-${stamp}.json`, diagnostic);
   }
 
-  const displayItems = useMemo(() => mergeLearningItems(items), [items]);
+  const displayItems = useMemo(() => mergeLearningItems(items).filter(item => {
+    const valid = validEncounters(item);
+    const hasExamples = item.examples.length > 0;
+
+    if (item.category === "learning-unit") return false;
+    if (item.encounters.length > 0 && valid.length === 0 && !hasExamples) return false;
+    return true;
+  }), [items]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("de-DE");
