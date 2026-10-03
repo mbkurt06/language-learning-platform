@@ -1604,13 +1604,12 @@ function App() {
         <button className={"nav-item " + (activeView === "encounters" ? "active" : "")} onClick={() => { setSelectedItemId(null); setActiveView("encounters"); }}><span>▶</span>Karşılaşmalar</button>
         <button className={"nav-item " + (activeView === "review" ? "active" : "")} onClick={() => { setSelectedItemId(null); setActiveView("review"); }}><span>✓</span>Tekrar</button>
       </nav>
-      <div className="sidebar-export">
-        <button onClick={exportWebDiagnostic}>⇩ Web Diagnostic Export</button>
-        <small>Tüm sayfalar, özellikler, öğrenme verisi ve kaynak eşleşmelerini JSON olarak dışa aktar.</small>
-      </div>
-      <div className="sidebar-foot">
-        <span className={"status-dot " + (status === "çalışıyor" ? "ok" : "")}></span>
-        Platform API {status}
+      <div className="sidebar-bottom">
+        <button className="sidebar-export" onClick={exportWebDiagnostic}>⇩ Web Diagnostic Export</button>
+        <div className="sidebar-foot">
+          <span className={"status-dot " + (status === "çalışıyor" ? "ok" : "")}></span>
+          Platform API {status}
+        </div>
       </div>
     </aside>
 
