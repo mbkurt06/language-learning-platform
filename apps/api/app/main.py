@@ -1290,12 +1290,13 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                 if not matched_surface:
                     continue
 
+                is_timed_media = content.source_type == "video" or content.provider in {"youtube", "zdf"}
                 recovered.append({
                     "id": f"indexed:{segment.id}:{item.id}",
                     "surface_form": matched_surface,
                     "sentence": sentence,
-                    "media_timestamp_ms": segment.start_ms,
-                    "media_end_timestamp_ms": segment.end_ms,
+                    "media_timestamp_ms": segment.start_ms if is_timed_media else None,
+                    "media_end_timestamp_ms": segment.end_ms if is_timed_media else None,
                     "encountered_at": content.analyzed_at or content.created_at,
                     "context": {
                         "derived_from": "indexed-content",
