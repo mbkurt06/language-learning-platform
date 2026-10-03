@@ -899,7 +899,17 @@ function ReviewPage({
   }, [index, reviewItems.length]);
 
   const item = reviewItems[index] || null;
-  const example = item?.encounters[0] || item?.examples[0] || null;
+  const example = item
+    ? [...item.encounters, ...item.examples].find(encounter => {
+        const sentence = encounter.sentence.toLocaleLowerCase("de-DE");
+        const surface = (encounter.surface_form || "").toLocaleLowerCase("de-DE").trim();
+        const canonical = item.canonical_form.toLocaleLowerCase("de-DE").trim();
+        return Boolean(
+          (surface && sentence.includes(surface))
+          || (canonical && sentence.includes(canonical))
+        );
+      }) || null
+    : null;
 
   async function mark(status: "learning" | "learned") {
     if (!item) return;
