@@ -1020,16 +1020,22 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
                     ): (batch_index, chunk)
                     for batch_index, chunk in enumerate(chunks, start=1)
                 }
+                failed_batches: list[str] = []
                 for future in as_completed(future_map):
                     batch_index, chunk = future_map[future]
                     try:
                         result = future.result()
                     except Exception as exc:
                         indexes = [item.get("index") for item in chunk]
-                        raise RuntimeError(
-                            f"AI batch {batch_index}/{total_batches} failed "
+                        failed_batches.append(
+                            f"batch {batch_index}/{total_batches} "
                             f"(segment indexes {indexes[0] if indexes else '?'}..{indexes[-1] if indexes else '?'}): {exc}"
-                        ) from exc
+                        )
+                        # Do not abort on the first failed future. Other queued
+                        # batches are already running; keep committing every
+                        # successful result so a retry only has to fill the
+                        # genuinely missing segments.
+                        continue
 
                     _record_ai_usage(db, result, content_id=content.id, batch_index=batch_index)
                     analyzer_provider = result.get("provider") or analyzer_provider
@@ -1067,6 +1073,9 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
                     # rows immediately instead of waiting for the whole article.
                     db.commit()
                     db.refresh(content)
+
+                if failed_batches:
+                    raise RuntimeError("AI batches failed after retries: " + " | ".join(failed_batches))
 
         expected_indexes = {item["index"] for item in segment_payloads}
         missing = expected_indexes - persisted_indexes
