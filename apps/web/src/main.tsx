@@ -40,6 +40,7 @@ type LearningItem = {
   translations: { language: string; meaning: string }[];
   examples: Encounter[];
   encounters: Encounter[];
+  merged_ids?: string[];
 };
 
 type IndexedToken = {
@@ -582,6 +583,61 @@ function validEncounters(item: LearningItem) {
   return matching.length ? matching : item.encounters.filter(encounter =>
     Boolean(encounterContextualMeaning(encounter))
   );
+}
+
+function mergeLearningItems(items: LearningItem[]) {
+  const groups = new Map<string, LearningItem[]>();
+  for (const item of items) {
+    const key = [
+      item.category === "expression" ? "expression" : "word",
+      item.canonical_form.trim().toLocaleLowerCase("de-DE"),
+    ].join(":");
+    const group = groups.get(key) || [];
+    group.push(item);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].map(group => {
+    if (group.length === 1) return { ...group[0], merged_ids: [group[0].id] };
+
+    const primary = group[0];
+    const encounterMap = new Map<string, Encounter>();
+    const exampleMap = new Map<string, Encounter>();
+    const translationMap = new Map<string, { language: string; meaning: string }>();
+
+    for (const item of group) {
+      for (const encounter of item.encounters) {
+        const key = [
+          encounter.source?.provider || "",
+          encounter.source?.external_id || "",
+          encounter.sentence,
+          encounter.media_timestamp_ms ?? "",
+        ].join("|");
+        if (!encounterMap.has(key) || encounterContextualMeaning(encounter)) {
+          encounterMap.set(key, encounter);
+        }
+      }
+      for (const example of item.examples) {
+        const key = [example.source?.external_id || "", example.sentence].join("|");
+        if (!exampleMap.has(key)) exampleMap.set(key, example);
+      }
+      for (const translation of item.translations) {
+        const key = translation.language + ":" + translation.meaning.trim().toLocaleLowerCase("tr-TR");
+        if (!translationMap.has(key)) translationMap.set(key, translation);
+      }
+    }
+
+    return {
+      ...primary,
+      status: group.some(item => itemStatus(item) === "learned") ? "learned" : primary.status,
+      language_specific_type: group.find(item => item.language_specific_type)?.language_specific_type
+        || primary.language_specific_type,
+      translations: [...translationMap.values()],
+      encounters: [...encounterMap.values()],
+      examples: [...exampleMap.values()],
+      merged_ids: group.map(item => item.id),
+    };
+  });
 }
 
 function HighlightedSentence({ sentence, terms }: { sentence: string; terms: string[] }) {
@@ -1242,16 +1298,20 @@ function App() {
     const confirmed = window.confirm(`"${item.canonical_form}" ve buna ait tüm karşılaşmalar silinsin mi?`);
     if (!confirmed) return;
 
+    const ids = item.merged_ids?.length ? item.merged_ids : [item.id];
     setDeletingItemId(item.id);
     try {
-      const response = await fetch(apiBase + "/api/v1/learning-items/" + encodeURIComponent(item.id), {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("delete failed");
-      setItems(current => current.filter(existing => existing.id !== item.id));
+      for (const id of ids) {
+        const response = await fetch(apiBase + "/api/v1/learning-items/" + encodeURIComponent(id), {
+          method: "DELETE",
+        });
+        if (!response.ok) throw new Error("delete failed");
+      }
+      setItems(current => current.filter(existing => !ids.includes(existing.id)));
       if (playingEncounter && item.encounters.some(encounter => encounter.id === playingEncounter)) {
         setPlayingEncounter(null);
       }
+      if (selectedItemId && ids.includes(selectedItemId)) setSelectedItemId(null);
     } catch {
       window.alert("Kelime silinemedi. Platform API bağlantısını kontrol et.");
     } finally {
@@ -1259,9 +1319,11 @@ function App() {
     }
   }
 
+  const displayItems = useMemo(() => mergeLearningItems(items), [items]);
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("de-DE");
-    return items.filter(item => {
+    return displayItems.filter(item => {
       if (statusFilter !== "all" && itemStatus(item) !== statusFilter) return false;
       const normalizedKind = item.category === "expression" ? "expression" : "word";
       if (kindFilter !== "all" && normalizedKind !== kindFilter) return false;
@@ -1270,10 +1332,12 @@ function App() {
       const sentences = [...item.encounters, ...item.examples].map(e => e.sentence).join(" ");
       return `${item.canonical_form} ${meaning} ${sentences}`.toLocaleLowerCase("de-DE").includes(needle);
     });
-  }, [items, query, statusFilter, kindFilter]);
+  }, [displayItems, query, statusFilter, kindFilter]);
 
-  const encounterCount = items.reduce((total, item) => total + item.encounters.length, 0);
-  const selectedItem = selectedItemId ? items.find(item => item.id === selectedItemId) || null : null;
+  const encounterCount = displayItems.reduce((total, item) => total + validEncounters(item).length, 0);
+  const selectedItem = selectedItemId
+    ? displayItems.find(item => item.id === selectedItemId || item.merged_ids?.includes(selectedItemId)) || null
+    : null;
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -1304,8 +1368,8 @@ function App() {
           onBack={() => { setPlayingEncounter(null); setSelectedItemId(null); }}
         />
         : activeView === "reader" ? <SemanticReader profileId={profileId} items={items} onItemsChanged={refreshItems} />
-        : activeView === "encounters" ? <EncountersPage items={items} playingEncounter={playingEncounter} onTogglePlay={setPlayingEncounter} />
-        : activeView === "review" ? <ReviewPage profileId={profileId} items={items} onItemsChanged={refreshItems} />
+        : activeView === "encounters" ? <EncountersPage items={displayItems} playingEncounter={playingEncounter} onTogglePlay={setPlayingEncounter} />
+        : activeView === "review" ? <ReviewPage profileId={profileId} items={displayItems} onItemsChanged={refreshItems} />
         : <>
       <header className="page-head">
         <div>
@@ -1326,9 +1390,9 @@ function App() {
       </header>
 
       <section className="stats">
-        <article><strong>{items.length}</strong><span>Öğrenilen öğe</span></article>
+        <article><strong>{displayItems.length}</strong><span>Öğrenilen öğe</span></article>
         <article><strong>{encounterCount}</strong><span>Kaydedilen karşılaşma</span></article>
-        <article><strong>{items.filter(item => item.category === "expression").length}</strong><span>Kalıp / ifade</span></article>
+        <article><strong>{displayItems.filter(item => item.category === "expression").length}</strong><span>Kalıp / ifade</span></article>
       </section>
 
       <section className="toolbar library-toolbar">
