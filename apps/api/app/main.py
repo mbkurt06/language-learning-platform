@@ -1227,7 +1227,6 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
 
     canonical_key = str(item.canonical_key or "").strip().lower()
     canonical_form = str(item.canonical_form or "").strip().lower()
-    existing_sentences = {str(encounter.sentence or "").strip() for encounter in encounters}
     recovered_sentences: set[str] = set()
     recovered = []
 
