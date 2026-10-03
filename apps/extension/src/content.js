@@ -880,6 +880,38 @@
     return {provider:adapter.id||"web",sourceType:"page",externalId:location.href,url:location.href};
   }
 
+  function webEncounterForAnchor(anchor,surfaceForm){
+    if(adapter.id!=="web") return null;
+    const normalizedSurface=normalizeLearningIdentity(surfaceForm);
+    const anchorNode=anchor instanceof Node ? anchor : null;
+    const candidates=(state.web.segments||[]).filter(segment=>{
+      const text=normalizeLearningIdentity(segment?.text||"");
+      return !normalizedSurface || text.includes(normalizedSurface);
+    });
+    const segment=candidates.find(candidate=>{
+      const element=candidate?.sourceElement;
+      if(!element?.isConnected || !anchorNode) return false;
+      return element===anchorNode || element.contains(anchorNode) || (
+        anchorNode.parentElement && element.contains(anchorNode.parentElement)
+      );
+    }) || candidates[0];
+    if(!segment?.text) return null;
+
+    const descriptor=currentContentDescriptor();
+    return {
+      surface_form:surfaceForm,
+      sentence:segment.text,
+      provider:descriptor.provider,
+      source_type:descriptor.sourceType,
+      external_id:descriptor.externalId,
+      url:descriptor.url,
+      title:document.title.trim()||null,
+      media_timestamp_ms:null,
+      media_end_timestamp_ms:null,
+      context:{segment_index:segment.index,page_url:location.href,source:"web-hover"},
+    };
+  }
+
   function currentContentEncounter(surfaceForm){
     const descriptor=currentContentDescriptor();
     if(!descriptor.externalId) return null;
@@ -955,7 +987,7 @@
     return item?.status==="learned" || item?.status==="known" ? "learned" : "learning";
   }
 
-  async function setLearningStatus(payload,status){
+  async function setLearningStatus(payload,status,encounterSnapshot=null){
     const kind=payload.kind||"word";
     const key=String(payload.key||"").toLocaleLowerCase("de-DE");
     if(!key) return;
@@ -990,7 +1022,11 @@
     let updated=null;
     try{ updated=await response.json(); }catch(_error){}
     const targetId=updated?.id||existing?.id;
-    if(targetId) await captureCurrentEncounter(targetId,payload.surface||payload.label||existing?.label||key).catch(()=>{});
+    if(targetId) await captureCurrentEncounter(
+      targetId,
+      payload.surface||payload.label||existing?.label||key,
+      encounterSnapshot
+    ).catch(()=>{});
     await loadLearningItems();
     await announceLearningStateChange();
   }
@@ -1169,7 +1205,7 @@
       meaning:wordMeaning,
       surface:sourceToken?.text||lemma,
     };
-    const encounterSnapshot=currentContentEncounter(learnTarget.surface);
+    const encounterSnapshot=webEncounterForAnchor(anchor,learnTarget.surface) || currentContentEncounter(learnTarget.surface);
     const existingLearningItem=learnTarget.key
       ? state.learningItems.find(item=>learningKey(item.kind,item.key)===learningKey(learnTarget.kind,learnTarget.key))
       : null;
@@ -1188,7 +1224,7 @@
       button.disabled=true;
       try{
         const payload={kind:button.dataset.kind,key:button.dataset.key,label:button.dataset.label,meaning_tr:button.dataset.meaning,surface:button.dataset.surface};
-        await setLearningStatus(payload,status);
+        await setLearningStatus(payload,status,encounterSnapshot);
         if(adapter.id==="web"){
           scheduleWebLearningAnnotations();
           renderCard(data,tokenIndex,anchor);
