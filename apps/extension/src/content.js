@@ -880,7 +880,7 @@
     return {provider:adapter.id||"web",sourceType:"page",externalId:location.href,url:location.href};
   }
 
-  function webEncounterForAnchor(anchor,surfaceForm){
+  function webEncounterForAnchor(anchor,surfaceForm,contextualMeaning=""){
     if(adapter.id!=="web") return null;
     const normalizedSurface=normalizeLearningIdentity(surfaceForm);
     const anchorNode=anchor instanceof Node ? anchor : null;
@@ -908,7 +908,12 @@
       title:document.title.trim()||null,
       media_timestamp_ms:null,
       media_end_timestamp_ms:null,
-      context:{segment_index:segment.index,page_url:location.href,source:"web-hover"},
+      context:{
+        segment_index:segment.index,
+        page_url:location.href,
+        source:"web-hover",
+        contextual_meaning_tr:contextualMeaning||"",
+      },
     };
   }
 
@@ -1205,7 +1210,7 @@
       meaning:wordMeaning,
       surface:sourceToken?.text||lemma,
     };
-    const encounterSnapshot=webEncounterForAnchor(anchor,learnTarget.surface) || currentContentEncounter(learnTarget.surface);
+    const encounterSnapshot=webEncounterForAnchor(anchor,learnTarget.surface,learnTarget.meaning) || currentContentEncounter(learnTarget.surface);
     const existingLearningItem=learnTarget.key
       ? state.learningItems.find(item=>learningKey(item.kind,item.key)===learningKey(learnTarget.kind,learnTarget.key))
       : null;

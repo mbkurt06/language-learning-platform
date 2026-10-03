@@ -218,3 +218,12 @@ blockquote{margin:13px 0 12px;padding:0;border:0;color:#202d40;font-size:16px;li
   .encounter-library-head{flex-direction:column}
   .review-card{padding:20px}
 }
+
+
+.other-meanings,.review-other-meanings{margin-top:8px}
+.other-meanings summary,.review-other-meanings summary{cursor:pointer;color:#718096;font-size:12px;font-weight:800;list-style:none}
+.other-meanings summary::-webkit-details-marker,.review-other-meanings summary::-webkit-details-marker{display:none}
+.other-meanings summary::before,.review-other-meanings summary::before{content:"＋";margin-right:6px}
+.other-meanings[open] summary::before,.review-other-meanings[open] summary::before{content:"−"}
+.other-meanings div,.review-other-meanings div{margin-top:6px;color:#657388;font-size:12px;line-height:1.5}
+.review-other-meanings{margin-bottom:12px}
