@@ -1272,35 +1272,69 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                             break
 
                     # Older saves can store an expression by a broad canonical
-                    # form while the indexed segment only exposes its verb lemma
-                    # (for example: "etwas vorsehen" -> "sieht ... vor").
-                    # Prefer the last canonical word as the lexical head fallback.
+                    # form while the indexed segment only exposes lexical token
+                    # lemmas (for example: "etwas vorsehen" -> "sieht ... vor").
+                    # Do not fall back to a generic auxiliary such as "sein":
+                    # that produced false matches against "ist", "war", "seiner", etc.
                     if not matched_surface:
+                        ignored_words = {
+                            "etwas", "etw", "jemand", "jemanden", "jemandem",
+                            "jmd", "jmdn", "jmdm", "sich", "zu",
+                            "sein", "haben", "werden",
+                            "der", "die", "das", "den", "dem", "des",
+                            "ein", "eine", "einen", "einem", "einer", "eines",
+                        }
                         canonical_words = [
                             part.strip(".,;:!?()[]{}\"'").lower()
                             for part in canonical_form.split()
                             if part.strip(".,;:!?()[]{}\"'")
                         ]
-                        head_lemma = canonical_words[-1] if canonical_words else canonical_form
+                        content_words = [word for word in canonical_words if word not in ignored_words]
+                        lexical_head = content_words[-1] if content_words else ""
+                        segment_lexemes = set()
                         for token in analysis.get("tokens", []):
                             lemma = str(token.get("lemma") or "").strip().lower()
-                            if lemma and lemma in {canonical_key, canonical_form, head_lemma}:
+                            surface = str(token.get("surface") or token.get("text") or "").strip().lower()
+                            if lemma:
+                                segment_lexemes.add(lemma)
+                            if surface:
+                                segment_lexemes.add(surface)
+
+                        matched_content_words = {
+                            word for word in content_words if word in segment_lexemes
+                        }
+                        minimum_evidence = 1 if len(content_words) <= 1 else 2
+
+                        if (
+                            lexical_head
+                            and lexical_head in segment_lexemes
+                            and len(matched_content_words) >= minimum_evidence
+                        ):
+                            for token in analysis.get("tokens", []):
+                                lemma = str(token.get("lemma") or "").strip().lower()
+                                if lemma != lexical_head:
+                                    continue
                                 matched_surface = str(
                                     token.get("surface")
                                     or token.get("text")
                                     or token.get("lemma")
                                     or item.canonical_form
                                 ).strip()
-                                matched_contextual_meaning = str(
-                                    token.get("contextual_meaning_tr") or ""
-                                ).strip()
-                                raw_meanings = token.get("dictionary_meanings_tr") or []
-                                if isinstance(raw_meanings, list):
-                                    matched_dictionary_meanings = [
-                                        str(value).strip()
-                                        for value in raw_meanings
-                                        if str(value).strip()
-                                    ]
+                                # For a multiword expression, the lexical head's
+                                # token meaning is not the expression meaning.
+                                # Keep the saved item translation as primary unless
+                                # we found an exact expression match above.
+                                if len(content_words) <= 1:
+                                    matched_contextual_meaning = str(
+                                        token.get("contextual_meaning_tr") or ""
+                                    ).strip()
+                                    raw_meanings = token.get("dictionary_meanings_tr") or []
+                                    if isinstance(raw_meanings, list):
+                                        matched_dictionary_meanings = [
+                                            str(value).strip()
+                                            for value in raw_meanings
+                                            if str(value).strip()
+                                        ]
                                 break
                 else:
                     for token in analysis.get("tokens", []):
