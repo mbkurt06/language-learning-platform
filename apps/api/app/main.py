@@ -1270,6 +1270,31 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                                     str(value).strip() for value in raw_meanings if str(value).strip()
                                 ]
                             break
+
+                    # Older saves sometimes categorized a single canonical verb
+                    # as an expression. Fall back to the token lemma so those
+                    # items still recover the real sentence and contextual meaning.
+                    if not matched_surface and " " not in canonical_form:
+                        for token in analysis.get("tokens", []):
+                            lemma = str(token.get("lemma") or "").strip().lower()
+                            if lemma and lemma in {canonical_key, canonical_form}:
+                                matched_surface = str(
+                                    token.get("surface")
+                                    or token.get("text")
+                                    or token.get("lemma")
+                                    or item.canonical_form
+                                ).strip()
+                                matched_contextual_meaning = str(
+                                    token.get("contextual_meaning_tr") or ""
+                                ).strip()
+                                raw_meanings = token.get("dictionary_meanings_tr") or []
+                                if isinstance(raw_meanings, list):
+                                    matched_dictionary_meanings = [
+                                        str(value).strip()
+                                        for value in raw_meanings
+                                        if str(value).strip()
+                                    ]
+                                break
                 else:
                     for token in analysis.get("tokens", []):
                         lemma = str(token.get("lemma") or "").strip().lower()
@@ -1290,12 +1315,13 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                 if not matched_surface:
                     continue
 
+                is_timed_media = content.source_type == "video" or content.provider in {"youtube", "zdf"}
                 recovered.append({
                     "id": f"indexed:{segment.id}:{item.id}",
                     "surface_form": matched_surface,
                     "sentence": sentence,
-                    "media_timestamp_ms": segment.start_ms,
-                    "media_end_timestamp_ms": segment.end_ms,
+                    "media_timestamp_ms": segment.start_ms if is_timed_media else None,
+                    "media_end_timestamp_ms": segment.end_ms if is_timed_media else None,
                     "encountered_at": content.analyzed_at or content.created_at,
                     "context": {
                         "derived_from": "indexed-content",
