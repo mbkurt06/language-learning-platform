@@ -984,7 +984,11 @@ def resolve_content_index(payload: ContentIndexRequest, db: DbSession):
             else:
                 pending_segments.append(source)
 
-        batch_size = max(1, min(settings.ai_batch_segments, 8))
+        # Honor the configured batch size. The analyzer accepts up to 40
+        # segments per request; the default API setting is 20. The previous
+        # hard cap of 8 turned a ~150-segment transcript into ~20 sequential
+        # batches even though AI_BATCH_SEGMENTS=20 was configured.
+        batch_size = max(1, min(settings.ai_batch_segments, 40))
         chunks = [
             pending_segments[offset:offset + batch_size]
             for offset in range(0, len(pending_segments), batch_size)
