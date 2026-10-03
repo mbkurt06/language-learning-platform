@@ -1247,6 +1247,8 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                     continue
                 analysis = segment.analysis_json or {}
                 matched_surface = ""
+                matched_contextual_meaning = ""
+                matched_dictionary_meanings: list[str] = []
 
                 if item.category == "expression":
                     for expression in analysis.get("expressions", []):
@@ -1259,6 +1261,14 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                             matched_surface = str(
                                 expression.get("surface") or expression.get("canonical") or item.canonical_form
                             ).strip()
+                            matched_contextual_meaning = str(
+                                expression.get("contextual_meaning_tr") or ""
+                            ).strip()
+                            raw_meanings = expression.get("meaning_tr") or []
+                            if isinstance(raw_meanings, list):
+                                matched_dictionary_meanings = [
+                                    str(value).strip() for value in raw_meanings if str(value).strip()
+                                ]
                             break
                 else:
                     for token in analysis.get("tokens", []):
@@ -1267,6 +1277,14 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                             matched_surface = str(
                                 token.get("surface") or token.get("text") or token.get("lemma") or item.canonical_form
                             ).strip()
+                            matched_contextual_meaning = str(
+                                token.get("contextual_meaning_tr") or ""
+                            ).strip()
+                            raw_meanings = token.get("dictionary_meanings_tr") or []
+                            if isinstance(raw_meanings, list):
+                                matched_dictionary_meanings = [
+                                    str(value).strip() for value in raw_meanings if str(value).strip()
+                                ]
                             break
 
                 if not matched_surface:
@@ -1282,6 +1300,8 @@ def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: li
                     "context": {
                         "derived_from": "indexed-content",
                         "segment_index": segment.sequence_index,
+                        "contextual_meaning_tr": matched_contextual_meaning,
+                        "dictionary_meanings_tr": matched_dictionary_meanings,
                     },
                     "source": {
                         "provider": content.provider,
