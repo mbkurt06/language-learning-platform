@@ -1405,8 +1405,6 @@ function App() {
             </div>
             {playlistItemId === item.id && <ExamplePlaylist item={item} onClose={() => setPlaylistItemId(null)} />}
           </article>;
-        })}              </div>}
-          </article>;
         })}
       </section>
       </>}
