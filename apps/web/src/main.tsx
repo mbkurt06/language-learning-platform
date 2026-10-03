@@ -87,6 +87,30 @@ type ContentIndexResult = {
   segments?: IndexedSegment[];
 };
 
+type ReaderDiagnosticState = {
+  text: string;
+  sentence_count: number;
+  segment_count: number;
+  provider: string;
+  model: string;
+  busy: boolean;
+  error: string;
+  active: { segmentIndex: number; tokenIndex: number } | null;
+  segments: IndexedSegment[];
+};
+
+function downloadJsonFile(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function seconds(ms?: number | null) {
   return Math.max(0, Math.floor((ms || 0) / 1000));
 }
@@ -721,10 +745,12 @@ function SemanticReader({
   profileId,
   items,
   onItemsChanged,
+  onDiagnosticState,
 }: {
   profileId: string;
   items: LearningItem[];
   onItemsChanged: () => Promise<void>;
+  onDiagnosticState?: (state: ReaderDiagnosticState) => void;
 }) {
   const [text, setText] = useState("");
   const [segments, setSegments] = useState<IndexedSegment[]>([]);
@@ -734,6 +760,20 @@ function SemanticReader({
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
   const [active, setActive] = useState<{ segmentIndex: number; tokenIndex: number } | null>(null);
+
+  useEffect(() => {
+    onDiagnosticState?.({
+      text,
+      sentence_count: splitReaderSentences(text).length,
+      segment_count: segments.length,
+      provider,
+      model,
+      busy,
+      error,
+      active,
+      segments,
+    });
+  }, [active, busy, error, model, onDiagnosticState, provider, segments, text]);
 
   const activeSegment = active ? segments.find(segment => segment.index === active.segmentIndex) || null : null;
   const activeToken = activeSegment?.tokens.find(token => token.i === active?.tokenIndex) || null;
@@ -1247,6 +1287,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<"all" | "learning" | "learned">("all");
   const [kindFilter, setKindFilter] = useState<"all" | "word" | "expression">("all");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [readerDiagnostic, setReaderDiagnostic] = useState<ReaderDiagnosticState | null>(null);
 
   useEffect(() => {
     fetch(apiBase + "/health")
@@ -1319,6 +1360,215 @@ function App() {
     }
   }
 
+  function exportWebDiagnostic() {
+    const diagnosticItems = mergeLearningItems(items);
+    const enrichedItems = diagnosticItems.map(item => {
+      const valid = validEncounters(item);
+      const validIds = new Set(valid.map(encounter => encounter.id));
+      return {
+        id: item.id,
+        merged_ids: item.merged_ids || [item.id],
+        canonical_form: item.canonical_form,
+        canonical_key: item.canonical_key,
+        category: item.category,
+        language_specific_type: item.language_specific_type || null,
+        status: item.status,
+        derived_status: itemStatus(item),
+        primary_meaning_tr: itemContextualMeaning(item) || null,
+        alternate_meanings_tr: alternateMeanings(item),
+        translations: item.translations,
+        encounter_counts: {
+          total_raw: item.encounters.length,
+          valid: valid.length,
+          text: valid.filter(encounter => sourceKind(encounter) === "text").length,
+          video: valid.filter(encounter => sourceKind(encounter) !== "text").length,
+        },
+        valid_encounters: valid,
+        excluded_encounters: item.encounters.filter(encounter => !validIds.has(encounter.id)),
+        examples: item.examples,
+      };
+    });
+
+    const sourceInventory = new Map<string, {
+      provider: string;
+      source_type: string;
+      external_id: string;
+      url?: string | null;
+      title?: string | null;
+      encounter_count: number;
+    }>();
+    for (const item of diagnosticItems) {
+      for (const encounter of item.encounters) {
+        const source = encounter.source;
+        if (!source) continue;
+        const key = [source.provider, source.external_id].join("|");
+        const current = sourceInventory.get(key);
+        if (current) {
+          current.encounter_count += 1;
+        } else {
+          sourceInventory.set(key, {
+            provider: source.provider,
+            source_type: source.source_type,
+            external_id: source.external_id,
+            url: source.url,
+            title: source.title,
+            encounter_count: 1,
+          });
+        }
+      }
+    }
+
+    const featureManifest = {
+      words: {
+        title: "Kelimelerim",
+        features: [
+          "profil seçimi",
+          "arama",
+          "Öğreniyorum/Biliyorum filtresi",
+          "Kelime/Kalıp filtresi",
+          "duplicate learning-item birleştirme",
+          "bağlamsal anlamı önce gösterme",
+          "diğer anlamlar",
+          "metin/video karşılaşma sayaçları",
+          "detay sayfası",
+          "örnekleri dinleme",
+          "listeden çıkarma",
+        ],
+      },
+      detail: {
+        title: "Kelime/Kalıp Detayı",
+        features: [
+          "bağlamsal anlam",
+          "diğer anlamlar",
+          "öğrenme durumu",
+          "metin karşılaşmaları",
+          "sarı highlight",
+          "metin kaynağını açma",
+          "video karşılaşmaları",
+          "YouTube cümle oynatıcı",
+          "kaynak/timestamp bilgisi",
+        ],
+      },
+      reader: {
+        title: "Metin Analizi",
+        features: [
+          "Almanca metin girişi",
+          "cümlelere ayırma",
+          "AI analiz",
+          "cümle çevirisi",
+          "kelime hover",
+          "semantic group highlight",
+          "bağlamsal anlam",
+          "canonical yapı",
+          "gramer bilgisi",
+          "Öğreniyorum/Biliyorum kaydı",
+          "encounter oluşturma",
+        ],
+      },
+      encounters: {
+        title: "Karşılaşmalar",
+        features: [
+          "arama",
+          "kaynak türü ayrımı",
+          "gerçek cümle",
+          "bağlamsal anlam",
+          "YouTube cümle oynatma",
+          "Metni aç / Videoda aç",
+        ],
+      },
+      review: {
+        title: "Tekrar",
+        features: [
+          "kelime/kalıp kartı",
+          "anlamı gizle/göster",
+          "doğru encounter seçimi",
+          "bağlamsal anlamı önce gösterme",
+          "diğer anlamlar",
+          "Tekrar et",
+          "Biliyorum",
+          "önceki/sonraki",
+        ],
+      },
+    };
+
+    const diagnostic = {
+      schema_version: 1,
+      exported_at: new Date().toISOString(),
+      app: {
+        name: "Language Learning Platform Web",
+        api_base: apiBase,
+        location: window.location.href,
+        document_title: document.title,
+      },
+      runtime: {
+        user_agent: navigator.userAgent,
+        language: navigator.language,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          device_pixel_ratio: window.devicePixelRatio,
+        },
+      },
+      app_state: {
+        api_status: status,
+        active_view: activeView,
+        selected_item_id: selectedItemId,
+        selected_item: selectedItem,
+        profile_id: profileId,
+        profiles,
+        loading,
+        query,
+        status_filter: statusFilter,
+        kind_filter: kindFilter,
+        playing_encounter: playingEncounter,
+        playlist_item_id: playlistItemId,
+        deleting_item_id: deletingItemId,
+      },
+      counts: {
+        raw_learning_items: items.length,
+        merged_learning_items: diagnosticItems.length,
+        filtered_items: filtered.length,
+        total_valid_encounters: encounterCount,
+        words: diagnosticItems.filter(item => item.category !== "expression").length,
+        expressions: diagnosticItems.filter(item => item.category === "expression").length,
+        sources: sourceInventory.size,
+      },
+      feature_manifest: featureManifest,
+      reader_state: readerDiagnostic,
+      raw_learning_items: items,
+      merged_learning_items: enrichedItems,
+      filtered_item_ids: filtered.map(item => item.id),
+      sources: [...sourceInventory.values()],
+      current_dom_snapshot: {
+        text: document.querySelector(".content")?.textContent?.replace(/\s+/g, " ").trim() || "",
+        buttons: [...document.querySelectorAll("button")].map(button => ({
+          text: button.textContent?.replace(/\s+/g, " ").trim() || "",
+          disabled: button.disabled,
+          class_name: button.className,
+        })),
+        links: [...document.querySelectorAll("a")].map(link => ({
+          text: link.textContent?.replace(/\s+/g, " ").trim() || "",
+          href: link.href,
+          class_name: link.className,
+        })),
+        inputs: [...document.querySelectorAll("input, textarea, select")].map(element => ({
+          tag: element.tagName.toLowerCase(),
+          type: element instanceof HTMLInputElement ? element.type : null,
+          value: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement
+            ? element.value
+            : null,
+          placeholder: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+            ? element.placeholder
+            : null,
+          class_name: element.className,
+        })),
+      },
+    };
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadJsonFile(`Language-Learning-Web-Diagnostic-${stamp}.json`, diagnostic);
+  }
+
   const displayItems = useMemo(() => mergeLearningItems(items), [items]);
 
   const filtered = useMemo(() => {
@@ -1354,6 +1604,10 @@ function App() {
         <button className={"nav-item " + (activeView === "encounters" ? "active" : "")} onClick={() => { setSelectedItemId(null); setActiveView("encounters"); }}><span>▶</span>Karşılaşmalar</button>
         <button className={"nav-item " + (activeView === "review" ? "active" : "")} onClick={() => { setSelectedItemId(null); setActiveView("review"); }}><span>✓</span>Tekrar</button>
       </nav>
+      <div className="sidebar-export">
+        <button onClick={exportWebDiagnostic}>⇩ Web Diagnostic Export</button>
+        <small>Tüm sayfalar, özellikler, öğrenme verisi ve kaynak eşleşmelerini JSON olarak dışa aktar.</small>
+      </div>
       <div className="sidebar-foot">
         <span className={"status-dot " + (status === "çalışıyor" ? "ok" : "")}></span>
         Platform API {status}
@@ -1367,7 +1621,7 @@ function App() {
           onTogglePlay={setPlayingEncounter}
           onBack={() => { setPlayingEncounter(null); setSelectedItemId(null); }}
         />
-        : activeView === "reader" ? <SemanticReader profileId={profileId} items={items} onItemsChanged={refreshItems} />
+        : activeView === "reader" ? <SemanticReader profileId={profileId} items={items} onItemsChanged={refreshItems} onDiagnosticState={setReaderDiagnostic} />
         : activeView === "encounters" ? <EncountersPage items={displayItems} playingEncounter={playingEncounter} onTogglePlay={setPlayingEncounter} />
         : activeView === "review" ? <ReviewPage profileId={profileId} items={displayItems} onItemsChanged={refreshItems} />
         : <>
