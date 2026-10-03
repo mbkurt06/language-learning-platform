@@ -267,7 +267,31 @@ blockquote{margin:13px 0 12px;padding:0;border:0;color:#202d40;font-size:16px;li
 }
 
 
-.sidebar-export{margin-top:auto;padding:14px;border-top:1px solid rgba(255,255,255,.08)}
-.sidebar-export button{width:100%;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#e8eef9;border-radius:10px;padding:10px 11px;font-weight:800;text-align:left}
-.sidebar-export button:hover{background:rgba(255,255,255,.1)}
-.sidebar-export small{display:block;margin-top:7px;color:#8f9cb0;font-size:10px;line-height:1.4}
+.sidebar-export{
+  margin-top:-14px;
+  padding:12px;
+  border:1px solid #273246;
+  border-radius:14px;
+  background:#182131;
+  box-shadow:0 10px 24px rgba(18,29,46,.14)
+}
+.sidebar-export button{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:#f4f7fb;
+  border-radius:9px;
+  padding:2px 0;
+  font-weight:850;
+  font-size:13px;
+  text-align:left;
+  letter-spacing:-.01em
+}
+.sidebar-export button:hover{color:#b9ceff}
+.sidebar-export small{
+  display:block;
+  margin-top:7px;
+  color:#a7b3c5;
+  font-size:10px;
+  line-height:1.45
+}
