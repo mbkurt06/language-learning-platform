@@ -1206,12 +1206,125 @@ def serialize_examples(db: Session, lemma: str, limit: int = 6):
     return examples
 
 
+def _indexed_learning_encounters(db: Session, item: LearningItem, encounters: list[Encounter]):
+    """Recover sentence context from indexed AI content when an old encounter is missing/wrong."""
+    descriptors: list[tuple[str, str]] = []
+    for encounter in encounters:
+        source = db.get(ContentSource, encounter.source_id) if encounter.source_id else None
+        if source and (source.provider, source.external_id) not in descriptors:
+            descriptors.append((source.provider, source.external_id))
+
+    content_source = (item.metadata_json or {}).get("content_source") or {}
+    meta_provider = str(content_source.get("provider") or "").strip()
+    meta_external_id = str(
+        content_source.get("externalId") or content_source.get("external_id") or ""
+    ).strip()
+    if meta_provider and meta_external_id and (meta_provider, meta_external_id) not in descriptors:
+        descriptors.append((meta_provider, meta_external_id))
+
+    if not descriptors:
+        return []
+
+    canonical_key = str(item.canonical_key or "").strip().lower()
+    canonical_form = str(item.canonical_form or "").strip().lower()
+    existing_sentences = {str(encounter.sentence or "").strip() for encounter in encounters}
+    recovered = []
+
+    for provider, external_id in descriptors:
+        contents = list(db.scalars(
+            select(IndexedContent)
+            .where(
+                IndexedContent.provider == provider,
+                IndexedContent.external_id == external_id,
+                IndexedContent.status.in_(["ready", "failed"]),
+            )
+            .order_by(IndexedContent.analyzed_at.desc(), IndexedContent.created_at.desc())
+        ))
+        for content in contents:
+            for segment in content.segments:
+                sentence = str(segment.source_text or "").strip()
+                if not sentence or sentence in existing_sentences:
+                    continue
+                analysis = segment.analysis_json or {}
+                matched_surface = ""
+
+                if item.category == "expression":
+                    for expression in analysis.get("expressions", []):
+                        expression_key = str(expression.get("pattern_id") or "").strip().lower()
+                        expression_canonical = str(expression.get("canonical") or "").strip().lower()
+                        if (
+                            (canonical_key and expression_key == canonical_key)
+                            or (canonical_form and expression_canonical == canonical_form)
+                        ):
+                            matched_surface = str(
+                                expression.get("surface") or expression.get("canonical") or item.canonical_form
+                            ).strip()
+                            break
+                else:
+                    for token in analysis.get("tokens", []):
+                        lemma = str(token.get("lemma") or "").strip().lower()
+                        if lemma and lemma in {canonical_key, canonical_form}:
+                            matched_surface = str(
+                                token.get("surface") or token.get("text") or token.get("lemma") or item.canonical_form
+                            ).strip()
+                            break
+
+                if not matched_surface:
+                    continue
+
+                recovered.append({
+                    "id": f"indexed:{segment.id}:{item.id}",
+                    "surface_form": matched_surface,
+                    "sentence": sentence,
+                    "media_timestamp_ms": segment.start_ms,
+                    "media_end_timestamp_ms": segment.end_ms,
+                    "encountered_at": content.analyzed_at or content.created_at,
+                    "context": {
+                        "derived_from": "indexed-content",
+                        "segment_index": segment.sequence_index,
+                    },
+                    "source": {
+                        "provider": content.provider,
+                        "source_type": content.source_type,
+                        "external_id": content.external_id,
+                        "url": content.url,
+                        "title": content.title,
+                    },
+                })
+                existing_sentences.add(sentence)
+                if len(recovered) >= 3:
+                    return recovered
+
+    return recovered
+
+
 def serialize_learning_item(db: Session, item: LearningItem):
     encounters = db.scalars(
         select(Encounter)
         .where(Encounter.learning_item_id == item.id)
         .order_by(Encounter.encountered_at.desc())
     ).all()
+    serialized_encounters = [{
+        "id": encounter.id,
+        "surface_form": encounter.surface_form,
+        "sentence": encounter.sentence,
+        "media_timestamp_ms": encounter.media_timestamp_ms,
+        "media_end_timestamp_ms": encounter.media_end_timestamp_ms,
+        "encountered_at": encounter.encountered_at,
+        "context": encounter.context_json,
+        "source": (
+            {
+                "provider": source.provider,
+                "source_type": source.source_type,
+                "external_id": source.external_id,
+                "url": source.url,
+                "title": source.title,
+            }
+            if (source := db.get(ContentSource, encounter.source_id))
+            else None
+        ),
+    } for encounter in encounters]
+    serialized_encounters.extend(_indexed_learning_encounters(db, item, encounters))
     return {
         "id": item.id,
         "canonical_form": item.canonical_form,
@@ -1221,26 +1334,7 @@ def serialize_learning_item(db: Session, item: LearningItem):
         "status": item.status,
         "translations": [{"language": t.language, "meaning": t.meaning} for t in item.translations],
         "examples": serialize_examples(db, item.canonical_key) if item.category == "word" else [],
-        "encounters": [{
-            "id": encounter.id,
-            "surface_form": encounter.surface_form,
-            "sentence": encounter.sentence,
-            "media_timestamp_ms": encounter.media_timestamp_ms,
-            "media_end_timestamp_ms": encounter.media_end_timestamp_ms,
-            "encountered_at": encounter.encountered_at,
-            "context": encounter.context_json,
-            "source": (
-                {
-                    "provider": source.provider,
-                    "source_type": source.source_type,
-                    "external_id": source.external_id,
-                    "url": source.url,
-                    "title": source.title,
-                }
-                if (source := db.get(ContentSource, encounter.source_id))
-                else None
-            ),
-        } for encounter in encounters],
+        "encounters": serialized_encounters,
     }
 
 
