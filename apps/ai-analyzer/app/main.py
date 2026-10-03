@@ -65,26 +65,52 @@ Analyze each supplied German segment in its real context. Neighboring segments b
 to the same article/transcript and may be used as context, but return one result per
 input segment.
 
-Core rules:
-1. Translate each segment naturally into Turkish. Do not translate word-for-word when
-   German idiom or domain context requires a different Turkish expression.
-2. Return every lexical word occurrence as a token. Preserve its exact surface form,
-   lemma, POS, useful morphology, and the Turkish meaning it has IN THIS SEGMENT.
-3. contextual_meaning_tr must be contextual. Example: in "Die gesetzlichen Kassen",
-   "Kassen" means statutory health insurers / health-insurance funds, not cash/registers.
-4. Detect reusable learning units and multiword constructions: separable verbs,
-   reflexive verbs, verb+preposition, reflexive verb+preposition, noun+verb,
-   adjective+preposition, noun+preposition, function-verb constructions,
-   collocations, idioms and fixed constructions.
-5. canonical must be a reusable dictionary/learning form, not the inflected surface.
-   Examples: "geht davon aus" -> "von etwas ausgehen";
-   "steht ... gegenüber" -> "jemandem gegenüberstehen".
-6. expression token_indices must include ONLY fixed semantic members of the expression,
-   not argument/slot fillers. Example: in "über diese Reformen diskutiert" for
-   "über etwas diskutieren", include "über" and "diskutiert", not "Reformen".
-7. highlight_parts must contain the actual surface words that should be highlighted.
-8. Keep separate overlapping constructions when both are useful learning units.
-9. Return strict JSON only, no markdown.
+Core rules — use the same standard as the manually curated Tagesschau benchmark:
+1. SENTENCE TRANSLATION: Translate naturally into Turkish according to the real meaning
+   in context. Never preserve German word order just to stay literal. Preserve tone:
+   news should sound like natural Turkish news; dialogue/cartoon subtitles should sound
+   like natural spoken Turkish. Neighboring segments are context. If a subtitle is a
+   fragment of a larger sentence, use the neighboring fragments to understand it, but
+   translate only the current segment without duplicating adjacent content.
+2. TOKEN MEANING: Return every lexical word occurrence as a token. Preserve exact surface
+   form, lemma, POS, useful morphology, and the Turkish meaning/function it has IN THIS
+   SENTENCE. Do not give the most common dictionary meaning when context requires another
+   one. Pronouns, particles, auxiliaries and prepositions should describe their contextual
+   function when that is more useful than a standalone dictionary gloss.
+3. SEMANTIC GROUP FIRST: Detect the smallest sentence-level groups whose actual words
+   jointly carry one coherent meaning. The expression.surface must reflect the words that
+   occur in this sentence; contextual_meaning_tr must explain the meaning of that whole
+   group in this sentence.
+4. CANONICAL FORM SEPARATE FROM SURFACE: canonical is the reusable learning formula, not
+   the inflected sentence wording. Replace variable arguments with useful placeholders.
+   Examples:
+     "geht davon aus" -> "von etwas ausgehen"
+     "steht ... gegenüber" -> "jemandem gegenüberstehen"
+     "regt sich Widerstand" -> "sich regen"
+   The canonical form must never be invented from words that are absent from the sentence.
+5. HIGHLIGHT THE WHOLE MEANING-BEARING GROUP: token_indices/highlight_parts should include
+   all actual sentence words that a learner needs to see together to understand the
+   contextual meaning, including sentence-specific argument/filler words when they are
+   part of that semantic group. The reusable canonical form still uses placeholders.
+   Example: for "über diese Reformen diskutiert", highlighting may include
+   "über diese Reformen diskutiert", while canonical remains "über etwas diskutieren".
+6. NESTED / OVERLAPPING STRUCTURES: When useful, return both the broader semantic group
+   and smaller reusable structures inside it as separate overlapping expressions. This is
+   how the curated benchmark represents sentence meaning and grammar at the same time.
+7. DETECT LEARNING STRUCTURES: separable verbs, reflexive verbs, verb+preposition,
+   reflexive verb+preposition, noun+verb, adjective+preposition, noun+preposition,
+   function-verb constructions, collocations, idioms, fixed/grammar constructions.
+8. WHOLE-EXPRESSION MEANING WINS: contextual_meaning_tr for an expression is the meaning
+   of the entire expression, never merely the meaning of its head token or separable
+   particle. Example: "sieht ... vor" -> "öngörmek / düzenlemede yer vermek", not a gloss
+   for "vor" alone.
+9. AVOID FALSE GROUPS: Do not create an expression merely because one preposition,
+   auxiliary, particle or common verb appears. The returned surface/highlight must be
+   supported by the actual sentence.
+10. TURKISH QUALITY CHECK: Before returning, verify that every sentence translation and
+   contextual meaning is idiomatic Turkish, grammatically complete where the source is
+   complete, and semantically compatible with the surrounding segments.
+11. Return strict JSON only, no markdown.
 
 Return this exact shape:
 {{
