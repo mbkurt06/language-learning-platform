@@ -511,7 +511,7 @@ function encounterDictionaryMeanings(encounter?: Encounter | null) {
 }
 
 function itemContextualMeaning(item: LearningItem) {
-  for (const encounter of item.encounters) {
+  for (const encounter of validEncounters(item)) {
     const meaning = encounterContextualMeaning(encounter);
     if (meaning) return meaning;
   }
@@ -566,6 +566,22 @@ function matchingTerms(item: LearningItem, encounter: Encounter) {
   return [encounter.surface_form, item.canonical_form]
     .map(value => String(value || "").trim())
     .filter(Boolean);
+}
+
+function encounterMatchesItem(item: LearningItem, encounter: Encounter) {
+  const context = encounter.context || {};
+  if (context.derived_from === "indexed-content") return true;
+  const sentence = encounter.sentence.toLocaleLowerCase("de-DE");
+  return matchingTerms(item, encounter).some(term =>
+    sentence.includes(term.toLocaleLowerCase("de-DE"))
+  );
+}
+
+function validEncounters(item: LearningItem) {
+  const matching = item.encounters.filter(encounter => encounterMatchesItem(item, encounter));
+  return matching.length ? matching : item.encounters.filter(encounter =>
+    Boolean(encounterContextualMeaning(encounter))
+  );
 }
 
 function HighlightedSentence({ sentence, terms }: { sentence: string; terms: string[] }) {
@@ -1064,8 +1080,9 @@ function LearningItemDetailPage({
 }) {
   const primaryMeaning = itemContextualMeaning(item) || "Anlam henüz yok";
   const otherMeanings = alternateMeanings(item);
-  const textEncounters = item.encounters.filter(encounter => sourceKind(encounter) === "text");
-  const videoEncounters = item.encounters.filter(encounter => sourceKind(encounter) !== "text");
+  const encounters = validEncounters(item);
+  const textEncounters = encounters.filter(encounter => sourceKind(encounter) === "text");
+  const videoEncounters = encounters.filter(encounter => sourceKind(encounter) !== "text");
 
   return <div className="item-detail-page">
     <button className="detail-back" onClick={onBack}>← Kelimelerim</button>
@@ -1342,22 +1359,30 @@ function App() {
         {filtered.map(item => {
           const meaning = itemContextualMeaning(item) || "Anlam henüz yok";
           const otherMeanings = alternateMeanings(item);
-          return <article className="word-card" key={item.id}>
+          const encounters = validEncounters(item);
+          const textCount = encounters.filter(encounter => sourceKind(encounter) === "text").length;
+          const videoCount = encounters.length - textCount;
+          return <article className="word-card word-card-summary" key={item.id}>
             <div className="word-head">
-              <button className="word-main-link" onClick={() => setSelectedItemId(item.id)}>
-                <span className={"kind " + item.category}>{itemKindLabel(item)}</span>
-                <h2>{item.canonical_form}</h2>
+              <div className="word-summary">
+                <button className="word-title-link" onClick={() => setSelectedItemId(item.id)}>
+                  <span className={"kind " + item.category}>{itemKindLabel(item)}</span>
+                  <h2>{item.canonical_form}</h2>
+                </button>
                 <p className="meaning">{meaning}</p>
                 {otherMeanings.length > 0 && <details className="other-meanings">
                   <summary>Diğer anlamlar</summary>
                   <div>{otherMeanings.join(" · ")}</div>
                 </details>}
-                <span className={"learning-status " + itemStatus(item)}>
-                  {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
-                </span>
-              </button>
+                <div className="word-summary-meta">
+                  <span className={"learning-status " + itemStatus(item)}>
+                    {itemStatus(item) === "learned" ? "Biliyorum" : "Öğreniyorum"}
+                  </span>
+                  {textCount > 0 && <span>▤ {textCount} metin</span>}
+                  {videoCount > 0 && <span>▶ {videoCount} video</span>}
+                </div>
+              </div>
               <div className="word-actions">
-                <span className="encounter-badge">{item.encounters.length} karşılaşma</span>
                 <button className="detail-open" onClick={() => setSelectedItemId(item.id)}>Detay →</button>
                 {playlistEncounters(item.examples).length > 0 && <button
                   className="listen-examples"
@@ -1378,32 +1403,9 @@ function App() {
                 </button>
               </div>
             </div>
-
             {playlistItemId === item.id && <ExamplePlaylist item={item} onClose={() => setPlaylistItemId(null)} />}
-
-            {item.encounters.length === 0
-              ? <p className="no-encounter">Bu öğe eski kayıtlardan geldi; henüz kaynak cümlesi yok.</p>
-              : <div className="encounters">
-                {item.encounters.map(encounter => {
-                  const isYouTube = encounter.source?.provider === "youtube";
-                  const isPlaying = playingEncounter === encounter.id;
-                  return <div className="encounter" key={encounter.id}>
-                    <div className="source-row">
-                      <span className="source-pill">{sourceLabel(encounter)}</span>
-                      <strong>{encounter.source?.title || encounter.source?.url || "Kaynak"}</strong>
-                      {sourceKind(encounter) !== "text" && encounter.media_timestamp_ms != null && <span className="timestamp">{clock(encounter.media_timestamp_ms)}</span>}
-                    </div>
-                    <blockquote>{encounter.sentence}</blockquote>
-                    <div className="actions">
-                      {isYouTube && <button className="primary" onClick={() => setPlayingEncounter(isPlaying ? null : encounter.id)}>
-                        {isPlaying ? "Durdur" : "▶ Cümleyi dinle"}
-                      </button>}
-                      {encounter.source?.url && <a href={sourceKind(encounter) === "text" ? encounter.source.url : youtubeWatchUrl(encounter)} target="_blank" rel="noreferrer">{sourceActionLabel(encounter)}</a>}
-                    </div>
-                    {isPlaying && isYouTube && <SentencePlayer encounter={encounter} />}
-                  </div>;
-                })}
-              </div>}
+          </article>;
+        })}              </div>}
           </article>;
         })}
       </section>
