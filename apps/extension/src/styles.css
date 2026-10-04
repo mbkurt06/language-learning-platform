@@ -19,6 +19,23 @@
 .gle-youtube-overlay:hover .gle-youtube-drag-handle,.gle-youtube-drag-handle:focus-visible,.gle-youtube-overlay.gle-dragging .gle-youtube-drag-handle{opacity:1}
 .gle-youtube-overlay.gle-dragging .gle-youtube-drag-handle{cursor:grabbing}
 
+.gle-sentence-nav{
+  pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:4px;
+  margin-top:.18em;padding:3px 4px;border:1px solid rgba(255,255,255,.16);border-radius:999px;
+  background:rgba(20,20,20,.68);box-shadow:0 1px 5px rgba(0,0,0,.28);
+  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)
+}
+.gle-sentence-nav button{
+  appearance:none;border:0;border-radius:999px;background:transparent;color:#fff;
+  width:30px;height:25px;padding:0;display:grid;place-items:center;cursor:pointer;
+  font:700 18px/1 system-ui,-apple-system,sans-serif;opacity:.88
+}
+.gle-sentence-nav button[data-sentence-nav="replay"]{font-size:15px}
+.gle-sentence-nav button:hover,.gle-sentence-nav button:focus-visible{
+  background:rgba(255,255,255,.16);opacity:1;outline:none
+}
+.gle-sentence-nav button:active{background:rgba(255,255,255,.24)}
+
 .gle-context-primary{font-size:16px;margin:0 0 9px;padding:0 0 9px;border-bottom:1px solid #374151}
 .gle-learn-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid #374151}
 .gle-learn-button{appearance:none;border:1px solid #4b5563;border-radius:7px;background:#1f2937;color:#f9fafb;padding:5px 8px;font:12px/1.2 system-ui,-apple-system,sans-serif;cursor:pointer}

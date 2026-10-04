@@ -2853,6 +2853,49 @@
     });
   }
 
+  function createSentenceNavigationControls(overlay){
+    const controls=document.createElement("div");
+    controls.className="gle-sentence-nav";
+    controls.setAttribute("role","group");
+    controls.setAttribute("aria-label","Altyazı cümlesi oynatma kontrolleri");
+
+    const items=[
+      {action:"previous",label:"‹",title:"Önceki cümle (A)"},
+      {action:"replay",label:"↻",title:"Cümleyi tekrar oynat (S)"},
+      {action:"next",label:"›",title:"Sonraki cümle (D)"},
+    ];
+    for(const item of items){
+      const button=document.createElement("button");
+      button.type="button";
+      button.dataset.sentenceNav=item.action;
+      button.textContent=item.label;
+      button.title=item.title;
+      button.setAttribute("aria-label",item.title);
+      controls.appendChild(button);
+    }
+
+    controls.addEventListener("pointerdown",event=>{
+      event.stopPropagation();
+    });
+    controls.addEventListener("click",event=>{
+      const button=event.target.closest?.("[data-sentence-nav]");
+      if(!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const context=keyboardSentencePlaybackContext();
+      if(!context) return;
+      const current=context.index<0 ? 0 : context.index;
+      let target=current;
+      if(button.dataset.sentenceNav==="previous") target=Math.max(0,current-1);
+      if(button.dataset.sentenceNav==="next") target=Math.min(context.cues.length-1,current+1);
+      playSentenceFromKeyboard(target);
+    });
+
+    overlay.appendChild(controls);
+    return controls;
+  }
+
   function ensureYouTubeOverlay(){
     const player=document.querySelector(".html5-video-player");
     if(!player) return null;
@@ -2875,6 +2918,7 @@
       germanLine.className="gle-youtube-german";
       overlay.appendChild(germanLine);
       installSubtitleHoverPause(germanLine);
+      createSentenceNavigationControls(overlay);
       player.appendChild(overlay);
       installYouTubeDragHandle(player,overlay,handle);
     }
@@ -6603,6 +6647,7 @@
       const germanLine=document.createElement("div");
       germanLine.className="gle-youtube-german";
       overlay.appendChild(germanLine);
+      createSentenceNavigationControls(overlay);
       host.appendChild(overlay);
       installZdfDragHandle(video,overlay,handle);
     }
