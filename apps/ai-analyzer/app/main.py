@@ -125,7 +125,8 @@ Return this exact shape:
           "lemma": "...",
           "pos": "NOUN|VERB|ADJ|ADV|ADP|PRON|DET|AUX|PART|SCONJ|CCONJ|PROPN|NUM|OTHER",
           "morphology": {{}},
-          "contextual_meaning_tr": "..."
+          "contextual_meaning_tr": "...",
+          "dictionary_meanings_tr": ["..."]
         }}
       ],
       "expressions": [
@@ -162,6 +163,133 @@ def _usage_from_response(raw: dict[str, Any]) -> dict[str, int]:
 def _sum_usage(*items: dict[str, int]) -> dict[str, int]:
     keys=("request_count","input_tokens","output_tokens","total_tokens","cached_tokens")
     return {key: sum(int(item.get(key, 0)) for item in items) for key in keys}
+
+
+
+def _analysis_issues(payload: AnalyzeBatchRequest, parsed: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    segments = parsed.get("segments")
+    if not isinstance(segments, list):
+        return ["segments must be a list"]
+
+    expected = {item.index: item for item in payload.segments}
+    returned: dict[int, dict[str, Any]] = {}
+    for raw in segments:
+        if not isinstance(raw, dict):
+            issues.append("segment entry is not an object")
+            continue
+        try:
+            index = int(raw.get("index"))
+        except (TypeError, ValueError):
+            issues.append("segment has invalid/missing index")
+            continue
+        if index in returned:
+            issues.append(f"segment {index}: duplicate result")
+            continue
+        returned[index] = raw
+
+    missing = sorted(set(expected) - set(returned))
+    unexpected = sorted(set(returned) - set(expected))
+    if missing:
+        issues.append(f"missing segment indexes: {missing}")
+    if unexpected:
+        issues.append(f"unexpected segment indexes: {unexpected}")
+
+    for index, source in expected.items():
+        item = returned.get(index)
+        if item is None:
+            continue
+
+        if not str(item.get("sentence_translation") or "").strip():
+            issues.append(f"segment {index}: sentence_translation is blank")
+
+        tokens = item.get("tokens")
+        if not isinstance(tokens, list):
+            issues.append(f"segment {index}: tokens must be a list")
+            tokens = []
+
+        token_indexes: set[int] = set()
+        for offset, token in enumerate(tokens):
+            if not isinstance(token, dict):
+                issues.append(f"segment {index}: token {offset} is not an object")
+                continue
+            try:
+                token_i = int(token.get("i"))
+            except (TypeError, ValueError):
+                issues.append(f"segment {index}: token {offset} has invalid i")
+                continue
+            if token_i in token_indexes:
+                issues.append(f"segment {index}: duplicate token index {token_i}")
+            token_indexes.add(token_i)
+
+            surface = str(token.get("surface") or "").strip()
+            lemma = str(token.get("lemma") or "").strip()
+            meaning = str(token.get("contextual_meaning_tr") or "").strip()
+            if not surface:
+                issues.append(f"segment {index}: token {token_i} surface is blank")
+            if not lemma:
+                issues.append(f"segment {index}: token {token_i} lemma is blank")
+            if not meaning:
+                issues.append(
+                    f"segment {index}: token {token_i} ({surface or lemma or '?'}) contextual_meaning_tr is blank"
+                )
+
+        if any(ch.isalnum() for ch in source.text) and not tokens:
+            issues.append(f"segment {index}: lexical source has no tokens")
+
+        expressions = item.get("expressions")
+        if not isinstance(expressions, list):
+            issues.append(f"segment {index}: expressions must be a list")
+            expressions = []
+
+        for offset, expression in enumerate(expressions):
+            if not isinstance(expression, dict):
+                issues.append(f"segment {index}: expression {offset} is not an object")
+                continue
+            if not str(expression.get("canonical") or "").strip():
+                issues.append(f"segment {index}: expression {offset} canonical is blank")
+            if not str(expression.get("surface") or "").strip():
+                issues.append(f"segment {index}: expression {offset} surface is blank")
+            if not str(expression.get("contextual_meaning_tr") or "").strip():
+                issues.append(f"segment {index}: expression {offset} contextual_meaning_tr is blank")
+
+            raw_indices = expression.get("token_indices")
+            if not isinstance(raw_indices, list) or not raw_indices:
+                issues.append(f"segment {index}: expression {offset} token_indices is empty")
+            else:
+                bad = []
+                for value in raw_indices:
+                    try:
+                        parsed_index = int(value)
+                    except (TypeError, ValueError):
+                        bad.append(value)
+                        continue
+                    if parsed_index not in token_indexes:
+                        bad.append(value)
+                if bad:
+                    issues.append(
+                        f"segment {index}: expression {offset} token_indices not present in tokens: {bad}"
+                    )
+
+            highlights = expression.get("highlight_parts")
+            if not isinstance(highlights, list) or not any(str(value).strip() for value in highlights):
+                issues.append(f"segment {index}: expression {offset} highlight_parts is empty")
+
+    return issues
+
+
+def _repair_instruction(parsed: dict[str, Any], issues: list[str]) -> str:
+    return (
+        "QUALITY GATE REPAIR REQUIRED. The previous JSON was parseable but violates "
+        "the learning-platform contract. Repair the COMPLETE response, not only the "
+        "listed fields. Do not omit any input segment or lexical token. Every lexical "
+        "token must have a non-empty contextual_meaning_tr. Every expression must have "
+        "a whole-expression contextual meaning, canonical form, real sentence surface, "
+        "valid token_indices and highlight_parts. Re-check Turkish naturalness and the "
+        "semantic-group/canonical distinction. Return ONLY the complete corrected JSON.\n\n"
+        "ISSUES:\n- " + "\n- ".join(issues[:120]) + "\n\n"
+        "PREVIOUS JSON:\n" + json.dumps(parsed, ensure_ascii=False)
+    )
 
 
 def call_gemini(payload: AnalyzeBatchRequest) -> tuple[dict[str, Any], dict[str, int]]:
@@ -225,6 +353,30 @@ def call_gemini(payload: AnalyzeBatchRequest) -> tuple[dict[str, Any], dict[str,
 
     if not isinstance(parsed, dict) or not isinstance(parsed.get("segments"), list):
         raise RuntimeError("Gemini response does not match the expected analysis shape")
+
+    issues = _analysis_issues(payload, parsed)
+    if issues:
+        repair_raw, repair_text = request_once(_repair_instruction(parsed, issues))
+        usage = _sum_usage(usage, _usage_from_response(repair_raw))
+        try:
+            repaired = json.loads(repair_text)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Gemini quality-gate repair returned invalid JSON: {exc.msg} "
+                f"at line {exc.lineno} column {exc.colno}"
+            ) from exc
+
+        if not isinstance(repaired, dict) or not isinstance(repaired.get("segments"), list):
+            raise RuntimeError("Gemini quality-gate repair does not match expected analysis shape")
+
+        remaining = _analysis_issues(payload, repaired)
+        if remaining:
+            raise RuntimeError(
+                "Gemini analysis failed semantic completeness gate after repair: "
+                + " | ".join(remaining[:40])
+            )
+        parsed = repaired
+
     return parsed, usage
 
 
