@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     cors_origin_regex: str = r"^https://(www\.)?youtube\.com$|^https://([^.]+\.)?zdf\.de$|^https://([^.]+\.)?ardmediathek\.de$|^chrome-extension://.*$"
     environment: str = "local"
     ai_analyzer_url: str = "http://ai-analyzer:8780"
-    ai_analysis_schema_version: str = "v1"
+    ai_analysis_schema_version: str = "v2"
     ai_batch_segments: int = 20
     ai_batch_concurrency: int = 2
     google_cloud_project: str = ""
