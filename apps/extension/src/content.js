@@ -3107,14 +3107,23 @@
     state.playback.autoPauseReleasedCueKey="";
     state.playback.autoPauseScheduledKey="";
 
-    video.currentTime=Math.max(0,Number(cue.startMs||0)/1000);
+    // Do not pre-set cueIndex before rendering. renderZdfCue/renderTimedCue
+    // use an index change as the signal to replace the visible subtitle text.
+    // Pre-setting it caused A/S/D and the subtitle buttons to seek/play the
+    // right audio while leaving the previous German/Turkish subtitle on screen.
     if(adapter.id==="zdf"){
-      state.zdf.cueIndex=index;
-      state.youtube.cueIndex=index;
-      renderZdfCue();
+      state.zdf.cueIndex=-1;
+      state.youtube.cueIndex=-1;
     }else{
-      state.youtube.cueIndex=index;
-      renderTimedCue(undefined,5);
+      state.youtube.cueIndex=-1;
+    }
+
+    video.currentTime=Math.max(0,Number(cue.startMs||0)/1000);
+
+    if(adapter.id==="zdf"){
+      renderZdfCue(Number(cue.startMs||0)/1000);
+    }else{
+      renderTimedCue(Number(cue.startMs||0)/1000,5);
     }
     focusPanelSentence(index);
     video.play().catch(()=>{});
