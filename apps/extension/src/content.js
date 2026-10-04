@@ -3022,6 +3022,93 @@
     },80);
   }
 
+  function keyboardSentencePlaybackContext(){
+    if(state.settings.extensionEnabled===false) return null;
+    if(adapter.id!=="youtube" && adapter.id!=="zdf") return null;
+
+    const cues=adapter.id==="zdf" ? state.zdf.cues : state.youtube.cues;
+    if(!Array.isArray(cues) || !cues.length) return null;
+
+    const video=adapter.id==="zdf" ? bindZdfVideo() : bindYouTubeVideo();
+    if(!video) return null;
+
+    const nowMs=video.currentTime*1000;
+    const current=cueAtTime(cues,nowMs);
+    let index=Number.isInteger(current?.index)
+      ? current.index
+      : (adapter.id==="zdf" ? state.zdf.cueIndex : state.youtube.cueIndex);
+
+    if(!Number.isInteger(index) || index<0 || index>=cues.length){
+      index=cues.findLastIndex?.(cue=>Number(cue?.startMs||0)<=nowMs) ?? -1;
+      if(index<0){
+        index=cues.findIndex(cue=>Number(cue?.startMs||0)>nowMs);
+      }
+    }
+
+    return {video,cues,index};
+  }
+
+  function playSentenceFromKeyboard(targetIndex){
+    const context=keyboardSentencePlaybackContext();
+    if(!context) return false;
+
+    const {video,cues}=context;
+    const index=Math.max(0,Math.min(Number(targetIndex),cues.length-1));
+    const cue=cues[index];
+    if(!cue) return false;
+
+    stopYouTubePreview();
+    clearAutoPauseTimer();
+    state.playback.autoPausedCueKey="";
+    state.playback.autoPauseReleasedCueKey="";
+    state.playback.autoPauseScheduledKey="";
+
+    video.currentTime=Math.max(0,Number(cue.startMs||0)/1000);
+    if(adapter.id==="zdf"){
+      state.zdf.cueIndex=index;
+      state.youtube.cueIndex=index;
+      renderZdfCue();
+    }else{
+      state.youtube.cueIndex=index;
+      renderTimedCue(undefined,5);
+    }
+    focusPanelSentence(index);
+    video.play().catch(()=>{});
+    return true;
+  }
+
+  function isEditableKeyboardTarget(target){
+    if(!target) return false;
+    const element=target.nodeType===Node.ELEMENT_NODE ? target : target.parentElement;
+    return Boolean(element?.closest?.("input,textarea,select,[contenteditable=true],[contenteditable=''],[role=textbox]"));
+  }
+
+  function installSentencePlaybackShortcuts(){
+    document.addEventListener("keydown",event=>{
+      if(event.defaultPrevented || event.repeat) return;
+      if(event.metaKey || event.ctrlKey || event.altKey) return;
+      if(isEditableKeyboardTarget(event.target)) return;
+
+      const code=event.code;
+      if(code!=="KeyA" && code!=="KeyS" && code!=="KeyD") return;
+
+      const context=keyboardSentencePlaybackContext();
+      if(!context) return;
+
+      let target=context.index;
+      if(code==="KeyA") target=Math.max(0,(context.index<0?0:context.index)-1);
+      if(code==="KeyD") target=Math.min(context.cues.length-1,(context.index<0?-1:context.index)+1);
+      if(code==="KeyS" && target<0) target=0;
+
+      event.preventDefault();
+      event.stopPropagation();
+      if(typeof event.stopImmediatePropagation==="function") event.stopImmediatePropagation();
+      playSentenceFromKeyboard(target);
+    },true);
+  }
+
+  installSentencePlaybackShortcuts();
+
   function setSharedPanelCollapsed(collapsed){
     state.panel.collapsed=Boolean(collapsed);
     if(!state.panel.collapsed && adapter.id==="youtube" && !state.youtube.cues?.length){
