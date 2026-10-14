@@ -1,3 +1,5 @@
+const extensionEnabled=document.querySelector("#extensionEnabled");
+extensionEnabled.addEventListener("change",()=>chrome.storage.sync.set({extensionEnabled:extensionEnabled.checked}));
 const url=document.querySelector("#url");
 const interfaceLanguage=document.querySelector("#interfaceLanguage");
 const showVideoTranslation=document.querySelector("#showVideoTranslation");
@@ -12,8 +14,9 @@ const learningList=document.querySelector("#learningList");
 let learningItems=[];
 let learningProfileId="";
 
-const defaults={platformApiUrl:"http://127.0.0.1:8000",interfaceLanguage:"tr",showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100};
+const defaults={extensionEnabled:true,platformApiUrl:"http://127.0.0.1:8000",interfaceLanguage:"tr",showVideoTranslation:true,showPanelTranslation:true,followActiveSubtitle:true,germanFontSize:100,translationFontSize:100};
 chrome.storage.sync.get(defaults,async x=>{
+  extensionEnabled.checked=x.extensionEnabled!==false;
   url.value=x.platformApiUrl;
   interfaceLanguage.value=x.interfaceLanguage;
   showVideoTranslation.checked=x.showVideoTranslation;
@@ -34,6 +37,7 @@ chrome.storage.sync.get(defaults,async x=>{
 germanSize.addEventListener("input",()=>germanSizeValue.value=germanSize.value+"%");
 translationSize.addEventListener("input",()=>sizeValue.value=translationSize.value+"%");
 document.querySelector("#save").onclick=()=>chrome.storage.sync.set({
+  extensionEnabled:extensionEnabled.checked,
   platformApiUrl:url.value.trim(),
   interfaceLanguage:interfaceLanguage.value,
   showVideoTranslation:showVideoTranslation.checked,
