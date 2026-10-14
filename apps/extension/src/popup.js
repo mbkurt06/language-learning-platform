@@ -1,16 +1,37 @@
-const masterToggle=document.querySelector("#extensionEnabled");
-chrome.storage.sync.get({extensionEnabled:true},settings=>{
-  masterToggle.checked=settings.extensionEnabled!==false;
-  button.disabled=!masterToggle.checked;
-});
-masterToggle.addEventListener("change",async()=>{
-  await chrome.storage.sync.set({extensionEnabled:masterToggle.checked});
-  button.disabled=!masterToggle.checked;
-  status.textContent=masterToggle.checked?"Language Learning aktif.":"Language Learning kapalı.";
-});
+const masterButton=document.querySelector("#toggleExtension");
 const button=document.querySelector("#indexVideo");
 const status=document.querySelector("#status");
-
+let extensionEnabled=true;
+function renderMasterButton(){
+  masterButton.textContent=extensionEnabled?"⏻ Language Learning KAPAT":"⏻ Language Learning AÇ";
+  masterButton.classList.toggle("is-off",!extensionEnabled);
+  masterButton.setAttribute("aria-pressed",String(extensionEnabled));
+  button.disabled=!extensionEnabled;
+}
+chrome.storage.sync.get({extensionEnabled:true},settings=>{
+  extensionEnabled=settings.extensionEnabled!==false;
+  renderMasterButton();
+});
+masterButton.addEventListener("click",async()=>{
+  masterButton.disabled=true;
+  const next=!extensionEnabled;
+  try{
+    await chrome.storage.sync.set({extensionEnabled:next});
+    extensionEnabled=next;
+    renderMasterButton();
+    status.textContent=next?"Language Learning açıldı.":"Language Learning kapatıldı.";
+  }catch(error){
+    status.textContent="Durum değiştirilemedi. Tekrar dene.";
+  }finally{
+    masterButton.disabled=false;
+  }
+});
+chrome.storage.onChanged.addListener((changes,area)=>{
+  if(area==="sync"&&changes.extensionEnabled){
+    extensionEnabled=changes.extensionEnabled.newValue!==false;
+    renderMasterButton();
+  }
+});
 button.addEventListener("click",async()=>{
   button.disabled=true;
   status.textContent="Video indexleniyor…";
