@@ -3,9 +3,9 @@ const button=document.querySelector("#indexVideo");
 const status=document.querySelector("#status");
 let extensionEnabled=true;
 function renderMasterButton(){
-  masterButton.textContent=extensionEnabled?"⏻ Language Learning KAPAT":"⏻ Language Learning AÇ";
+  document.querySelector("#toggleState").textContent=extensionEnabled?"Açık":"Kapalı";
   masterButton.classList.toggle("is-off",!extensionEnabled);
-  masterButton.setAttribute("aria-pressed",String(extensionEnabled));
+  masterButton.setAttribute("aria-checked",String(extensionEnabled));
   button.disabled=!extensionEnabled;
 }
 chrome.storage.sync.get({extensionEnabled:true},settings=>{
