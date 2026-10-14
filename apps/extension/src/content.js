@@ -331,7 +331,7 @@
       dialog.querySelector('[name="'+name+'"]').addEventListener("change",async event=>{
         state.settings[name]=event.target.checked;
         await chrome.storage.sync.set({[name]:event.target.checked});
-        if(name==="extensionEnabled") renderPlayerControls();
+        if(name==="extensionEnabled"){ document.getElementById("gle-settings-dialog")?.remove(); applySharedAppearance(); if(event.target.checked) scan(); }
         if(name==="systemMonitorEnabled") syncSystemMonitorVisibility();
         if(name==="showVideoTranslation") refreshVideoTranslations();
         if(name==="showPanelTranslation" && state.panel.tab==="subtitles") renderSharedPanel();
@@ -6992,7 +6992,7 @@
   }
 
   function scan(){
-    if(!state.settingsHydrated) return;
+    if(!state.settingsHydrated || state.settings.extensionEnabled===false) return;
     if(adapter.id==="web"){
       scanWebPage();
       return;
@@ -7076,7 +7076,7 @@
       return;
     }
     if(area!=="sync") return;
-    if(changes.extensionEnabled) state.settings.extensionEnabled=changes.extensionEnabled.newValue;
+    if(changes.extensionEnabled){ state.settings.extensionEnabled=changes.extensionEnabled.newValue!==false; if(state.settings.extensionEnabled) scan(); }
     if(changes.systemMonitorEnabled){
       state.settings.systemMonitorEnabled=changes.systemMonitorEnabled.newValue!==false;
       syncSystemMonitorVisibility();

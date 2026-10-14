@@ -1,3 +1,13 @@
+const masterToggle=document.querySelector("#extensionEnabled");
+chrome.storage.sync.get({extensionEnabled:true},settings=>{
+  masterToggle.checked=settings.extensionEnabled!==false;
+  button.disabled=!masterToggle.checked;
+});
+masterToggle.addEventListener("change",async()=>{
+  await chrome.storage.sync.set({extensionEnabled:masterToggle.checked});
+  button.disabled=!masterToggle.checked;
+  status.textContent=masterToggle.checked?"Language Learning aktif.":"Language Learning kapalı.";
+});
 const button=document.querySelector("#indexVideo");
 const status=document.querySelector("#status");
 
