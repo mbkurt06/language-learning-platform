@@ -6,15 +6,19 @@ b{display:block;margin-bottom:6px}
 small{color:#667085}
 button{width:100%;margin-top:12px;padding:9px 10px;border:0;border-radius:9px;background:#245ee7;color:#fff;font-weight:700;cursor:pointer}
 button:disabled{opacity:.55;cursor:not-allowed}
-#toggleExtension{margin-top:16px;background:#1b7a50;font-size:15px;min-height:44px}
-#toggleExtension.is-off{background:#245ee7}
+#toggleRow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;font-weight:650}
+#toggleExtension{width:48px;height:28px;min-width:48px;min-height:28px;margin:0;padding:3px;border:0;border-radius:999px;background:#16815b;position:relative;transition:background .15s}
+#toggleExtension::after{content:"";display:block;width:22px;height:22px;border-radius:50%;background:#fff;transform:translateX(20px);transition:transform .15s;box-shadow:0 1px 3px #0003}
+#toggleExtension.is-off{background:#9ca3af}
+#toggleExtension.is-off::after{transform:translateX(0)}
+#toggleExtension:focus-visible{outline:3px solid #245ee7;outline-offset:3px}
 #status{display:block;margin-top:9px;min-height:18px;color:#667085}
 a{display:inline-block;margin-top:8px}
 </style>
 <b>German Language Context</b>
 <div>Context first, dictionary second.</div>
 <p><small>ZDF · ARD · YouTube</small></p>
-<button id="toggleExtension" type="button" aria-pressed="false" aria-label="Language Learning aç veya kapat">Durum yükleniyor…</button>
+<div id="toggleRow"><span>Language Learning <span id="toggleState">Açık</span></span><button id="toggleExtension" type="button" role="switch" aria-checked="true" aria-label="Language Learning aç veya kapat"></button></div>
 <button id="indexVideo" type="button">Bu videoyu indexle</button>
 <small id="status"></small>
 <a href="options.html" target="_blank">Engine ayarları</a>
