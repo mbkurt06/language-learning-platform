@@ -1816,3 +1816,14 @@ html:not(.gle-web-panel-open) body{
   font:800 9px/1 system-ui,-apple-system,sans-serif;
   letter-spacing:.04em;vertical-align:middle
 }
+
+/* Master switch: no extension UI or overlays remain on the page. */
+html.gle-extension-disabled #gle-tooltip,
+html.gle-extension-disabled #gle-settings-dialog,
+html.gle-extension-disabled [id^="gle-"],
+html.gle-extension-disabled [class*="gle-"],
+html.gle-extension-disabled [class*="gle_"] {
+ display:none!important;
+ visibility:hidden!important;
+ pointer-events:none!important;
+}
